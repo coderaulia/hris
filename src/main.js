@@ -12,7 +12,7 @@ import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog,
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
-import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, removeKpiDef, removeKpiRecord, clearKpiDefForm, onKpiMetricChange } from './modules/kpi.js';
+import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets } from './modules/kpi.js';
 import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
 
 // ---- Expose functions to onclick handlers ----
@@ -47,8 +47,8 @@ window.__app = {
     renderDashboard,
 
     // KPI
-    renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, removeKpiDef,
-    removeKpiRecord, clearKpiDefForm, onKpiMetricChange,
+    renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef,
+    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets,
 
     // Settings
     renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleDashboardView,

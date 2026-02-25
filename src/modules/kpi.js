@@ -9,7 +9,7 @@ import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord,
 // ---- RENDER KPI TAB ----
 export function renderKpiManager() {
     renderKpiDefinitions();
-    renderKpiInput();
+    renderKpiTargetConfig();
     renderKpiHistory();
 }
 
@@ -27,7 +27,7 @@ function renderKpiDefinitions() {
         return;
     }
 
-    // Group by category
+    // Group by category (which we now treat as Position)
     const groups = {};
     defs.forEach(kpi => {
         const cat = kpi.category || 'General';
@@ -36,7 +36,7 @@ function renderKpiDefinitions() {
     });
 
     Object.keys(groups).sort().forEach(cat => {
-        let html = `<div class="mb-3"><h6 class="fw-bold text-uppercase small text-muted mb-2"><i class="bi bi-tag-fill me-1"></i>${escapeHTML(cat)}</h6>`;
+        let html = `<div class="mb-3"><h6 class="fw-bold text-uppercase small text-primary mb-2"><i class="bi bi-briefcase-fill me-1"></i>${escapeHTML(cat)}</h6>`;
 
         groups[cat].forEach(kpi => {
             html += `
@@ -47,8 +47,9 @@ function renderKpiDefinitions() {
             <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target || '-'} ${escapeHTML(kpi.unit || '')}</span>
           </div>
           ${isAdmin ? `<div class="btn-group btn-group-sm">
-            <button class="btn btn-outline-primary" onclick="window.__app.editKpiDef('${kpi.id}')"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-outline-danger" onclick="window.__app.removeKpiDef('${kpi.id}')"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${kpi.id}')" title="Copy KPI"><i class="bi bi-files"></i></button>
+            <button class="btn btn-outline-primary" onclick="window.__app.editKpiDef('${kpi.id}')" title="Edit KPI"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-outline-danger" onclick="window.__app.removeKpiDef('${kpi.id}')" title="Delete KPI"><i class="bi bi-trash"></i></button>
           </div>` : ''}
         </div>`;
         });
@@ -58,43 +59,179 @@ function renderKpiDefinitions() {
     });
 }
 
-// ---- KPI INPUT FORM ----
-function renderKpiInput() {
-    const form = document.getElementById('kpi-input-section');
-    if (!form) return;
-
-    // Employee selector (admin/manager only)
+// ---- KPI TARGET ASSIGNMENT FORM (Settings) ----
+function renderKpiTargetConfig() {
     const empSelect = document.getElementById('kpi-employee-select');
-    if (empSelect) {
-        empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
-        const { currentUser, db } = state;
+    if (!empSelect) return;
 
-        if (currentUser.role === 'employee') {
-            empSelect.innerHTML = `<option value="${currentUser.id}" selected>${escapeHTML(db[currentUser.id]?.name || currentUser.name)}</option>`;
-            empSelect.disabled = true;
-        } else {
-            let keys = Object.keys(db);
-            if (currentUser.role === 'manager') {
-                const mgrRec = db[currentUser.id];
-                if (mgrRec?.department) {
-                    keys = keys.filter(id => db[id].department === mgrRec.department);
-                }
-            }
-            keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
-            keys.forEach(id => {
-                empSelect.innerHTML += `<option value="${escapeHTML(id)}">${escapeHTML(db[id].name)} (${escapeHTML(db[id].position)})</option>`;
-            });
-            empSelect.disabled = false;
+    empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
+    const { currentUser, db } = state;
+
+    let keys = Object.keys(db);
+    if (currentUser.role === 'manager') {
+        const mgrRec = db[currentUser.id];
+        if (mgrRec?.department) {
+            keys = keys.filter(id => db[id].department === mgrRec.department);
         }
     }
+    keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
+    keys.forEach(id => {
+        empSelect.innerHTML += `<option value="${escapeHTML(id)}">${escapeHTML(db[id].name)} (${escapeHTML(db[id].position)})</option>`;
+    });
 
-    // KPI selector
+    const defSelect = document.getElementById('kpi-def-category');
+    if (defSelect) {
+        const currentVal = defSelect.value;
+        defSelect.innerHTML = '<option value="">-- Apply to Position (Global if blank) --</option>';
+        const allPositions = new Set();
+        if (state.appConfig) Object.keys(state.appConfig).forEach(pos => allPositions.add(pos));
+        try {
+            const deptMap = JSON.parse(state.appSettings?.dept_positions || '{}');
+            Object.values(deptMap).forEach(positions => positions.forEach(pos => allPositions.add(pos)));
+        } catch { /* ignore */ }
+
+        [...allPositions].sort().forEach(pos => {
+            defSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
+        });
+        if (currentVal) defSelect.value = currentVal;
+    }
+}
+
+export function onKpiEmployeeChange() {
+    const empId = document.getElementById('kpi-employee-select')?.value;
+    const listDiv = document.getElementById('kpi-target-list');
+    const saveBtn = document.getElementById('kpi-target-save-btn');
+    if (!listDiv || !saveBtn) return;
+
+    if (!empId) {
+        listDiv.innerHTML = '<div class="text-muted small fst-italic">Please select an employee...</div>';
+        saveBtn.classList.add('hidden');
+        return;
+    }
+
+    const { db, kpiConfig } = state;
+    const emp = db[empId];
+    if (!emp || !kpiConfig) return;
+
+    const empPos = emp.position || '';
+    const applicableKpis = kpiConfig.filter(kpi => {
+        const pos = kpi.category || 'General';
+        return pos === 'General' || pos === empPos;
+    });
+
+    if (applicableKpis.length === 0) {
+        listDiv.innerHTML = '<div class="alert alert-warning py-2 small m-0">No KPIs found for this position. Please define them first.</div>';
+        saveBtn.classList.add('hidden');
+        return;
+    }
+
+    const targets = emp.kpi_targets || {};
+    let html = '';
+
+    applicableKpis.forEach(kpi => {
+        const val = targets[kpi.id] !== undefined ? targets[kpi.id] : '';
+        html += `
+        <div class="d-flex justify-content-between align-items-center bg-white border rounded px-2 py-1">
+            <div class="flex-grow-1">
+                <div class="small fw-bold text-truncate" style="max-width: 250px;" title="${escapeHTML(kpi.name)}">${escapeHTML(kpi.name)}</div>
+                <div class="text-muted" style="font-size: 10px;">Global Default: ${kpi.target} ${escapeHTML(kpi.unit || '')}</div>
+            </div>
+            <div class="ms-2 d-flex gap-1 align-items-center" style="width: 140px;">
+                <input type="number" class="form-control form-control-sm text-end target-custom-input" 
+                    data-kpi="${kpi.id}" value="${val}" placeholder="${kpi.target}">
+                <span class="small text-muted" style="width: 40px;">${escapeHTML(kpi.unit || '')}</span>
+            </div>
+        </div>`;
+    });
+
+    listDiv.innerHTML = html;
+    saveBtn.classList.remove('hidden');
+}
+
+export async function saveKpiTargets() {
+    const empId = document.getElementById('kpi-employee-select')?.value;
+    if (!empId) return;
+
+    const inputs = document.querySelectorAll('.target-custom-input');
+    const targets = {};
+
+    inputs.forEach(inp => {
+        const val = inp.value.trim();
+        if (val !== '') {
+            targets[inp.dataset.kpi] = parseFloat(val);
+        }
+    });
+
+    const emp = state.db[empId];
+    if (emp) {
+        emp.kpi_targets = targets;
+        try {
+            const { saveEmployee } = await import('./data.js');
+            await saveEmployee(emp);
+            alert('Employee personalized KPI targets saved successfully!');
+        } catch (e) {
+            alert('Error saving custom targets: ' + e.message);
+        }
+    }
+}
+
+// ---- START KPI INPUT (from Assessment Tab) ----
+export function startKpiInput() {
+    const targetId = document.getElementById('inp-id')?.value?.trim();
+    if (!targetId) { alert('Error: No Employee ID identified.'); return; }
+
+    const rec = state.db[targetId];
+    if (!rec) { alert('Employee Record not found in database.'); return; }
+
+    document.getElementById('step-login').classList.add('hidden');
+    document.getElementById('step-kpi-input').classList.remove('hidden');
+
+    const nameLabel = document.getElementById('kpi-input-emp-name');
+    if (nameLabel) nameLabel.innerText = rec.name;
+
     const kpiSelect = document.getElementById('kpi-metric-select');
     if (kpiSelect) {
         kpiSelect.innerHTML = '<option value="">-- Select KPI --</option>';
-        (state.kpiConfig || []).forEach(kpi => {
-            kpiSelect.innerHTML += `<option value="${kpi.id}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${kpi.target || ''}">${escapeHTML(kpi.name)} (${escapeHTML(kpi.category || 'General')})</option>`;
+        document.getElementById('kpi-unit-label').innerText = '';
+        document.getElementById('kpi-target-label').innerText = 'Target: -';
+
+        const { kpiConfig } = state;
+        const empPos = rec.position || '';
+        const targets = rec.kpi_targets || {};
+
+        const applicableKpis = (kpiConfig || []).filter(kpi => {
+            const pos = kpi.category || 'General';
+            return pos === 'General' || pos === empPos;
         });
+
+        applicableKpis.forEach(kpi => {
+            const effectiveTarget = targets[kpi.id] !== undefined ? targets[kpi.id] : kpi.target;
+            kpiSelect.innerHTML += `<option value="${kpi.id}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}">${escapeHTML(kpi.name)}</option>`;
+        });
+    }
+
+    // Auto-fetch small history inside assessment routing
+    const histBody = document.getElementById('kpi-quick-history');
+    if (histBody) {
+        const empRecords = (state.kpiRecords || []).filter(r => r.employee_id === rec.id).slice(0, 5);
+        histBody.innerHTML = '';
+        if (empRecords.length === 0) {
+            histBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted fst-italic py-2 small">No recent KPI achievements logged.</td></tr>';
+        } else {
+            empRecords.forEach(r => {
+                const kpiDef = (state.kpiConfig || []).find(k => k.id === r.kpi_id);
+                const t = targets[r.kpi_id] !== undefined ? targets[r.kpi_id] : (kpiDef?.target || 0);
+                const ach = t > 0 ? Math.round((r.value / t) * 100) : 0;
+                let bg = ach >= 100 ? 'bg-success' : ach >= 75 ? 'bg-primary' : ach >= 50 ? 'bg-warning text-dark' : 'bg-danger';
+                histBody.innerHTML += `<tr>
+                    <td class="small">${formatPeriod(r.period)}</td>
+                    <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(kpiDef?.name || '')}">${escapeHTML(kpiDef?.name || '-')}</td>
+                    <td class="text-center small fw-bold">${r.value}</td>
+                    <td class="text-center small">${t}</td>
+                    <td class="text-center"><span class="badge ${bg} px-1" style="font-size: 9px;">${ach}%</span></td>
+                </tr>`;
+            });
+        }
     }
 }
 
@@ -127,7 +264,8 @@ async function renderKpiHistory() {
     records.forEach(record => {
         const emp = db[record.employee_id];
         const kpiDef = kpiConfig.find(k => k.id === record.kpi_id);
-        const target = kpiDef?.target || 0;
+        const targets = emp?.kpi_targets || {};
+        const target = targets[record.kpi_id] !== undefined ? targets[record.kpi_id] : (kpiDef?.target || 0);
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
 
         let achBadge = 'bg-secondary';
@@ -153,7 +291,7 @@ async function renderKpiHistory() {
 
 // ---- SAVE KPI RECORD ----
 export async function submitKpiRecord() {
-    const empId = document.getElementById('kpi-employee-select')?.value;
+    const empId = document.getElementById('inp-id')?.value?.trim();
     const kpiId = document.getElementById('kpi-metric-select')?.value;
     const period = document.getElementById('kpi-period')?.value;
     const value = parseFloat(document.getElementById('kpi-value')?.value);
@@ -184,6 +322,7 @@ export async function submitKpiRecord() {
 
         await fetchKpiRecords();
         renderKpiHistory();
+        startKpiInput(); // Refresh target history
     } catch (err) {
         alert('Error saving KPI record: ' + err.message);
     }
@@ -230,6 +369,26 @@ export function editKpiDef(id) {
     document.getElementById('kpi-def-title').innerText = 'Edit KPI Definition';
 }
 
+export function copyKpiDef(id) {
+    const kpi = state.kpiConfig.find(k => k.id === id);
+    if (!kpi) return;
+
+    document.getElementById('kpi-def-name').value = kpi.name + ' (Copy)';
+    document.getElementById('kpi-def-desc').value = kpi.description || '';
+    document.getElementById('kpi-def-category').value = kpi.category || 'General';
+    document.getElementById('kpi-def-target').value = kpi.target || '';
+    document.getElementById('kpi-def-unit').value = kpi.unit || '';
+
+    // Explicitly reset the ID so it saves as a NEW definition
+    document.getElementById('kpi-def-edit-id').value = '';
+
+    document.getElementById('kpi-def-title').innerText = 'Copying KPI Definition: ' + kpi.name;
+
+    // Scroll to the definition form
+    const formEl = document.getElementById('kpi-def-title');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 export async function removeKpiDef(id) {
     if (!confirm('Delete this KPI definition?')) return;
     try {
@@ -264,5 +423,56 @@ export function onKpiMetricChange() {
     const sel = document.getElementById('kpi-metric-select');
     const opt = sel.options[sel.selectedIndex];
     const unitLabel = document.getElementById('kpi-unit-label');
+    const targetLabel = document.getElementById('kpi-target-label');
+
     if (unitLabel) unitLabel.innerText = opt?.dataset?.unit || '';
+    if (targetLabel) {
+        const t = opt?.dataset?.target || '-';
+        const u = opt?.dataset?.unit || '';
+        targetLabel.innerText = `Target: ${t} ${u}`;
+    }
+}
+
+// ---- KPI JSON EXPORT / IMPORT ----
+export function exportKpiJSON() {
+    const sanitizedConfig = state.kpiConfig.map(k => {
+        const { id, ...rest } = k;
+        return rest; // export without DB IDs
+    });
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(sanitizedConfig, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', 'kpi_definitions.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+export async function importKpiJSON(input) {
+    if (state.currentUser?.role !== 'superadmin') { alert('Access Denied'); return; }
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const json = JSON.parse(e.target.result);
+            if (!Array.isArray(json)) throw new Error("Expected an array of KPI definitions.");
+
+            let count = 0;
+            for (const kpi of json) {
+                // Remove ID if present to force insert
+                const { id, ...cleanKpi } = kpi;
+                await saveKpiDefinition(cleanKpi);
+                count++;
+            }
+            renderKpiManager();
+            alert(`Imported ${count} KPIs successfully!`);
+        } catch (err) {
+            alert('Invalid JSON file. Error: ' + err.message);
+            console.error(err);
+        }
+        input.value = '';
+    };
+    reader.readAsText(file);
 }

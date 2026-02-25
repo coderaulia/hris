@@ -395,8 +395,9 @@ export async function finalSubmit() {
 
 // ---- BACK ----
 export function goBack(stepId) {
-    ['step-login', 'step-form', 'step-review'].forEach(id => {
-        document.getElementById(id).classList.add('hidden');
+    ['step-login', 'step-form', 'step-review', 'step-kpi-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
     });
     document.getElementById(stepId).classList.remove('hidden');
 

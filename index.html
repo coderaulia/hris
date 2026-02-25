@@ -89,7 +89,7 @@
                     <div class="nav-item" data-role="admin-manager">
                         <button class="nav-link nav-tab" id="nav-assessment"
                             onclick="window.__app.switchTab('tab-assessment')">
-                            <i class="bi bi-clipboard-check me-1"></i><span class="nav-label">Assessment</span>
+                            <i class="bi bi-clipboard-check me-1"></i><span class="nav-label">Assessment & KPI</span>
                         </button>
                     </div>
                     <div class="nav-item" data-role="all">
@@ -440,9 +440,61 @@
                                     <option value="Manager">Manager</option>
                                 </select>
                             </div>
-                            <div class="col-12 mt-3">
-                                <button class="btn btn-primary px-4" onclick="window.__app.startAssessment()">
-                                    <i class="bi bi-arrow-right me-1"></i> Next: Load Competencies
+                            <div class="col-12 mt-4 d-flex gap-3">
+                                <button class="btn btn-primary px-4 py-2 flex-fill fw-bold shadow-sm"
+                                    onclick="window.__app.startAssessment()">
+                                    <i class="bi bi-pencil-square me-2"></i> Assess Competencies
+                                </button>
+                                <button class="btn btn-success px-4 py-2 flex-fill fw-bold shadow-sm"
+                                    onclick="window.__app.startKpiInput()">
+                                    <i class="bi bi-graph-up-arrow me-2"></i> Input KPI Achievement
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- STEP KPI: Input -->
+                    <div id="step-kpi-input" class="hidden">
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                            <h5 class="card-title text-success m-0">
+                                <i class="bi bi-graph-up-arrow me-1"></i> Input KPI Achievement
+                            </h5>
+                            <button class="btn btn-sm btn-outline-secondary"
+                                onclick="window.__app.goBack('step-login')"><i class="bi bi-arrow-left"></i> Change
+                                Employee</button>
+                        </div>
+                        <div class="alert alert-success py-2 small mb-4">
+                            Log actual KPI values for <strong id="kpi-input-emp-name">Employee</strong> for a specific
+                            period. Target calculations automatically default to the employee's personalized target, or
+                            the position average.
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">KPI Metric</label>
+                                <select id="kpi-metric-select" class="form-select form-select-sm"
+                                    onchange="window.__app.onKpiMetricChange()"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Period</label>
+                                <input type="month" id="kpi-period" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Value <span id="kpi-unit-label"
+                                        class="text-primary ms-1"></span></label>
+                                <input type="number" id="kpi-value" class="form-control form-control-sm" step="any"
+                                    placeholder="Actual attained value...">
+                                <small class="text-muted fst-italic mt-1 d-block" id="kpi-target-label">Target:
+                                    -</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small">Notes (Optional)</label>
+                                <input type="text" id="kpi-notes" class="form-control form-control-sm"
+                                    placeholder="Any context or proof links...">
+                            </div>
+                            <div class="col-12 mt-3 text-end">
+                                <button class="btn btn-success px-4 shadow-sm" onclick="window.__app.submitKpiRecord()">
+                                    <i class="bi bi-check-lg me-1"></i> Submit Achievement
                                 </button>
                             </div>
                         </div>
@@ -689,42 +741,26 @@
                                     <div class="col-md-5">
                                         <div class="card border mb-3">
                                             <div class="card-header bg-light">
-                                                <h6 class="m-0 fw-bold small"><i class="bi bi-graph-up-arrow me-1"></i>
-                                                    KPI Input</h6>
+                                                <h6 class="m-0 fw-bold small"><i
+                                                        class="bi bi-person-lines-fill me-1"></i> Employee Targets
+                                                    Config</h6>
                                             </div>
-                                            <div class="card-body" id="kpi-input-section">
-                                                <div class="mb-2">
-                                                    <label class="small text-muted fw-bold">Employee</label>
-                                                    <select id="kpi-employee-select"
-                                                        class="form-select form-select-sm"></select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label class="small text-muted fw-bold">KPI Metric</label>
-                                                    <select id="kpi-metric-select" class="form-select form-select-sm"
-                                                        onchange="window.__app.onKpiMetricChange()"></select>
-                                                </div>
-                                                <div class="row g-2 mb-2">
-                                                    <div class="col-6">
-                                                        <label class="small text-muted fw-bold">Period</label>
-                                                        <input type="month" id="kpi-period"
-                                                            class="form-control form-control-sm">
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <label class="small text-muted fw-bold">Value <span
-                                                                id="kpi-unit-label" class="text-primary"></span></label>
-                                                        <input type="number" id="kpi-value"
-                                                            class="form-control form-control-sm" step="any"
-                                                            placeholder="Value">
-                                                    </div>
-                                                </div>
+                                            <div class="card-body" id="kpi-target-section">
+                                                <p class="small text-muted mb-3">Select an employee to assign
+                                                    personalized target values for their role KPIs. If blank, global
+                                                    default applies.</p>
                                                 <div class="mb-3">
-                                                    <label class="small text-muted fw-bold">Notes</label>
-                                                    <textarea id="kpi-notes" class="form-control form-control-sm"
-                                                        rows="2" placeholder="Optional notes..."></textarea>
+                                                    <label class="small fw-bold">Select Employee</label>
+                                                    <select id="kpi-employee-select" class="form-select form-select-sm"
+                                                        onchange="window.__app.onKpiEmployeeChange()"></select>
                                                 </div>
-                                                <button class="btn btn-success btn-sm w-100"
-                                                    onclick="window.__app.submitKpiRecord()">
-                                                    <i class="bi bi-check-lg me-1"></i> Submit KPI
+                                                <div id="kpi-target-list" class="vstack gap-2">
+                                                    <div class="text-muted small fst-italic">Please select an
+                                                        employee...</div>
+                                                </div>
+                                                <button class="btn btn-primary btn-sm mt-3 w-100 hidden"
+                                                    id="kpi-target-save-btn" onclick="window.__app.saveKpiTargets()">
+                                                    <i class="bi bi-save me-1"></i> Save Employee Targets
                                                 </button>
                                             </div>
                                         </div>
@@ -743,8 +779,11 @@
                                                     <div class="col-12"><input type="text" id="kpi-def-desc"
                                                             class="form-control form-control-sm"
                                                             placeholder="Description"></div>
-                                                    <div class="col-6"><input type="text" id="kpi-def-category"
-                                                            class="form-control form-control-sm" placeholder="Category">
+                                                    <div class="col-6">
+                                                        <select id="kpi-def-category"
+                                                            class="form-select form-select-sm">
+                                                            <option value="">-- Apply to Position --</option>
+                                                        </select>
                                                     </div>
                                                     <div class="col-3"><input type="number" id="kpi-def-target"
                                                             class="form-control form-control-sm" placeholder="Target">
@@ -789,11 +828,24 @@
                                             </div>
                                         </div>
                                         <div class="card border">
-                                            <div class="card-header bg-light">
+                                            <div
+                                                class="card-header bg-light d-flex justify-content-between align-items-center mb-0 pb-2">
                                                 <h6 class="m-0 fw-bold small"><i class="bi bi-bullseye me-1"></i> KPI
                                                     Definitions</h6>
+                                                <div class="d-flex gap-1"
+                                                    style="transform: scale(0.85); transform-origin: right center;">
+                                                    <button class="btn btn-warning btn-sm"
+                                                        onclick="window.__app.exportKpiJSON()"><i
+                                                            class="bi bi-download"></i></button>
+                                                    <button class="btn btn-outline-secondary btn-sm"
+                                                        onclick="document.getElementById('kpi-import-input').click()"><i
+                                                            class="bi bi-upload"></i></button>
+                                                    <input type="file" id="kpi-import-input" class="hidden"
+                                                        accept=".json" onchange="window.__app.importKpiJSON(this)">
+                                                </div>
                                             </div>
-                                            <div class="card-body" id="kpi-definitions-list"></div>
+                                            <div class="card-body" id="kpi-definitions-list"
+                                                style="max-height: 400px; overflow-y: auto;"></div>
                                         </div>
                                     </div>
                                 </div>

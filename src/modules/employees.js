@@ -137,6 +137,7 @@ export async function saveEmployeeData() {
         id, date_created: '-', date_updated: '-', date_next: '-',
         percentage: 0, scores: [], training_history: [], history: [],
         self_scores: [], self_percentage: 0, self_date: '',
+        kpi_targets: {}
     };
 
     rec.name = name;
@@ -255,6 +256,7 @@ export async function importEmployeeCSV(input) {
                     id, percentage: 0, scores: [], history: [], training_history: [],
                     date_created: '-', date_updated: '-', date_next: '-',
                     self_scores: [], self_percentage: 0, self_date: '',
+                    kpi_targets: {}
                 };
 
                 existing.name = parts[1];

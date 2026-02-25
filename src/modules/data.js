@@ -56,6 +56,7 @@ export async function fetchEmployees() {
             date_updated: row.date_updated || '-',
             date_next: row.date_next || '-',
             tenure_display: row.tenure_display || '',
+            kpi_targets: row.kpi_targets || {},
         };
     });
 
@@ -87,6 +88,7 @@ export async function saveEmployee(rec) {
         date_updated: rec.date_updated || '-',
         date_next: rec.date_next || '-',
         tenure_display: rec.tenure_display || '',
+        kpi_targets: rec.kpi_targets || {},
     };
 
     const { error } = await supabase

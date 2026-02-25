@@ -1,0 +1,289 @@
+[
+    {
+        "name": "Revenue Growth Rate",
+        "description": "Revenue Growth: (Current Period Revenue - Previous Period Revenue) / Previous Period Revenue.",
+        "category": "Client Leader",
+        "target": 10,
+        "unit": "%"
+    },
+    {
+        "name": "Cross-sell/Upsell Conversion",
+        "description": "Upsell Rate: (Number of existing clients purchasing new services / Total number of active clients) * 100.",
+        "category": "Client Leader",
+        "target": 20,
+        "unit": "%"
+    },
+    {
+        "name": "Net Promoter Score (NPS)",
+        "description": "Client Advocacy Score: % of Promoters - % of Detractors.",
+        "category": "Client Leader",
+        "target": 50,
+        "unit": "Point"
+    },
+    {
+        "name": "Perfect Billing Rate",
+        "description": "Billing Accuracy and Timeliness: (Number of invoices sent on time without errors / Total invoices sent) * 100.",
+        "category": "Client Leader",
+        "target": 100,
+        "unit": "%"
+    },
+    {
+        "name": "Budget Variance",
+        "description": "Budget Utilization Efficiency: (Actual Spend / Approved Monthly Plan) * 100.",
+        "category": "Planning and Analyst",
+        "target": 100,
+        "unit": "%"
+    },
+    {
+        "name": "Margin Improvement",
+        "description": "Resource Calibration Impact: (Project Margin After Calibration - Project Margin Before Calibration) / Margin Before Calibration.",
+        "category": "Planning and Analyst",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Strategy Win Count",
+        "description": "Market Intelligence Success: Total count of pitches or campaigns won where data insights were cited as the key success factor.",
+        "category": "Planning and Analyst",
+        "target": 2,
+        "unit": "Count"
+    },
+    {
+        "name": "Forecast Deviation Rate",
+        "description": "Forecast Accuracy: Absolute value of (Actual Revenue - Forecasted Revenue) / Actual Revenue. (Lower is better)",
+        "category": "Planning and Analyst",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Lead-to-Deal Ratio",
+        "description": "Lead Conversion Rate: (Number of Closed Deals / Number of Qualified Leads) * 100.",
+        "category": "New Business Development",
+        "target": 15,
+        "unit": "%"
+    },
+    {
+        "name": "New Business Revenue / GMV",
+        "description": "New Revenue Contribution: Sum of Total Contract Value or GMV from new clients.",
+        "category": "New Business Development",
+        "target": 1000000000,
+        "unit": "IDR"
+    },
+    {
+        "name": "Commission to Revenue Ratio",
+        "description": "Commission Efficiency: (Total Commissions Paid / Total Revenue/GMV Generated) * 100.",
+        "category": "New Business Development",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Average Sales Cycle Length",
+        "description": "Pipeline Velocity: Average number of days from Lead Identification to Contract Signed.",
+        "category": "New Business Development",
+        "target": 30,
+        "unit": "Days"
+    },
+    {
+        "name": "Delivery OTIF (On-Time In-Full) Rate",
+        "description": "OTIF Rate: (Number of campaigns delivered 100% complete by the deadline / Total campaigns delivered) * 100.",
+        "category": "Implementation (CM and PM)",
+        "target": 95,
+        "unit": "%"
+    },
+    {
+        "name": "Optimization Count",
+        "description": "Optimization Frequency: Total count of documented interventions/adjustments made to live campaigns.",
+        "category": "Implementation (CM and PM)",
+        "target": 10,
+        "unit": "Count"
+    },
+    {
+        "name": "COGS Margin Adherence",
+        "description": "Financial Control: (Actual COGS / Revenue) compared to (Target COGS / Revenue).",
+        "category": "Implementation (CM and PM)",
+        "target": 100,
+        "unit": "%"
+    },
+    {
+        "name": "Business Revenue / GMV",
+        "description": "Revenue Contribution: Sum of Total Contract Value or GMV from managed clients.",
+        "category": "Implementation (CM and PM)",
+        "target": 500000000,
+        "unit": "IDR"
+    },
+    {
+        "name": "Average Daily GMV",
+        "description": "BAU Performance: Total GMV generated on non-campaign days / Number of non-campaign days.",
+        "category": "Livestreaming",
+        "target": 100000000,
+        "unit": "IDR"
+    },
+    {
+        "name": "Campaign Uplift Factor",
+        "description": "Big Sale Uplift: ((Big Sale GMV - Average Daily GMV) / Average Daily GMV) * 100.",
+        "category": "Livestreaming",
+        "target": 200,
+        "unit": "%"
+    },
+    {
+        "name": "Average View Duration",
+        "description": "Audience Retention: Total Time Watched by all viewers / Total Number of Views.",
+        "category": "Livestreaming",
+        "target": 120,
+        "unit": "Seconds"
+    },
+    {
+        "name": "Click-to-Order Rate (CTOR)",
+        "description": "Conversion Efficiency: (Total Orders / Total Product Clicks in stream) * 100.",
+        "category": "Livestreaming",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Net WCA Creator Growth",
+        "description": "Supply Growth: ((Total End - Total Start) / Total Start) * 100.",
+        "category": "WCA (WEI Creator Academy)",
+        "target": 10,
+        "unit": "%"
+    },
+    {
+        "name": "Return on Investment per Creator",
+        "description": "Creator ROI: (Total GMV Generated by WCA Creators / Total Investment in WCA Creators) * 100.",
+        "category": "WCA (WEI Creator Academy)",
+        "target": 500,
+        "unit": "%"
+    },
+    {
+        "name": "Active Supply Count",
+        "description": "Creator Utilization: Count of unique WCA creators who have been booked or utilized.",
+        "category": "WCA (WEI Creator Academy)",
+        "target": 50,
+        "unit": "Count"
+    },
+    {
+        "name": "Supply Efficiency Rate",
+        "description": "Utilization Rate: (Number of Active WCA Creators / Total Available WCA Creators in the Pool) * 100.",
+        "category": "WCA (WEI Creator Academy)",
+        "target": 80,
+        "unit": "%"
+    },
+    {
+        "name": "Platform Incentive Revenue (WCA)",
+        "description": "Income Revenue from Platform: Sum of all direct revenue earned from the platform for WCA.",
+        "category": "WCA (WEI Creator Academy)",
+        "target": 100000000,
+        "unit": "IDR"
+    },
+    {
+        "name": "Net Creator Acquisition Rate",
+        "description": "Growth of New Creators: ((Number of Active Creators End - Number Start) / Number Start) * 100.",
+        "category": "Creator Manager",
+        "target": 15,
+        "unit": "%"
+    },
+    {
+        "name": "Performance Improvement Rate",
+        "description": "Growth of Creator Performance: ((Avg Views/Engagement Current - Avg Previous) / Avg Previous) * 100.",
+        "category": "Creator Manager",
+        "target": 10,
+        "unit": "%"
+    },
+    {
+        "name": "Platform Incentive Revenue (CM)",
+        "description": "Income Revenue from Platform: Sum of all direct revenue earned from the platform.",
+        "category": "Creator Manager",
+        "target": 50000000,
+        "unit": "IDR"
+    },
+    {
+        "name": "Creator Cost Inflation Rate",
+        "description": "Inflation for Mid & Top Creator: ((Avg Cost Current - Avg Cost Previous) / Avg Cost Previous) * 100.",
+        "category": "Creator Manager",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Average GMV per Creator Growth",
+        "description": "GMV/Creator: ((Current Avg GMV - Previous Avg GMV) / Previous Avg GMV) * 100.",
+        "category": "Creator Manager",
+        "target": 10,
+        "unit": "%"
+    },
+    {
+        "name": "Actual Sales GMV",
+        "description": "Based on Screenshot Table - Actual GMV Sales Achievement",
+        "category": "Creator Manager",
+        "target": 7885800000,
+        "unit": "IDR"
+    },
+    {
+        "name": "New Brands Acquisition",
+        "description": "Based on Screenshot Table - Actual New Brands Acquired",
+        "category": "Creator Manager",
+        "target": 36,
+        "unit": "Count"
+    },
+    {
+        "name": "Managing Existing Brands",
+        "description": "Based on Screenshot Table - Actual Managing Existing Brands",
+        "category": "Creator Manager",
+        "target": 60,
+        "unit": "Count"
+    },
+    {
+        "name": "Booking Variance",
+        "description": "Accrual Accuracy: Absolute value of (Booked Revenue/Cost - Actual Bank Statement Amount).",
+        "category": "Finance and Accounting",
+        "target": 0,
+        "unit": "IDR"
+    },
+    {
+        "name": "On-Time Payment Rate",
+        "description": "Vendor Liability Management: (Number of payments made within agreed terms / Total number of payments) * 100.",
+        "category": "Finance and Accounting",
+        "target": 98,
+        "unit": "%"
+    },
+    {
+        "name": "Budget Variance Ratio",
+        "description": "Forecasting Precision: (Actual Financial Results - Forecasted Results) / Forecasted Results.",
+        "category": "Finance and Accounting",
+        "target": 5,
+        "unit": "%"
+    },
+    {
+        "name": "Compliance Defect Rate",
+        "description": "Compliance and Reporting: Number of late tax filings or internal audit flags.",
+        "category": "Finance and Accounting",
+        "target": 0,
+        "unit": "Count"
+    },
+    {
+        "name": "Average Turnaround Time",
+        "description": "Document Processing Speed: Sum of hours spent processing documents / Total documents processed.",
+        "category": "Finance Admin",
+        "target": 24,
+        "unit": "Hours"
+    },
+    {
+        "name": "Data Error Rate",
+        "description": "Data Entry Integrity: (Number of entries with detected errors / Total entries made) * 100.",
+        "category": "Finance Admin",
+        "target": 1,
+        "unit": "%"
+    },
+    {
+        "name": "Opex Budget Utilization",
+        "description": "Expense Tracking: (Actual Operational Expense / Budgeted Operational Expense) * 100.",
+        "category": "Finance Admin",
+        "target": 95,
+        "unit": "%"
+    },
+    {
+        "name": "Mean Time to Resolve (MTTR)",
+        "description": "Support Responsiveness: Average time taken to close internal finance tickets/queries.",
+        "category": "Finance Admin",
+        "target": 48,
+        "unit": "Hours"
+    }
+]
