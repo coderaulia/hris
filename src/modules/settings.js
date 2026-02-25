@@ -86,20 +86,133 @@ export function applyBranding() {
 // ---- ORG SETTINGS ----
 function renderOrgSettings() {
     const { appSettings } = state;
-    const levelsEl = document.getElementById('settings-levels');
-    const deptsEl = document.getElementById('settings-departments');
 
+    // Levels
+    const levelsEl = document.getElementById('settings-levels');
     if (levelsEl) levelsEl.value = appSettings.levels || 'Junior, Intermediate, Senior, Lead, Manager, Director';
-    if (deptsEl) deptsEl.value = appSettings.departments || 'Human Resources, Finance, IT, Operations, Marketing, Sales';
+
+    // Department → Positions mapping
+    renderDeptPositions();
+}
+
+function renderDeptPositions() {
+    const container = document.getElementById('org-dept-positions-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const { appSettings } = state;
+    let deptMap = {};
+    try {
+        deptMap = JSON.parse(appSettings.dept_positions || '{}');
+    } catch {
+        // Fallback: migrate from old comma-separated departments
+        const oldDepts = (appSettings.departments || '').split(',').map(s => s.trim()).filter(Boolean);
+        oldDepts.forEach(d => { deptMap[d] = []; });
+    }
+
+    // If empty, show a default placeholder
+    if (Object.keys(deptMap).length === 0) {
+        container.innerHTML = '<div class="text-muted fst-italic small py-2">No departments configured yet. Click "Add Department" below.</div>';
+        return;
+    }
+
+    Object.keys(deptMap).forEach((deptName, deptIdx) => {
+        const positions = deptMap[deptName] || [];
+        const safeDept = escapeHTML(deptName);
+
+        let positionsHtml = '';
+        positions.forEach((pos, posIdx) => {
+            positionsHtml += `
+            <div class="input-group input-group-sm mb-1">
+                <input type="text" class="form-control dept-pos-input" value="${escapeHTML(pos)}" data-dept="${safeDept}" placeholder="Position name">
+                <button class="btn btn-outline-danger btn-sm" type="button" onclick="this.closest('.input-group').remove()"><i class="bi bi-x"></i></button>
+            </div>`;
+        });
+
+        container.innerHTML += `
+        <div class="card border mb-3 org-dept-card" data-dept-name="${safeDept}">
+            <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2 flex-grow-1">
+                    <i class="bi bi-building text-success"></i>
+                    <input type="text" class="form-control form-control-sm fw-bold dept-name-input" value="${safeDept}" placeholder="Department Name" style="max-width: 300px;">
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.org-dept-card').remove()" title="Remove Department"><i class="bi bi-trash"></i></button>
+            </div>
+            <div class="card-body py-2">
+                <div class="dept-positions-list">
+                    ${positionsHtml}
+                </div>
+                <button class="btn btn-sm btn-outline-primary mt-1" onclick="window.__app.addOrgPosition(this)"><i class="bi bi-plus me-1"></i>Add Position</button>
+            </div>
+        </div>`;
+    });
+}
+
+export function addOrgDepartment() {
+    const container = document.getElementById('org-dept-positions-container');
+    if (!container) return;
+
+    // Remove the "no departments" placeholder if present
+    const placeholder = container.querySelector('.text-muted');
+    if (placeholder) placeholder.remove();
+
+    const card = document.createElement('div');
+    card.className = 'card border mb-3 org-dept-card border-success';
+    card.innerHTML = `
+        <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 flex-grow-1">
+                <i class="bi bi-building text-success"></i>
+                <input type="text" class="form-control form-control-sm fw-bold dept-name-input" value="" placeholder="New Department Name" style="max-width: 300px;" autofocus>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" onclick="this.closest('.org-dept-card').remove()" title="Remove Department"><i class="bi bi-trash"></i></button>
+        </div>
+        <div class="card-body py-2">
+            <div class="dept-positions-list"></div>
+            <button class="btn btn-sm btn-outline-primary mt-1" onclick="window.__app.addOrgPosition(this)"><i class="bi bi-plus me-1"></i>Add Position</button>
+        </div>`;
+    container.appendChild(card);
+    card.querySelector('.dept-name-input').focus();
+}
+
+export function addOrgPosition(btn) {
+    const list = btn.closest('.card-body').querySelector('.dept-positions-list');
+    const div = document.createElement('div');
+    div.className = 'input-group input-group-sm mb-1';
+    div.innerHTML = `
+        <input type="text" class="form-control dept-pos-input" value="" placeholder="Position name">
+        <button class="btn btn-outline-danger btn-sm" type="button" onclick="this.closest('.input-group').remove()"><i class="bi bi-x"></i></button>`;
+    list.appendChild(div);
+    div.querySelector('input').focus();
+}
+
+function collectDeptPositions() {
+    const cards = document.querySelectorAll('#org-dept-positions-container .org-dept-card');
+    const deptMap = {};
+    cards.forEach(card => {
+        const deptName = card.querySelector('.dept-name-input')?.value?.trim();
+        if (!deptName) return;
+        const positions = [];
+        card.querySelectorAll('.dept-pos-input').forEach(inp => {
+            const val = inp.value.trim();
+            if (val) positions.push(val);
+        });
+        deptMap[deptName] = positions;
+    });
+    return deptMap;
 }
 
 export async function saveOrgConfig() {
     try {
         const levels = document.getElementById('settings-levels').value.trim();
-        const depts = document.getElementById('settings-departments').value.trim();
-
         await saveSetting('levels', levels);
-        await saveSetting('departments', depts);
+
+        // Save department→positions mapping as JSON
+        const deptMap = collectDeptPositions();
+        await saveSetting('dept_positions', JSON.stringify(deptMap));
+
+        // Also save a flat departments list for backward compat
+        const deptNames = Object.keys(deptMap).join(', ');
+        await saveSetting('departments', deptNames);
 
         alert('Organization settings saved successfully!');
     } catch (err) {

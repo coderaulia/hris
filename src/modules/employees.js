@@ -10,20 +10,31 @@ import { saveEmployee, deleteEmployee as deleteEmpFromDB } from './data.js';
 export function renderEmployeeManager() {
     const { appConfig, db, currentUser } = state;
 
-    // 1. Position Dropdown
+    // 1. Position Dropdown — pull from both competency config and dept→positions mapping
     const posSelect = document.getElementById('emp-position');
     if (!posSelect) return;
     const currentPosVal = posSelect.value;
     posSelect.innerHTML = '<option value="">-- Select Position --</option>';
-    if (appConfig) {
-        Object.keys(appConfig).sort().forEach(pos => {
-            posSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
+
+    // Collect all unique positions
+    const allPositions = new Set();
+    if (appConfig) Object.keys(appConfig).forEach(pos => allPositions.add(pos));
+
+    // Also collect from dept_positions org setting
+    const { appSettings } = state;
+    try {
+        const deptMap = JSON.parse(appSettings.dept_positions || '{}');
+        Object.values(deptMap).forEach(positions => {
+            positions.forEach(pos => allPositions.add(pos));
         });
-    }
+    } catch { /* ignore */ }
+
+    [...allPositions].sort().forEach(pos => {
+        posSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
+    });
     if (currentPosVal && document.getElementById('emp-edit-mode').value === 'true') posSelect.value = currentPosVal;
 
     // 1b. Levels & Departments
-    const { appSettings } = state;
     const loadDropdown = (selId, settingKey, defStr, prevVal) => {
         const sel = document.getElementById(selId);
         if (!sel) return;

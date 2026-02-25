@@ -13,7 +13,7 @@ import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestion
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
 import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, removeKpiDef, removeKpiRecord, clearKpiDefForm, onKpiMetricChange } from './modules/kpi.js';
-import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig } from './modules/settings.js';
+import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
 
 // ---- Expose functions to onclick handlers ----
 window.__app = {
@@ -21,7 +21,7 @@ window.__app = {
     attemptLogin, doLogout: signOut,
 
     // Navigation
-    switchTab, toggleTheme,
+    switchTab, toggleTheme, toggleDashboardView,
 
     // Assessment
     renderPendingList, loadPendingEmployee, startAssessment, renderQuestions,
@@ -51,7 +51,7 @@ window.__app = {
     removeKpiRecord, clearKpiDefForm, onKpiMetricChange,
 
     // Settings
-    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, toggleSettingsView,
+    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleDashboardView,
 };
 
 // ---- Tab Navigation ----
@@ -67,8 +67,6 @@ function switchTab(tabId) {
         'tab-employees': 'nav-employees',
         'tab-assessment': 'nav-assessment',
         'tab-records': 'nav-records',
-        'tab-admin': 'nav-admin',
-        'tab-kpi': 'nav-kpi',
         'tab-settings': 'nav-settings',
     };
 
@@ -83,25 +81,35 @@ function switchTab(tabId) {
     if (tabId === 'tab-records') renderRecordsTable();
     if (tabId === 'tab-assessment') renderPendingList();
     if (tabId === 'tab-employees') renderEmployeeManager();
-    if (tabId === 'tab-kpi') renderKpiManager();
     if (tabId === 'tab-settings') {
         renderSettings();
-        renderAdminList(); // Also render competencies setup since it's now inside settings
+        renderAdminList();
+        renderKpiManager();
     }
 }
 
-// ---- Sub-View Toggle (Settings/Dashboard) ----
+// ---- Sub-View Toggle (Settings) ----
 function toggleSettingsView(viewId, btn) {
-    // Hide all
-    ['set-general', 'set-users', 'set-competencies', 'set-org'].forEach(id => {
+    ['set-general', 'set-users', 'set-competencies', 'set-kpi', 'set-org'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
-
-    // Deactivate all pills
     document.querySelectorAll('#settingsPills .nav-link').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById(viewId);
+    if (target) target.classList.remove('hidden');
+    if (btn) btn.classList.add('active');
+    // Trigger KPI render when switching to KPI panel
+    if (viewId === 'set-kpi') renderKpiManager();
+    if (viewId === 'set-competencies') renderAdminList();
+}
 
-    // Show active
+// ---- Sub-View Toggle (Dashboard) ----
+function toggleDashboardView(viewId, btn) {
+    ['dashboard-assessment', 'dashboard-kpi'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    document.querySelectorAll('#dashboardPills .nav-link').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     if (target) target.classList.remove('hidden');
     if (btn) btn.classList.add('active');
@@ -161,9 +169,9 @@ function showApp() {
 
     // Role-based navigation
     const navConfig = {
-        superadmin: ['nav-dashboard', 'nav-employees', 'nav-assessment', 'nav-records', 'nav-kpi', 'nav-settings'],
-        manager: ['nav-dashboard', 'nav-assessment', 'nav-records', 'nav-kpi'],
-        employee: ['nav-records', 'nav-kpi'],
+        superadmin: ['nav-dashboard', 'nav-employees', 'nav-assessment', 'nav-records', 'nav-settings'],
+        manager: ['nav-dashboard', 'nav-assessment', 'nav-records'],
+        employee: ['nav-records'],
     };
 
     const allowedNavs = navConfig[role] || navConfig.employee;
