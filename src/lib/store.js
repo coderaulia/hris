@@ -1,0 +1,39 @@
+// ==================================================
+// REACTIVE STATE STORE
+// ==================================================
+
+export const state = {
+    db: {},           // Employee database { id: { ...record } }
+    appConfig: {},    // Competency config { positionName: { competencies: [...] } }
+    kpiConfig: [],    // KPI definitions
+    kpiRecords: [],   // KPI records
+    appSettings: {},  // App settings { app_name, company_name, ... }
+    currentUser: null,
+    currentSession: {},
+};
+
+const listeners = {};
+
+export function subscribe(event, fn) {
+    if (!listeners[event]) listeners[event] = [];
+    listeners[event].push(fn);
+}
+
+export function emit(event, data) {
+    if (listeners[event]) {
+        listeners[event].forEach(fn => fn(data));
+    }
+}
+
+// Helper to check permissions
+export function isAdmin() {
+    return state.currentUser?.role === 'superadmin';
+}
+
+export function isManager() {
+    return state.currentUser?.role === 'manager' || state.currentUser?.role === 'superadmin';
+}
+
+export function isEmployee() {
+    return state.currentUser?.role === 'employee';
+}
