@@ -323,7 +323,12 @@ export async function renderKpiHistory() {
         <td class="text-center">${formatNumber(target)} ${escapeHTML(kpiDef?.unit || '')}</td>
         <td class="text-center"><span class="badge ${achBadge}">${achievement}%</span></td>
         <td class="text-end">
-          ${currentUser.role !== 'employee' ? `<button class="btn btn-sm btn-outline-danger" onclick="window.__app.removeKpiRecord('${record.id}')"><i class="bi bi-trash"></i></button>` : ''}
+          ${currentUser.role !== 'employee' ? `
+            <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-primary" onclick="window.__app.editKpiRecord('${record.id}')" title="Edit KPI Record"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-outline-danger" onclick="window.__app.removeKpiRecord('${record.id}')" title="Delete KPI Record"><i class="bi bi-trash"></i></button>
+            </div>
+          ` : ''}
         </td>
       </tr> `;
     });
@@ -448,6 +453,63 @@ export async function removeKpiRecord(id) {
         renderKpiHistory();
     } catch (err) {
         alert('Error: ' + err.message);
+    }
+}
+
+export async function editKpiRecord(id) {
+    if (state.currentUser?.role === 'employee') { alert('Access Denied'); return; }
+
+    const record = state.kpiRecords.find(r => r.id === id);
+    if (!record) { alert('Record not found.'); return; }
+
+    const emp = state.db[record.employee_id];
+    const kpiDef = state.kpiConfig.find(k => k.id === record.kpi_id);
+    const unit = kpiDef?.unit ? ` ${kpiDef.unit}` : '';
+
+    const newValueRaw = prompt(
+        `Edit KPI Value\nEmployee: ${emp?.name || record.employee_id}\nKPI: ${kpiDef?.name || 'Unknown KPI'}\n\nEnter new value${unit}:`,
+        String(record.value ?? '')
+    );
+    if (newValueRaw === null) return;
+    const newValue = parseFloat(newValueRaw);
+    if (isNaN(newValue)) {
+        alert('Invalid value. Please enter a numeric KPI value.');
+        return;
+    }
+
+    const newPeriod = prompt(
+        'Edit KPI Period (YYYY-MM):',
+        String(record.period || '')
+    );
+    if (newPeriod === null) return;
+    const period = newPeriod.trim();
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(period)) {
+        alert('Invalid period format. Use YYYY-MM.');
+        return;
+    }
+
+    const newNotes = prompt(
+        'Edit Notes (optional):',
+        String(record.notes || '')
+    );
+    if (newNotes === null) return;
+
+    const updated = {
+        ...record,
+        value: newValue,
+        period,
+        notes: newNotes.trim(),
+        submitted_by: state.currentUser.id,
+        submitted_at: new Date().toISOString(),
+    };
+
+    try {
+        await saveKpiRecord(updated);
+        await fetchKpiRecords();
+        renderKpiHistory();
+        alert('KPI record updated successfully!');
+    } catch (err) {
+        alert('Error updating KPI record: ' + err.message);
     }
 }
 
