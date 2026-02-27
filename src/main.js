@@ -27,12 +27,12 @@ document.getElementById('component-overlays').innerHTML = overlaysHTML;
 import { state, subscribe, emit, isAdmin, isManager, isEmployee } from './lib/store.js';
 import { restoreSession, signIn, signOut } from './modules/auth.js';
 import { syncAll } from './modules/data.js';
-import { renderDashboard } from './modules/dashboard.js';
+import { renderDashboard, openDeptKpiModal, exportDeptKpiExcel, exportDeptKpiPDF } from './modules/dashboard.js';
 import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess } from './modules/records.js';
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
-import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
+import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
 import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
 
 // ---- Expose functions to onclick handlers ----
@@ -64,11 +64,11 @@ window.__app = {
     deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV,
 
     // Dashboard
-    renderDashboard,
+    renderDashboard, openDeptKpiModal, exportDeptKpiExcel, exportDeptKpiPDF,
 
     // KPI
     renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef,
-    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
+    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
 
     // Settings
     renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleDashboardView, toggleRecordsView,

@@ -1,157 +1,207 @@
-        <!-- ==================== TAB: DASHBOARD ==================== -->
-        <div id="tab-dashboard" class="content-section">
-            <ul class="nav nav-pills mb-4 dashboard-pills" id="dashboardPills">
-                <li class="nav-item">
-                    <button class="nav-link active" data-target="dashboard-assessment"
-                        onclick="window.__app.toggleDashboardView('dashboard-assessment', this)">
-                        <i class="bi bi-clipboard-data me-1"></i>Assessment Summary
-                    </button>
-                </li>
-                <li class="nav-item">
-                    <button class="nav-link" data-target="dashboard-kpi"
-                        onclick="window.__app.toggleDashboardView('dashboard-kpi', this)">
-                        <i class="bi bi-graph-up-arrow me-1"></i>KPI Summary
-                    </button>
-                </li>
-            </ul>
+<!-- ==================== TAB: DASHBOARD ==================== -->
+<div id="tab-dashboard" class="content-section">
+    <ul class="nav nav-pills mb-4 dashboard-pills" id="dashboardPills">
+        <li class="nav-item">
+            <button class="nav-link active" data-target="dashboard-assessment"
+                onclick="window.__app.toggleDashboardView('dashboard-assessment', this)">
+                <i class="bi bi-clipboard-data me-1"></i>Assessment Summary
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-target="dashboard-kpi"
+                onclick="window.__app.toggleDashboardView('dashboard-kpi', this)">
+                <i class="bi bi-graph-up-arrow me-1"></i>KPI Summary
+            </button>
+        </li>
+    </ul>
 
-            <!-- ASSESSMENT SUMMARY VIEW -->
-            <div id="dashboard-assessment">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-4">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-primary-subtle"><i class="bi bi-people-fill text-primary"></i>
-                                </div>
-                                <small class="text-muted text-uppercase fw-bold">Total Employees</small>
-                                <div class="fs-2 fw-bold" id="d-total-emp">0</div>
-                                <div class="small" id="d-total-sub">Records</div>
-                            </div>
+    <!-- ASSESSMENT SUMMARY VIEW -->
+    <div id="dashboard-assessment">
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-primary-subtle"><i class="bi bi-people-fill text-primary"></i>
                         </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
-                                </div>
-                                <small class="text-muted text-uppercase fw-bold">Company Average</small>
-                                <div class="fs-2 fw-bold" id="d-avg-score">0%</div>
-                                <div class="small text-muted">Completed Assessments</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-warning-subtle"><i class="bi bi-trophy-fill text-warning"></i>
-                                </div>
-                                <small class="text-muted text-uppercase fw-bold">Top Performer</small>
-                                <div class="fs-4 fw-bold text-truncate" id="d-top-emp">-</div>
-                                <div class="small text-muted" id="d-top-role">Department</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-4 mb-4">
-                    <div class="col-md-4">
-                        <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-white border-bottom py-3">
-                                <h6 class="fw-bold m-0 text-danger"><i class="bi bi-exclamation-circle-fill"></i> Top
-                                    Skill Gaps</h6>
-                            </div>
-                            <div class="card-body">
-                                <ul class="list-group list-group-flush small" id="d-skill-gaps">
-                                    <li class="list-group-item text-center text-muted">No data available.</li>
-                                </ul>
-                            </div>
-                            <div class="card-body border-top">
-                                <h6 class="fw-bold mb-3 small text-uppercase">Performance Spread</h6>
-                                <div style="height: 150px;"><canvas id="chartDist"></canvas></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="card shadow-sm border-0 mb-4">
-                            <div class="card-body">
-                                <h6 class="fw-bold mb-3 small text-uppercase">Assessment Progress by Department</h6>
-                                <div style="height: 200px;"><canvas id="chartStatus"></canvas></div>
-                            </div>
-                        </div>
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body">
-                                <h6 class="fw-bold mb-3 small text-uppercase">Average Score by Department</h6>
-                                <div style="height: 200px;"><canvas id="chartScore"></canvas></div>
-                            </div>
-                        </div>
+                        <small class="text-muted text-uppercase fw-bold">Total Employees</small>
+                        <div class="fs-2 fw-bold" id="d-total-emp">0</div>
+                        <div class="small" id="d-total-sub">Records</div>
                     </div>
                 </div>
             </div>
-
-            <!-- KPI SUMMARY VIEW -->
-            <div id="dashboard-kpi" class="hidden">
-                <div class="row g-3 mb-4">
-                    <div class="col-md-3">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-info-subtle"><i class="bi bi-bullseye text-info"></i></div>
-                                <small class="text-muted text-uppercase fw-bold">Total KPIs</small>
-                                <div class="fs-2 fw-bold" id="d-kpi-total">0</div>
-                            </div>
+            <div class="col-md-4">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
                         </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-primary-subtle"><i
-                                        class="bi bi-journal-check text-primary"></i></div>
-                                <small class="text-muted text-uppercase fw-bold">Records</small>
-                                <div class="fs-2 fw-bold" id="d-kpi-records">0</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
-                                </div>
-                                <small class="text-muted text-uppercase fw-bold">Avg Achievement</small>
-                                <div class="fs-2 fw-bold" id="d-kpi-avg">0%</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card stat-card border-0 h-100">
-                            <div class="card-body">
-                                <div class="stat-icon bg-warning-subtle"><i class="bi bi-check2-all text-warning"></i>
-                                </div>
-                                <small class="text-muted text-uppercase fw-bold">Met Target</small>
-                                <div class="fs-2 fw-bold" id="d-kpi-met">0</div>
-                            </div>
-                        </div>
+                        <small class="text-muted text-uppercase fw-bold">Company Average</small>
+                        <div class="fs-2 fw-bold" id="d-avg-score">0%</div>
+                        <div class="small text-muted">Completed Assessments</div>
                     </div>
                 </div>
-                <div class="row g-4">
-                    <div class="col-md-7">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body">
-                                <h6 class="fw-bold mb-3 small text-uppercase">Achievement by Category</h6>
-                                <div style="height: 250px;"><canvas id="chartKpiOverview"></canvas></div>
-                            </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-warning-subtle"><i class="bi bi-trophy-fill text-warning"></i>
                         </div>
-                    </div>
-                    <div class="col-md-5">
-                        <div class="card shadow-sm border-0 h-100">
-                            <div class="card-header bg-white border-bottom py-3">
-                                <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Top KPI
-                                    Performers</h6>
-                            </div>
-                            <div class="card-body">
-                                <ul class="list-group list-group-flush small" id="d-kpi-performers">
-                                    <li class="list-group-item text-center text-muted fst-italic">No KPI data yet.</li>
-                                </ul>
-                            </div>
-                        </div>
+                        <small class="text-muted text-uppercase fw-bold">Top Performer</small>
+                        <div class="fs-4 fw-bold text-truncate" id="d-top-emp">-</div>
+                        <div class="small text-muted" id="d-top-role">Department</div>
                     </div>
                 </div>
             </div>
         </div>
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold m-0 text-danger"><i class="bi bi-exclamation-circle-fill"></i> Top
+                            Skill Gaps</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush small" id="d-skill-gaps">
+                            <li class="list-group-item text-center text-muted">No data available.</li>
+                        </ul>
+                    </div>
+                    <div class="card-body border-top">
+                        <h6 class="fw-bold mb-3 small text-uppercase">Performance Spread</h6>
+                        <div style="height: 150px;"><canvas id="chartDist"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3 small text-uppercase">Assessment Progress by Department</h6>
+                        <div style="height: 200px;"><canvas id="chartStatus"></canvas></div>
+                    </div>
+                </div>
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3 small text-uppercase">Average Score by Department</h6>
+                        <div style="height: 200px;"><canvas id="chartScore"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI SUMMARY VIEW -->
+    <div id="dashboard-kpi" class="hidden">
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-info-subtle"><i class="bi bi-bullseye text-info"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Total KPIs</small>
+                        <div class="fs-2 fw-bold" id="d-kpi-total">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-primary-subtle"><i class="bi bi-journal-check text-primary"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Records</small>
+                        <div class="fs-2 fw-bold" id="d-kpi-records">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
+                        </div>
+                        <small class="text-muted text-uppercase fw-bold">Avg Achievement</small>
+                        <div class="fs-2 fw-bold" id="d-kpi-avg">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-warning-subtle"><i class="bi bi-check2-all text-warning"></i>
+                        </div>
+                        <small class="text-muted text-uppercase fw-bold">Met Target</small>
+                        <div class="fs-2 fw-bold" id="d-kpi-met">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-7">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <h6 class="fw-bold mb-3 small text-uppercase">Achievement by Category</h6>
+                        <div style="height: 250px;"><canvas id="chartKpiOverview"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Top KPI
+                            Performers</h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush small" id="d-kpi-performers">
+                            <li class="list-group-item text-center text-muted fst-italic">No KPI data yet.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Department KPI Cards -->
+        <div class="mt-4">
+            <h6 class="fw-bold mb-3 small text-uppercase"><i class="bi bi-building me-1"></i>Department KPI Overview
+                <span class="text-muted fw-normal">(click to drill down)</span></h6>
+            <div class="row g-3" id="d-kpi-dept-cards">
+                <div class="col-12 text-center text-muted small py-3 fst-italic">Loading department data...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Department KPI Drill-Down Modal -->
+<div class="modal fade" id="deptKpiModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold"><i class="bi bi-building me-2"></i><span
+                        id="deptKpiModalTitle">Department</span> — KPI Performance</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Department Summary Stats -->
+                <div class="row g-3 mb-4" id="deptKpiModalStats"></div>
+
+                <!-- Employee KPI Table -->
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Employee</th>
+                                <th>Position</th>
+                                <th>KPI</th>
+                                <th class="text-center">Period</th>
+                                <th class="text-center">Value</th>
+                                <th class="text-center">Target</th>
+                                <th class="text-center">Achievement</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deptKpiModalBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-success btn-sm px-3" onclick="window.__app.exportDeptKpiExcel()"><i
+                        class="bi bi-file-earmark-spreadsheet me-1"></i>Export Excel</button>
+                <button class="btn btn-danger btn-sm px-3" onclick="window.__app.exportDeptKpiPDF()"><i
+                        class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
+                <button class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

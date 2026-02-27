@@ -351,6 +351,8 @@ export async function submitKpiRecord() {
         // Clear form
         document.getElementById('kpi-value').value = '';
         document.getElementById('kpi-notes').value = '';
+        document.getElementById('kpi-dividend').value = '';
+        document.getElementById('kpi-divisor').value = '';
 
         await fetchKpiRecords();
         renderKpiHistory();
@@ -457,11 +459,42 @@ export function onKpiMetricChange() {
     const unitLabel = document.getElementById('kpi-unit-label');
     const targetLabel = document.getElementById('kpi-target-label');
 
-    if (unitLabel) unitLabel.innerText = opt?.dataset?.unit || '';
+    const unit = opt?.dataset?.unit || '';
+    if (unitLabel) unitLabel.innerText = unit;
     if (targetLabel) {
         const t = opt?.dataset?.target || '-';
-        const u = opt?.dataset?.unit || '';
-        targetLabel.innerText = `Target: ${t} ${u}`;
+        targetLabel.innerText = `Target: ${t} ${unit}`;
+    }
+
+    // Handle percentage inputs
+    const divCol = document.getElementById('kpi-pct-dividend-col');
+    const diviCol = document.getElementById('kpi-pct-divisor-col');
+    const valInput = document.getElementById('kpi-value');
+
+    if (unit === '%') {
+        divCol?.classList.remove('d-none');
+        diviCol?.classList.remove('d-none');
+        if (valInput) valInput.readOnly = true;
+    } else {
+        divCol?.classList.add('d-none');
+        diviCol?.classList.add('d-none');
+        if (valInput) valInput.readOnly = false;
+
+        // Reset specific inputs
+        if (document.getElementById('kpi-dividend')) document.getElementById('kpi-dividend').value = '';
+        if (document.getElementById('kpi-divisor')) document.getElementById('kpi-divisor').value = '';
+    }
+}
+
+export function calcKpiPercentage() {
+    const dividend = parseFloat(document.getElementById('kpi-dividend')?.value);
+    const divisor = parseFloat(document.getElementById('kpi-divisor')?.value);
+    const valInput = document.getElementById('kpi-value');
+
+    if (valInput && !isNaN(dividend) && !isNaN(divisor) && divisor !== 0) {
+        valInput.value = Number(((dividend / divisor) * 100).toFixed(2));
+    } else if (valInput) {
+        valInput.value = '';
     }
 }
 
