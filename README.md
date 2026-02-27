@@ -68,11 +68,11 @@ TNA/
 ### Phase 2: Connecting the Frontend
 
 1. On your Supabase Dashboard, click on **Settings (Gear Icon)** -> **API**.
-2. Keep this tab open. In your local project folder, open `src/lib/supabase.js`.
-3. Replace the placeholder constants with your actual environment variables:
-   ```javascript
-   const SUPABASE_URL = 'https://[YOUR_PROJECT_ID].supabase.co';
-   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR...';
+2. Keep this tab open. In your local project folder, create a `.env` file (or copy `.env.example`).
+3. Add your Supabase credentials:
+   ```env
+   VITE_SUPABASE_URL=https://[YOUR_PROJECT_ID].supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR...
    ```
 
 ### Phase 3: Launching Locally
@@ -138,3 +138,4 @@ Since this app operates completely as a **Static Frontend Site (SPA)** connectin
 
 - **SQL Injection/XSS Prevention:** The system utilizes robust frontend sanitization via custom `escapeHTML` formatters natively across all list/render functions preventing DOM injections.
 - **Row Level Security:** Ensure that your Supabase instance doesn't have RLS disabled. The queries are formatted exclusively expecting the native secure SDK flow.
+

@@ -68,18 +68,73 @@ CREATE TABLE IF NOT EXISTS kpi_records (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 3. RLS — DROP existing policies first, then recreate
+-- 3. RLS — role-aware policies (superadmin / manager / employee)
 ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE competency_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kpi_definitions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE kpi_records ENABLE ROW LEVEL SECURITY;
 
+-- Helper functions for policy checks
+CREATE OR REPLACE FUNCTION auth_employee_id()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT e.employee_id
+  FROM employees e
+  WHERE e.auth_id = auth.uid()::text
+     OR (e.auth_email IS NOT NULL AND lower(e.auth_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+  ORDER BY CASE WHEN e.auth_id = auth.uid()::text THEN 0 ELSE 1 END
+  LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION auth_department()
+RETURNS TEXT
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT e.department
+  FROM employees e
+  WHERE e.employee_id = auth_employee_id()
+  LIMIT 1;
+$$;
+
+CREATE OR REPLACE FUNCTION is_superadmin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM employees e
+    WHERE e.employee_id = auth_employee_id()
+      AND e.role = 'superadmin'
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION is_manager()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM employees e
+    WHERE e.employee_id = auth_employee_id()
+      AND e.role IN ('manager', 'superadmin')
+  );
+$$;
 -- App Settings
 DROP POLICY IF EXISTS "Allow read settings" ON app_settings;
 DROP POLICY IF EXISTS "Allow write settings" ON app_settings;
-CREATE POLICY "Allow read settings" ON app_settings FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow write settings" ON app_settings FOR ALL TO authenticated USING (true);
+DROP POLICY IF EXISTS "Read settings" ON app_settings;
+DROP POLICY IF EXISTS "Superadmin manage settings" ON app_settings;
+CREATE POLICY "Read settings"
+ON app_settings FOR SELECT TO authenticated
+USING (true);
+CREATE POLICY "Superadmin manage settings"
+ON app_settings FOR ALL TO authenticated
+USING (is_superadmin())
+WITH CHECK (is_superadmin());
 
 -- Employees
 DROP POLICY IF EXISTS "Allow read for authenticated users" ON employees;
@@ -90,29 +145,154 @@ DROP POLICY IF EXISTS "Allow read employees" ON employees;
 DROP POLICY IF EXISTS "Allow insert employees" ON employees;
 DROP POLICY IF EXISTS "Allow update employees" ON employees;
 DROP POLICY IF EXISTS "Allow delete employees" ON employees;
-CREATE POLICY "Allow read employees" ON employees FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow insert employees" ON employees FOR INSERT TO authenticated WITH CHECK (true);
-CREATE POLICY "Allow update employees" ON employees FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "Allow delete employees" ON employees FOR DELETE TO authenticated USING (true);
+DROP POLICY IF EXISTS "Read employees by scope" ON employees;
+DROP POLICY IF EXISTS "Superadmin insert employees" ON employees;
+DROP POLICY IF EXISTS "Update employees by scope" ON employees;
+DROP POLICY IF EXISTS "Superadmin delete employees" ON employees;
 
--- Config
+CREATE POLICY "Read employees by scope"
+ON employees FOR SELECT TO authenticated
+USING (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR manager_id = auth_employee_id()
+  OR (is_manager() AND department = auth_department())
+  OR (auth_email IS NOT NULL AND lower(auth_email) = lower(coalesce(auth.jwt() ->> 'email', '')))
+);
+
+CREATE POLICY "Superadmin insert employees"
+ON employees FOR INSERT TO authenticated
+WITH CHECK (is_superadmin());
+
+CREATE POLICY "Update employees by scope"
+ON employees FOR UPDATE TO authenticated
+USING (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR manager_id = auth_employee_id()
+  OR (is_manager() AND department = auth_department())
+)
+WITH CHECK (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR manager_id = auth_employee_id()
+  OR (is_manager() AND department = auth_department())
+);
+
+CREATE POLICY "Superadmin delete employees"
+ON employees FOR DELETE TO authenticated
+USING (is_superadmin());
+
+-- Competency Config
 DROP POLICY IF EXISTS "Allow read config" ON competency_config;
 DROP POLICY IF EXISTS "Allow write config" ON competency_config;
-CREATE POLICY "Allow read config" ON competency_config FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow write config" ON competency_config FOR ALL TO authenticated USING (true);
+DROP POLICY IF EXISTS "Read competency config" ON competency_config;
+DROP POLICY IF EXISTS "Superadmin manage competency config" ON competency_config;
+CREATE POLICY "Read competency config"
+ON competency_config FOR SELECT TO authenticated
+USING (true);
+CREATE POLICY "Superadmin manage competency config"
+ON competency_config FOR ALL TO authenticated
+USING (is_superadmin())
+WITH CHECK (is_superadmin());
 
 -- KPI Definitions
 DROP POLICY IF EXISTS "Allow read kpi defs" ON kpi_definitions;
 DROP POLICY IF EXISTS "Allow write kpi defs" ON kpi_definitions;
-CREATE POLICY "Allow read kpi defs" ON kpi_definitions FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow write kpi defs" ON kpi_definitions FOR ALL TO authenticated USING (true);
+DROP POLICY IF EXISTS "Read kpi definitions" ON kpi_definitions;
+DROP POLICY IF EXISTS "Superadmin manage kpi definitions" ON kpi_definitions;
+CREATE POLICY "Read kpi definitions"
+ON kpi_definitions FOR SELECT TO authenticated
+USING (true);
+CREATE POLICY "Superadmin manage kpi definitions"
+ON kpi_definitions FOR ALL TO authenticated
+USING (is_superadmin())
+WITH CHECK (is_superadmin());
 
 -- KPI Records
 DROP POLICY IF EXISTS "Allow read kpi records" ON kpi_records;
 DROP POLICY IF EXISTS "Allow write kpi records" ON kpi_records;
-CREATE POLICY "Allow read kpi records" ON kpi_records FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Allow write kpi records" ON kpi_records FOR ALL TO authenticated USING (true);
+DROP POLICY IF EXISTS "Read kpi records by scope" ON kpi_records;
+DROP POLICY IF EXISTS "Insert kpi records by scope" ON kpi_records;
+DROP POLICY IF EXISTS "Update kpi records by scope" ON kpi_records;
+DROP POLICY IF EXISTS "Delete kpi records by scope" ON kpi_records;
 
+CREATE POLICY "Read kpi records by scope"
+ON kpi_records FOR SELECT TO authenticated
+USING (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR EXISTS (
+    SELECT 1
+    FROM employees e
+    WHERE e.employee_id = kpi_records.employee_id
+      AND (
+        e.manager_id = auth_employee_id()
+        OR (is_manager() AND e.department = auth_department())
+      )
+  )
+);
+
+CREATE POLICY "Insert kpi records by scope"
+ON kpi_records FOR INSERT TO authenticated
+WITH CHECK (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR EXISTS (
+    SELECT 1
+    FROM employees e
+    WHERE e.employee_id = kpi_records.employee_id
+      AND (
+        e.manager_id = auth_employee_id()
+        OR (is_manager() AND e.department = auth_department())
+      )
+  )
+);
+
+CREATE POLICY "Update kpi records by scope"
+ON kpi_records FOR UPDATE TO authenticated
+USING (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR EXISTS (
+    SELECT 1
+    FROM employees e
+    WHERE e.employee_id = kpi_records.employee_id
+      AND (
+        e.manager_id = auth_employee_id()
+        OR (is_manager() AND e.department = auth_department())
+      )
+  )
+)
+WITH CHECK (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR EXISTS (
+    SELECT 1
+    FROM employees e
+    WHERE e.employee_id = kpi_records.employee_id
+      AND (
+        e.manager_id = auth_employee_id()
+        OR (is_manager() AND e.department = auth_department())
+      )
+  )
+);
+
+CREATE POLICY "Delete kpi records by scope"
+ON kpi_records FOR DELETE TO authenticated
+USING (
+  is_superadmin()
+  OR employee_id = auth_employee_id()
+  OR EXISTS (
+    SELECT 1
+    FROM employees e
+    WHERE e.employee_id = kpi_records.employee_id
+      AND (
+        e.manager_id = auth_employee_id()
+        OR (is_manager() AND e.department = auth_department())
+      )
+  )
+);
 -- 4. INDEXES
 CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
 CREATE INDEX IF NOT EXISTS idx_employees_auth_id ON employees(auth_id);
@@ -305,3 +485,4 @@ INSERT INTO competency_config (position_name, competencies) VALUES
 
 ON CONFLICT (position_name) DO UPDATE SET
   competencies = EXCLUDED.competencies;
+

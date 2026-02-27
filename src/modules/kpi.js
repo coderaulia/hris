@@ -213,7 +213,7 @@ export function startKpiInput() {
 
         applicableKpis.forEach(kpi => {
             const effectiveTarget = targets[kpi.id] !== undefined ? targets[kpi.id] : kpi.target;
-            kpiSelect.innerHTML += `< option value = "${kpi.id}" data - unit="${escapeHTML(kpi.unit || '')}" data - target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option > `;
+            kpiSelect.innerHTML += `<option value = "${kpi.id}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option> `;
         });
     }
 
@@ -230,13 +230,13 @@ export function startKpiInput() {
                 const t = targets[r.kpi_id] !== undefined ? targets[r.kpi_id] : (kpiDef?.target || 0);
                 const ach = t > 0 ? Math.round((r.value / t) * 100) : 0;
                 let bg = ach >= 100 ? 'bg-success' : ach >= 75 ? 'bg-primary' : ach >= 50 ? 'bg-warning text-dark' : 'bg-danger';
-                histBody.innerHTML += `< tr >
+                histBody.innerHTML += `<tr>
                     <td class="small">${formatPeriod(r.period)}</td>
                     <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(kpiDef?.name || '')}">${escapeHTML(kpiDef?.name || '-')}</td>
                     <td class="text-center small fw-bold">${formatNumber(r.value)}</td>
                     <td class="text-center small">${formatNumber(t)}</td>
                     <td class="text-center"><span class="badge ${bg} px-1" style="font-size: 9px;">${ach}%</span></td>
-                </tr > `;
+                </tr> `;
             });
         }
     }
@@ -264,7 +264,7 @@ export async function renderKpiHistory() {
         }
         keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
         keys.forEach(id => {
-            empFilter.innerHTML += `< option value = "${escapeHTML(id)}" > ${escapeHTML(db[id].name)}</option > `;
+            empFilter.innerHTML += `<option value = "${escapeHTML(id)}" > ${escapeHTML(db[id].name)}</option> `;
         });
     }
 
@@ -315,7 +315,7 @@ export async function renderKpiHistory() {
         else achBadge = 'bg-danger';
 
         tbody.innerHTML += `
-            < tr >
+            <tr>
         <td class="fw-bold">${escapeHTML(emp?.name || record.employee_id)}</td>
         <td>${escapeHTML(kpiDef?.name || 'Unknown KPI')}</td>
         <td class="text-center">${formatPeriod(record.period)}</td>
@@ -325,7 +325,7 @@ export async function renderKpiHistory() {
         <td class="text-end">
           ${currentUser.role !== 'employee' ? `<button class="btn btn-sm btn-outline-danger" onclick="window.__app.removeKpiRecord('${record.id}')"><i class="bi bi-trash"></i></button>` : ''}
         </td>
-      </tr > `;
+      </tr> `;
     });
 }
 
@@ -549,3 +549,4 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
+
