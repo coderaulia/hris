@@ -1,103 +1,140 @@
-# WEI HR Performance Suite
+# HR Performance Suite
 
-Competencies Assessment & KPI Performance Management System for Warna Emas Indonesia.
+A modern and comprehensive Human Resources management system focusing on Employee Competencies Assessment and KPI Tracking, built for **Warna Emas Indonesia (WEI)**.
 
-## Architecture
+This system replaces older, disconnected spreadsheets by centralizing authentication, competency evaluations, and key performance indicators into a sleek, real-time dashboard powered by **Supabase (PostgreSQL)**.
 
-```
+---
+
+## 🚀 Features Highlights
+
+### **1. Competency Assessment**
+- **Dual Evaluation System:** Employees perform self-assessments, which are then reviewed and finalized by their Managers.
+- **Dynamic Questionnaires:** Questions branch based on the employee's role and configured competencies.
+- **Training Recommendations:** Tracks recommended training for employees who score below the required baseline.
+
+### **2. Employee KPI Manager**
+- **Monthly/Quarterly KPI Tracking:** Employees can report data on targets ranging from Sales performance to Customer Satisfaction.
+- **Department Drill-Downs:** Managers can view individual and aggregate departmental achievement scores, complete with 6-month trends.
+- **KPI Library:** Admins can create overarching KPI definitions and apply global or personalized targets for every employee.
+
+### **3. Robust Analytics Dashboard**
+- **Actionable Insights:** Tracks overall organizational skill averages, highest/lowest-scoring groups, and KPI top performers continuously.
+- **Data Exporting:** Every table and visualization can be instantly exported to Excel (`.xlsx`) or PDF.
+
+---
+
+## 🏗 Architecture & Stack 
+
+- **Frontend Framework:** Vanilla JavaScript + HTML5 + Bootstrap 5 (Custom CSS)
+- **Bundler:** Vite
+- **Backend & Database:** Supabase (PostgreSQL + Auth)
+- **Charting Engine:** Chart.js
+- **PDF/Excel Exporting:** jspdf + xlsx
+
+### Project Structure
+```text
 TNA/
-├── index.html              ← Single HTML entry point (Vite)
-├── vite.config.js           ← Vite configuration
-├── package.json
-├── supabase-schema.sql      ← Database schema (run in Supabase SQL Editor)
+├── index.html               ← Application Entry Point
+├── vite.config.js           ← Vite Bundler Configurations
+├── package.json             ← Project Dependencies
+├── supabase-schema.sql      ← Complete Supabase Database Architecture
 ├── src/
-│   ├── main.js              ← App entry: initialization, routing, event wiring
+│   ├── main.js              ← Core Routing, Event Wirings, and Initializer
 │   ├── lib/
-│   │   ├── supabase.js      ← Supabase client config
-│   │   ├── store.js         ← Reactive state store with event bus
-│   │   └── utils.js         ← Shared utility functions
-│   ├── modules/
-│   │   ├── auth.js          ← Supabase authentication (sign in/out/restore)
-│   │   ├── data.js          ← Supabase CRUD (employees, config, KPI)
-│   │   ├── assessment.js    ← Assessment workflow (self/manager)
-│   │   ├── records.js       ← Records table, reports, training log
-│   │   ├── dashboard.js     ← Dashboard (Assessment + KPI summary)
-│   │   ├── admin.js         ← Competencies configuration CRUD
-│   │   ├── employees.js     ← Employee directory management
-│   │   └── kpi.js           ← KPI input, definitions, records
-│   └── styles/
-│       └── main.css         ← Design system & all styles
-└── _legacy/                 ← Old numbered JS files (backup)
+│   │   ├── supabase.js      ← Supabase SDK Setup & Credentials
+│   │   ├── store.js         ← Native App Reactive Store (Pub/Sub)
+│   │   └── utils.js         ← Global Formatting & Helpers
+│   ├── components/          ← HTML Partial Views (Injected via Vite `?raw`)
+│   ├── modules/             ← JS Feature Controllers (Auth, KPI, Dashboard, Data)
+│   └── styles/              
+│       └── main.css         ← Global Application Stylesheet
 ```
 
-## Setup Instructions
+---
 
-### 1. Supabase Project
+## ⚙️ Initial Setup Guide
 
-1. Go to [supabase.com](https://supabase.com) and create a new project
-2. In the SQL Editor, run the contents of `supabase-schema.sql`
-3. Copy your project URL and anon key from **Settings > API**
+### Phase 1: Supabase Configuration
 
-### 2. Configure the App
+1. Log in to [Supabase](https://supabase.com) and create exactly **one new project**.
+2. Once the project dashboard is ready, navigate to the **SQL Editor** on the left menu.
+3. Open the `supabase-schema.sql` file from this project's root folder. Copy **everything** inside that file.
+4. Paste it into your Supabase SQL Editor and click **RUN**. This single script handles everything: 
+   - Generates all Database Tables.
+   - Triggers the necessary Row-Level Security (RLS) policies.
+   - Inserts vital initial Default Data (The overarching admin account, default competencies, and a default company configuration).
 
-Edit `src/lib/supabase.js` and replace the placeholder values:
+### Phase 2: Connecting the Frontend
 
-```js
-const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
-```
+1. On your Supabase Dashboard, click on **Settings (Gear Icon)** -> **API**.
+2. Keep this tab open. In your local project folder, open `src/lib/supabase.js`.
+3. Replace the placeholder constants with your actual environment variables:
+   ```javascript
+   const SUPABASE_URL = 'https://[YOUR_PROJECT_ID].supabase.co';
+   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR...';
+   ```
 
-### 3. Create Users
+### Phase 3: Launching Locally
 
-In the Supabase dashboard:
-1. Go to **Authentication > Users**
-2. Create users with email/password
-3. In the `employees` table, add a row for each user:
-   - `employee_id`: unique ID (e.g., "101")
-   - `name`: display name
-   - `auth_id`: the UUID from the auth users table
-   - `role`: `admin`, `manager`, or `employee`
-   - Other fields as needed
+You must have **Node.js** installed on your computer.
 
-### 4. Run Locally
+1. Open your terminal in the project's root directory:
+   ```bash
+   npm install
+   ```
+2. Start the local development server:
+   ```bash
+   npm run dev
+   ```
+3. The app will launch (typically at `http://localhost:5173`). 
+4. **Log in using the default Super Admin credential:**
+   - **Email:** `admin@hrsuite.com`
+   - **Password:** `admin123`
 
-```bash
-npm install
-npm run dev
-```
+*(Note: Ensure you change this default password via the Settings or Supabase dashboard before putting your app into actual production!)*
 
-### 5. Build for Production
+---
 
-```bash
-npm run build
-```
+## 🌍 Deployment Guide (Hostinger & Similar standard Web Hosts)
 
-Output will be in the `dist/` folder.
+Since this app operates completely as a **Static Frontend Site (SPA)** connecting to Supabase, deploying to shared hosting like Hostinger is remarkably easy. You do **not** need Node.js installed on your Hostinger server.
 
-## Features
+1. First, inside your local project terminal, create the production build:
+   ```bash
+   npm run build
+   ```
+2. Vite will process and bundle all instructions into a brand new folder named **`dist/`**.
+3. Log into your **Hostinger hPanel**.
+4. Go to the **File Manager** for your specific domain or subdomain (e.g., `hr.yourdomain.com`).
+5. Open the `public_html/` folder.
+6. Upload the **contents** of your local `dist/` folder directly into `public_html/`. Make sure `index.html` sits immediately inside `public_html/`, not inside a sub-folder.
+7. You're done! Visit your domain. 
 
-### Existing (Migrated)
-- ✅ **Assessment** — Self-assessment (employee) & manager assessment
-- ✅ **Records** — Assessment history with competency reports
-- ✅ **Dashboard** — Assessment summary with charts
-- ✅ **Employees** — Staff directory with CRUD
-- ✅ **Training** — Training log & recommendation tracking
-- ✅ **Admin** — Competencies configuration
+---
 
-### New
-- 🆕 **KPI Input** — Record KPI metrics per employee per period
-- 🆕 **KPI Definitions** — Admin-managed KPI metrics with targets
-- 🆕 **KPI Dashboard** — Achievement charts, top performers, category breakdown
-- 🆕 **Supabase Auth** — Email/password authentication (replaces hardcoded passwords)
-- 🆕 **Supabase Database** — PostgreSQL backend (replaces Google Sheets)
-- 🆕 **Vite Build System** — ES modules, hot reload, optimized builds
+## 📘 User Roles & Workflows
 
-## Migration from Google Sheets
+### 1. Admins (Super Users)
+- **Capabilities:** Have unrestricted access. Only Admins can tweak the global Competency matrices, establish organization-wide KPI scales, map exact organizational hierarchies (Departments/Roles/Branches), and import/export raw infrastructure configuration JSONs.
 
-| Before | After |
-|---|---|
-| Google Sheets + Apps Script | Supabase PostgreSQL |
-| Hardcoded password hash | Supabase Auth (email/password) |
-| Single `index.html` + numbered JS | Vite + ES modules |
-| `localStorage` caching | Real-time Supabase queries |
-| `0_config.js` → `6_employees.js` | `auth.js`, `data.js`, `assessment.js`, etc. |
+### 2. Managers
+- **Capabilities:** Have visibility strictly linked to their explicit Department.
+- **Workflow:** 
+   1. The Manager opens the app and switches to the "Assessments" tab to view what their reporting employees have submitted.
+   2. They leave managerial scores, which ultimately create the locked final KPI report.
+   3. They monitor their specific Department's monthly KPI dashboards to track performance visually.
+
+### 3. Employees
+- **Capabilities:** Limited view, focusing only on their direct requirements.
+- **Workflow:**
+   1. Logs into their account.
+   2. Promptly clicks 'Initiate Self Assessment' if a review cycle is currently open. They grade themselves across listed competency parameters.
+   3. Clicks 'Submit monthly KPI data' on the Records/Overview page when applicable to pass performance metrics (like total calls or success retention) upward to the Manager.
+
+---
+
+## ✨ Support & Security Note
+
+- **SQL Injection/XSS Prevention:** The system utilizes robust frontend sanitization via custom `escapeHTML` formatters natively across all list/render functions preventing DOM injections.
+- **Row Level Security:** Ensure that your Supabase instance doesn't have RLS disabled. The queries are formatted exclusively expecting the native secure SDK flow.

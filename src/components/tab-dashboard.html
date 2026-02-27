@@ -180,40 +180,86 @@
 <div class="modal fade" id="deptKpiModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header border-bottom">
-                <h5 class="modal-title fw-bold"><i class="bi bi-building me-2"></i><span
-                        id="deptKpiModalTitle">Department</span> — KPI Performance</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header border-0 pb-0 px-4 pt-4">
+                <div class="d-flex align-items-center">
+                    <div class="rounded d-flex align-items-center justify-content-center me-3"
+                        style="width: 48px; height: 48px; background: rgba(168, 85, 247, 0.1);">
+                        <i class="bi bi-diagram-3-fill fs-4" style="color: #a855f7;"></i>
+                    </div>
+                    <div>
+                        <h4 class="modal-title fw-bold m-0" id="deptKpiModalTitle">Department</h4>
+                        <div class="text-muted small">Department KPI Drill-down</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close align-self-start" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-                <!-- Department Summary Stats -->
-                <div class="row g-3 mb-4" id="deptKpiModalStats"></div>
 
-                <!-- Month Tabs -->
-                <ul class="nav nav-tabs mb-3" id="deptKpiMonthTabs"></ul>
+            <div class="modal-body p-4 bg-light">
+                <!-- Department Summary Stats & Chart row -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-7">
+                        <div class="row g-3" id="deptKpiModalStats">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card border-0 shadow-sm h-100 rounded-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold m-0 small">6-Month Trend</h6>
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill"
+                                        id="deptKpiTrendBadge">+0.0%</span>
+                                </div>
+                                <div style="height: 120px;">
+                                    <canvas id="deptKpiTrendChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <!-- Employee KPI Table -->
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm align-middle mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>KPI Metrics</th>
-                                <th class="text-center">Period</th>
-                                <th class="text-center">Value</th>
-                                <th class="text-center">Target</th>
-                                <th class="text-center">Achievement</th>
-                            </tr>
-                        </thead>
-                        <tbody id="deptKpiModalBody"></tbody>
-                    </table>
+                <div class="card border-0 shadow-sm rounded-3">
+                    <div
+                        class="card-header bg-white border-0 pt-3 pb-2 px-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h6 class="fw-bold m-0">Employee Performance</h6>
+                        <div class="d-flex gap-2">
+                            <input type="text" class="form-control form-control-sm border-2 rounded-pill px-3"
+                                id="deptKpiSearch" placeholder="Search employee..." style="width: 200px;"
+                                oninput="window.__app.searchDeptKpiModal()">
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3"><i
+                                    class="bi bi-filter me-1"></i> Filter</button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="px-4 py-2 border-bottom border-top bg-light">
+                            <!-- Month Tabs -->
+                            <ul class="nav nav-pills nav-sm gap-1" id="deptKpiMonthTabs" style="font-size: 0.85rem;">
+                            </ul>
+                        </div>
+
+                        <!-- Employee KPI Table -->
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 border-white">
+                                <thead style="font-size: 0.75rem; color: #a0aec0;">
+                                    <tr>
+                                        <th class="ps-4 fw-bold text-uppercase border-bottom">KPI Name</th>
+                                        <th class="text-end fw-bold text-uppercase border-bottom">Target</th>
+                                        <th class="text-end fw-bold text-uppercase border-bottom">Actual</th>
+                                        <th class="text-center fw-bold text-uppercase border-bottom">Status</th>
+                                        <th class="border-bottom"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="deptKpiModalBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn btn-success btn-sm px-3" onclick="window.__app.exportDeptKpiExcel()"><i
-                        class="bi bi-file-earmark-spreadsheet me-1"></i>Export Excel</button>
-                <button class="btn btn-danger btn-sm px-3" onclick="window.__app.exportDeptKpiPDF()"><i
-                        class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
-                <button class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer border-0 px-4 pb-4">
+                <button type="button" class="btn btn-light border" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary px-4" onclick="window.__app.exportDeptKpiPDF()">Download
+                    Report</button>
             </div>
         </div>
     </div>

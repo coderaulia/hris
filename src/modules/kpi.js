@@ -188,6 +188,14 @@ export function startKpiInput() {
     const nameLabel = document.getElementById('kpi-input-emp-name');
     if (nameLabel) nameLabel.innerText = rec.name;
 
+    const periodInput = document.getElementById('kpi-period');
+    if (periodInput) {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        periodInput.max = `${yyyy}-${mm}`;
+    }
+
     const kpiSelect = document.getElementById('kpi-metric-select');
     if (kpiSelect) {
         kpiSelect.innerHTML = '<option value="">-- Select KPI --</option>';

@@ -17,6 +17,7 @@ let _currentDeptName = '';
 let _currentDeptRows = [];
 let _currentDeptEmpIds = [];
 let _currentDeptRecords = [];
+let _deptKpiTrendChart = null;
 
 export function renderDashboard() {
     renderAssessmentSummary();
@@ -474,30 +475,101 @@ export function renderDeptKpiTable(month, tabBtn) {
     const statsEl = document.getElementById('deptKpiModalStats');
     if (statsEl) {
         statsEl.innerHTML = `
-        <div class="col-md-3">
-            <div class="card border-0 bg-light"><div class="card-body text-center py-2">
-                <div class="text-muted small fw-bold text-uppercase">Employees</div>
-                <div class="fs-4 fw-bold">${_currentDeptEmpIds.length}</div>
+        <div class="col-md-4">
+            <div class="card border border-2 h-100"><div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-muted small fw-bold text-uppercase">Total Employees</div>
+                    <div class="bg-primary bg-opacity-10 text-primary rounded p-1"><i class="bi bi-people-fill" style="font-size: 0.7rem;"></i></div>
+                </div>
+                <div class="fs-2 fw-bold mb-1">${_currentDeptEmpIds.length}</div>
+                <div class="small text-success"><i class="bi bi-arrow-up-short"></i> Stable</div>
             </div></div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 bg-light"><div class="card-body text-center py-2">
-                <div class="text-muted small fw-bold text-uppercase">KPI Records</div>
-                <div class="fs-4 fw-bold">${monthRecords.length}</div>
+        <div class="col-md-4">
+            <div class="card border border-2 h-100"><div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-muted small fw-bold text-uppercase">Active KPIs</div>
+                    <div class="bg-warning bg-opacity-10 text-warning rounded p-1"><i class="bi bi-flag-fill" style="font-size: 0.7rem;"></i></div>
+                </div>
+                <div class="fs-2 fw-bold mb-1">${monthRecords.length}</div>
+                <div class="small text-muted">Targets set</div>
             </div></div>
         </div>
-        <div class="col-md-3">
-            <div class="card border-0 bg-light"><div class="card-body text-center py-2">
-                <div class="text-muted small fw-bold text-uppercase">Avg Achievement</div>
-                <div class="fs-4 fw-bold">${avgAch}%</div>
-            </div></div>
-        </div>
-        <div class="col-md-3">
-            <div class="card border-0 bg-light"><div class="card-body text-center py-2">
-                <div class="text-muted small fw-bold text-uppercase">Met Target</div>
-                <div class="fs-4 fw-bold">${metCount} / ${achCount}</div>
+        <div class="col-md-4">
+            <div class="card border border-2 h-100"><div class="card-body p-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="text-muted small fw-bold text-uppercase">Overall Achievement</div>
+                    <div class="bg-warning bg-opacity-10 text-warning rounded p-1"><i class="bi bi-trophy-fill" style="font-size: 0.7rem;"></i></div>
+                </div>
+                <div class="d-flex align-items-baseline gap-2 mb-2">
+                    <div class="fs-2 fw-bold">${avgAch}%</div>
+                    <div class="small ${avgAch >= 100 ? 'text-success' : 'text-danger'}">${avgAch >= 100 ? 'On Target' : 'Below Target'}</div>
+                </div>
+                <div class="progress" style="height: 4px;">
+                    <div class="progress-bar ${avgAch >= 100 ? 'bg-success' : 'bg-warning'}" style="width: ${Math.min(avgAch, 100)}%"></div>
+                </div>
             </div></div>
         </div>`;
+    }
+
+    // 6-Month Trend Chart
+    const trendCtx = document.getElementById('deptKpiTrendChart');
+    if (trendCtx) {
+        if (_deptKpiTrendChart) _deptKpiTrendChart.destroy();
+
+        // Calculate last 6 months logic
+        const monthCounts = {};
+        const monthAchs = {};
+        const today2 = new Date();
+        const past6Months = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(today2.getFullYear(), today2.getMonth() - i, 1);
+            past6Months.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+        }
+
+        _currentDeptRecords.forEach(r => {
+            if (past6Months.includes(r.period)) {
+                if (!monthCounts[r.period]) { monthCounts[r.period] = 0; monthAchs[r.period] = 0; }
+
+                const def = kpiConfig.find(k => k.id === r.kpi_id);
+                const t = (db[r.employee_id]?.kpi_targets || {})[r.kpi_id] !== undefined ? db[r.employee_id]?.kpi_targets[r.kpi_id] : (def?.target || 0);
+                if (t > 0) {
+                    monthAchs[r.period] += (r.value / t) * 100;
+                    monthCounts[r.period]++;
+                }
+            }
+        });
+
+        const chartData = past6Months.map(m => monthCounts[m] ? monthAchs[m] / monthCounts[m] : 0);
+
+        // Update badge (compare last vs previous)
+        const curM = chartData[5];
+        const prevM = chartData[4];
+        const diff = prevM > 0 ? ((curM - prevM) / prevM) * 100 : (curM > 0 ? 100 : 0);
+        const badgeEl = document.getElementById('deptKpiTrendBadge');
+        if (badgeEl) {
+            badgeEl.innerText = (diff >= 0 ? '+' : '') + diff.toFixed(1) + '%';
+            badgeEl.className = `badge rounded-pill ${diff >= 0 ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger'}`;
+        }
+
+        const mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        _deptKpiTrendChart = new Chart(trendCtx, {
+            type: 'bar',
+            data: {
+                labels: past6Months.map(m => mNames[parseInt(m.split('-')[1]) - 1]),
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: chartData.map((_, i) => i === 5 ? '#a855f7' : i === 4 ? '#c084fc' : '#e9d5ff'),
+                    borderRadius: 2
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { x: { display: true, grid: { display: false }, border: { display: false } }, y: { display: false, max: 120 } },
+                plugins: { legend: { display: false }, tooltip: { enabled: true } }
+            }
+        });
     }
 
     // Table rows
@@ -505,7 +577,7 @@ export function renderDeptKpiTable(month, tabBtn) {
     if (tbody) {
         tbody.innerHTML = '';
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No KPI records for this month.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">No KPI records for this month.</td></tr>';
         } else {
             // Sort rows by employee name, then by period
             rows.sort((a, b) => {
@@ -526,36 +598,81 @@ export function renderDeptKpiTable(month, tabBtn) {
             rows.forEach(r => {
                 if (currentEmp !== r.name) {
                     const avg = empOverall[r.name].count > 0 ? Math.round(empOverall[r.name].sum / empOverall[r.name].count) : 0;
+
+                    const initials = r.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+
                     tbody.innerHTML += `
-                    <tr class="table-light">
-                        <td colspan="5" class="fw-bold text-primary py-2 border-bottom border-primary-subtle">
-                            <i class="bi bi-person-fill me-2 fs-6"></i>${escapeHTML(r.name)}
-                            <span class="text-muted fw-normal ms-2 small">&mdash; ${escapeHTML(r.position)}</span>
-                            <span class="badge ${avg >= 100 ? 'bg-success' : avg >= 75 ? 'bg-primary' : avg >= 50 ? 'bg-warning text-dark' : 'bg-danger'} ms-2">Overall: ${avg}%</span>
+                    <tr class="table-light kpi-emp-row">
+                        <td colspan="5" class="py-3 px-4 border-bottom">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold me-3" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                    ${initials}
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="fw-bold emp-search-target">${escapeHTML(r.name)}</span>
+                                    <span class="text-muted small">${escapeHTML(r.position)}</span>
+                                </div>
+                                <div class="ms-auto small fw-bold" style="color: ${avg >= 100 ? '#10b981' : avg >= 75 ? '#f59e0b' : '#ef4444'}">
+                                    ${avg}% Avg
+                                </div>
+                            </div>
                         </td>
                     </tr>`;
                     currentEmp = r.name;
                 }
 
-                let achBadge = 'bg-secondary';
-                if (r.achievement >= 100) achBadge = 'bg-success';
-                else if (r.achievement >= 75) achBadge = 'bg-primary';
-                else if (r.achievement >= 50) achBadge = 'bg-warning text-dark';
-                else achBadge = 'bg-danger';
+                let badgeHtml = '';
+                if (r.achievement >= 100) {
+                    badgeHtml = '<span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2"><span style="font-size: 8px; vertical-align: middle;">🟢</span> On Track</span>';
+                } else if (r.achievement >= 75) {
+                    badgeHtml = '<span class="badge bg-warning bg-opacity-10 text-warning rounded-pill px-2"><span style="font-size: 8px; vertical-align: middle;">🟡</span> Delayed</span>';
+                } else {
+                    badgeHtml = '<span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-2"><span style="font-size: 8px; vertical-align: middle;">🔴</span> At Risk</span>';
+                }
 
-                tbody.innerHTML += `<tr>
-                    <td class="ps-4">
-                        <i class="bi bi-arrow-return-right text-muted me-2 small"></i>
-                        <span class="fw-medium">${escapeHTML(r.kpi)}</span>
+                tbody.innerHTML += `<tr class="kpi-detail-row" data-emp="${escapeHTML(r.name)}">
+                    <td class="ps-5 pe-4">
+                        <span class="text-dark small">${escapeHTML(r.kpi)}</span>
                     </td>
-                    <td class="text-center small">${escapeHTML(r.period)}</td>
-                    <td class="text-center fw-bold">${formatNumber(r.value)} ${escapeHTML(r.unit)}</td>
-                    <td class="text-center text-muted small">${formatNumber(r.target)} ${escapeHTML(r.unit)}</td>
-                    <td class="text-center"><span class="badge ${achBadge}">${r.achievement}%</span></td>
+                    <td class="text-end text-muted small pe-4">${formatNumber(r.target)}</td>
+                    <td class="text-end fw-bold small pe-4">${formatNumber(r.value)}</td>
+                    <td class="text-center">${badgeHtml}</td>
+                    <td class="text-end text-muted"><i class="bi bi-three-dots-vertical" role="button"></i></td>
                 </tr>`;
             });
         }
     }
+}
+
+export function searchDeptKpiModal() {
+    const input = document.getElementById('deptKpiSearch')?.value.toLowerCase() || '';
+    const tbody = document.getElementById('deptKpiModalBody');
+    if (!tbody) return;
+
+    // Filter logic: show rows where name matches, hide others
+    const empRows = tbody.querySelectorAll('.kpi-emp-row');
+    const detailRows = tbody.querySelectorAll('.kpi-detail-row');
+
+    const visibleEmps = new Set();
+
+    empRows.forEach(row => {
+        const name = row.querySelector('.emp-search-target')?.innerText.toLowerCase() || '';
+        if (name.includes(input)) {
+            row.style.display = '';
+            visibleEmps.add(name);
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    detailRows.forEach(row => {
+        const empName = row.getAttribute('data-emp').toLowerCase();
+        if (visibleEmps.has(empName)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
 }
 
 // ==================================================

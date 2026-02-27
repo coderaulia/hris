@@ -27,7 +27,7 @@ document.getElementById('component-overlays').innerHTML = overlaysHTML;
 import { state, subscribe, emit, isAdmin, isManager, isEmployee } from './lib/store.js';
 import { restoreSession, signIn, signOut } from './modules/auth.js';
 import { syncAll } from './modules/data.js';
-import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF } from './modules/dashboard.js';
+import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, searchDeptKpiModal } from './modules/dashboard.js';
 import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess } from './modules/records.js';
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
@@ -64,7 +64,7 @@ window.__app = {
     deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV,
 
     // Dashboard
-    renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF,
+    renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, searchDeptKpiModal,
 
     // KPI
     renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef,
