@@ -9,6 +9,13 @@ export function escapeHTML(str) {
     }[m]));
 }
 
+export function formatNumber(val) {
+    if (val === null || val === undefined || val === '') return '-';
+    const num = Number(val);
+    if (isNaN(num)) return val;
+    return num.toLocaleString('id-ID');
+}
+
 export function getDepartment(pos) {
     if (!pos) return 'Other';
     const p = pos.toLowerCase();

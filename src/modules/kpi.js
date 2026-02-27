@@ -3,7 +3,7 @@
 // ==================================================
 
 import { state, emit } from '../lib/store.js';
-import { escapeHTML, formatPeriod } from '../lib/utils.js';
+import { escapeHTML, formatPeriod, formatNumber } from '../lib/utils.js';
 import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords } from './data.js';
 
 // ---- RENDER KPI SETTINGS TAB ----
@@ -43,7 +43,7 @@ function renderKpiDefinitions() {
           <div>
             <span class="fw-bold">${escapeHTML(kpi.name)}</span>
             <span class="text-muted small ms-2">${escapeHTML(kpi.description || '')}</span>
-            <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target || '-'} ${escapeHTML(kpi.unit || '')}</span>
+            <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target ? formatNumber(kpi.target) : '-'} ${escapeHTML(kpi.unit || '')}</span>
           </div>
           ${isAdmin ? `<div class="btn-group btn-group-sm">
             <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${kpi.id}')" title="Copy KPI"><i class="bi bi-files"></i></button>
@@ -133,10 +133,10 @@ export function onKpiEmployeeChange() {
         <div class="d-flex justify-content-between align-items-center bg-white border rounded px-2 py-1">
             <div class="flex-grow-1">
                 <div class="small fw-bold text-truncate" style="max-width: 250px;" title="${escapeHTML(kpi.name)}">${escapeHTML(kpi.name)}</div>
-                <div class="text-muted" style="font-size: 10px;">Global Default: ${kpi.target} ${escapeHTML(kpi.unit || '')}</div>
+                <div class="text-muted" style="font-size: 10px;">Global Default: ${formatNumber(kpi.target)} ${escapeHTML(kpi.unit || '')}</div>
             </div>
             <div class="ms-2 d-flex gap-1 align-items-center" style="width: 140px;">
-                <input type="number" class="form-control form-control-sm text-end target-custom-input" 
+                <input type="number" class="form-control form-control-sm text-end target-custom-input"
                     data-kpi="${kpi.id}" value="${val}" placeholder="${kpi.target}">
                 <span class="small text-muted" style="width: 40px;">${escapeHTML(kpi.unit || '')}</span>
             </div>
@@ -205,7 +205,7 @@ export function startKpiInput() {
 
         applicableKpis.forEach(kpi => {
             const effectiveTarget = targets[kpi.id] !== undefined ? targets[kpi.id] : kpi.target;
-            kpiSelect.innerHTML += `<option value="${kpi.id}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}">${escapeHTML(kpi.name)}</option>`;
+            kpiSelect.innerHTML += `< option value = "${kpi.id}" data - unit="${escapeHTML(kpi.unit || '')}" data - target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option > `;
         });
     }
 
@@ -222,13 +222,13 @@ export function startKpiInput() {
                 const t = targets[r.kpi_id] !== undefined ? targets[r.kpi_id] : (kpiDef?.target || 0);
                 const ach = t > 0 ? Math.round((r.value / t) * 100) : 0;
                 let bg = ach >= 100 ? 'bg-success' : ach >= 75 ? 'bg-primary' : ach >= 50 ? 'bg-warning text-dark' : 'bg-danger';
-                histBody.innerHTML += `<tr>
+                histBody.innerHTML += `< tr >
                     <td class="small">${formatPeriod(r.period)}</td>
                     <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(kpiDef?.name || '')}">${escapeHTML(kpiDef?.name || '-')}</td>
-                    <td class="text-center small fw-bold">${r.value}</td>
-                    <td class="text-center small">${t}</td>
+                    <td class="text-center small fw-bold">${formatNumber(r.value)}</td>
+                    <td class="text-center small">${formatNumber(t)}</td>
                     <td class="text-center"><span class="badge ${bg} px-1" style="font-size: 9px;">${ach}%</span></td>
-                </tr>`;
+                </tr > `;
             });
         }
     }
@@ -256,7 +256,7 @@ export async function renderKpiHistory() {
         }
         keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
         keys.forEach(id => {
-            empFilter.innerHTML += `<option value="${escapeHTML(id)}">${escapeHTML(db[id].name)}</option>`;
+            empFilter.innerHTML += `< option value = "${escapeHTML(id)}" > ${escapeHTML(db[id].name)}</option > `;
         });
     }
 
@@ -307,17 +307,17 @@ export async function renderKpiHistory() {
         else achBadge = 'bg-danger';
 
         tbody.innerHTML += `
-      <tr>
+            < tr >
         <td class="fw-bold">${escapeHTML(emp?.name || record.employee_id)}</td>
         <td>${escapeHTML(kpiDef?.name || 'Unknown KPI')}</td>
         <td class="text-center">${formatPeriod(record.period)}</td>
-        <td class="text-center fw-bold">${record.value} ${escapeHTML(kpiDef?.unit || '')}</td>
-        <td class="text-center">${target} ${escapeHTML(kpiDef?.unit || '')}</td>
+        <td class="text-center fw-bold">${formatNumber(record.value)} ${escapeHTML(kpiDef?.unit || '')}</td>
+        <td class="text-center">${formatNumber(target)} ${escapeHTML(kpiDef?.unit || '')}</td>
         <td class="text-center"><span class="badge ${achBadge}">${achievement}%</span></td>
         <td class="text-end">
           ${currentUser.role !== 'employee' ? `<button class="btn btn-sm btn-outline-danger" onclick="window.__app.removeKpiRecord('${record.id}')"><i class="bi bi-trash"></i></button>` : ''}
         </td>
-      </tr>`;
+      </tr > `;
     });
 }
 
@@ -463,7 +463,7 @@ export function onKpiMetricChange() {
     if (unitLabel) unitLabel.innerText = unit;
     if (targetLabel) {
         const t = opt?.dataset?.target || '-';
-        targetLabel.innerText = `Target: ${t} ${unit}`;
+        targetLabel.innerText = `Target: ${t} ${unit} `;
     }
 
     // Handle percentage inputs

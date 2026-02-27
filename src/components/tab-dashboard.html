@@ -2,21 +2,21 @@
 <div id="tab-dashboard" class="content-section">
     <ul class="nav nav-pills mb-4 dashboard-pills" id="dashboardPills">
         <li class="nav-item">
-            <button class="nav-link active" data-target="dashboard-assessment"
-                onclick="window.__app.toggleDashboardView('dashboard-assessment', this)">
-                <i class="bi bi-clipboard-data me-1"></i>Assessment Summary
+            <button class="nav-link active" data-target="dashboard-kpi"
+                onclick="window.__app.toggleDashboardView('dashboard-kpi', this)">
+                <i class="bi bi-graph-up-arrow me-1"></i>KPI Summary
             </button>
         </li>
         <li class="nav-item">
-            <button class="nav-link" data-target="dashboard-kpi"
-                onclick="window.__app.toggleDashboardView('dashboard-kpi', this)">
-                <i class="bi bi-graph-up-arrow me-1"></i>KPI Summary
+            <button class="nav-link" data-target="dashboard-assessment"
+                onclick="window.__app.toggleDashboardView('dashboard-assessment', this)">
+                <i class="bi bi-clipboard-data me-1"></i>Assessment Summary
             </button>
         </li>
     </ul>
 
     <!-- ASSESSMENT SUMMARY VIEW -->
-    <div id="dashboard-assessment">
+    <div id="dashboard-assessment" class="hidden">
         <div class="row g-3 mb-4">
             <div class="col-md-4">
                 <div class="card stat-card border-0 h-100">
@@ -88,7 +88,17 @@
     </div>
 
     <!-- KPI SUMMARY VIEW -->
-    <div id="dashboard-kpi" class="hidden">
+    <div id="dashboard-kpi">
+        <!-- Department KPI Cards -->
+        <div class="mb-5">
+            <h6 class="fw-bold mb-3 small text-uppercase"><i class="bi bi-building me-1"></i>Department KPI Overview
+                <span class="text-muted fw-normal">(click to drill down)</span>
+            </h6>
+            <div class="row g-3" id="d-kpi-dept-cards">
+                <div class="col-12 text-center text-muted small py-3 fst-italic">Loading department data...</div>
+            </div>
+        </div>
+
         <div class="row g-3 mb-4">
             <div class="col-md-3">
                 <div class="card stat-card border-0 h-100">
@@ -130,35 +140,37 @@
             </div>
         </div>
         <div class="row g-4">
-            <div class="col-md-7">
-                <div class="card shadow-sm border-0">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
                     <div class="card-body">
                         <h6 class="fw-bold mb-3 small text-uppercase">Achievement by Category</h6>
                         <div style="height: 250px;"><canvas id="chartKpiOverview"></canvas></div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-3">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white border-bottom py-3">
-                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Top KPI
-                            Performers</h6>
+                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Monthly Top</h6>
                     </div>
-                    <div class="card-body">
-                        <ul class="list-group list-group-flush small" id="d-kpi-performers">
+                    <div class="card-body p-2">
+                        <ul class="list-group list-group-flush small" id="d-kpi-performers-monthly">
                             <li class="list-group-item text-center text-muted fst-italic">No KPI data yet.</li>
                         </ul>
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Department KPI Cards -->
-        <div class="mt-4">
-            <h6 class="fw-bold mb-3 small text-uppercase"><i class="bi bi-building me-1"></i>Department KPI Overview
-                <span class="text-muted fw-normal">(click to drill down)</span></h6>
-            <div class="row g-3" id="d-kpi-dept-cards">
-                <div class="col-12 text-center text-muted small py-3 fst-italic">Loading department data...</div>
+            <div class="col-md-3">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Quarterly Top</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <ul class="list-group list-group-flush small" id="d-kpi-performers-quarterly">
+                            <li class="list-group-item text-center text-muted fst-italic">No KPI data yet.</li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -177,14 +189,15 @@
                 <!-- Department Summary Stats -->
                 <div class="row g-3 mb-4" id="deptKpiModalStats"></div>
 
+                <!-- Month Tabs -->
+                <ul class="nav nav-tabs mb-3" id="deptKpiMonthTabs"></ul>
+
                 <!-- Employee KPI Table -->
                 <div class="table-responsive">
                     <table class="table table-hover table-sm align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Employee</th>
-                                <th>Position</th>
-                                <th>KPI</th>
+                                <th>KPI Metrics</th>
                                 <th class="text-center">Period</th>
                                 <th class="text-center">Value</th>
                                 <th class="text-center">Target</th>

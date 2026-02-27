@@ -4,7 +4,7 @@
 
 import { Chart } from 'chart.js/auto';
 import { state } from '../lib/store.js';
-import { getDepartment, formatPeriod, escapeHTML } from '../lib/utils.js';
+import { getDepartment, formatPeriod, escapeHTML, formatNumber } from '../lib/utils.js';
 
 let chartDistInstance = null;
 let chartStatusInstance = null;
@@ -12,9 +12,11 @@ let chartScoreInstance = null;
 let chartKpiOverviewInstance = null;
 let chartKpiTrendInstance = null;
 
-// Store modal data for export reuse
+// Store modal data for export/tab reuse
 let _currentDeptName = '';
 let _currentDeptRows = [];
+let _currentDeptEmpIds = [];
+let _currentDeptRecords = [];
 
 export function renderDashboard() {
     renderAssessmentSummary();
@@ -156,13 +158,26 @@ function renderAssessmentSummary() {
 function renderKpiSummary() {
     const { kpiRecords, kpiConfig, db } = state;
 
-    // KPI Overview Cards
+    const today = new Date();
+    const currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+
+    const currentQ = Math.floor(today.getMonth() / 3);
+    const qPeriods = [
+        today.getFullYear() + '-' + String(currentQ * 3 + 1).padStart(2, '0'),
+        today.getFullYear() + '-' + String(currentQ * 3 + 2).padStart(2, '0'),
+        today.getFullYear() + '-' + String(currentQ * 3 + 3).padStart(2, '0')
+    ];
+
+    const monthlyRecords = kpiRecords.filter(r => r.period === currentMonth);
+    const quarterlyRecords = kpiRecords.filter(r => qPeriods.includes(r.period));
+
+    // KPI Overview Cards (Current Month)
     const totalKpis = kpiConfig.length;
-    const totalRecords = kpiRecords.length;
+    const totalRecords = monthlyRecords.length;
     let totalAchievement = 0;
     let achievedCount = 0;
 
-    kpiRecords.forEach(record => {
+    monthlyRecords.forEach(record => {
         const def = kpiConfig.find(k => k.id === record.kpi_id);
         if (def && def.target > 0) {
             const ach = (record.value / def.target) * 100;
@@ -175,7 +190,7 @@ function renderKpiSummary() {
 
     // Count how many meet target
     let metTarget = 0;
-    kpiRecords.forEach(record => {
+    monthlyRecords.forEach(record => {
         const def = kpiConfig.find(k => k.id === record.kpi_id);
         if (def && def.target > 0 && record.value >= def.target) metTarget++;
     });
@@ -193,7 +208,7 @@ function renderKpiSummary() {
         if (chartKpiOverviewInstance) chartKpiOverviewInstance.destroy();
 
         const catMap = {};
-        kpiRecords.forEach(record => {
+        monthlyRecords.forEach(record => {
             const def = kpiConfig.find(k => k.id === record.kpi_id);
             if (!def) return;
             const cat = def.category || 'General';
@@ -226,14 +241,14 @@ function renderKpiSummary() {
         });
     }
 
-    // KPI Top/Bottom Performers
-    const perfList = document.getElementById('d-kpi-performers');
-    if (perfList) {
+    // Helper for rendering top performers list
+    const renderPerformers = (records, elId) => {
+        const perfList = document.getElementById(elId);
+        if (!perfList) return;
         perfList.innerHTML = '';
 
-        // Calculate average achievement per employee
         const empAch = {};
-        kpiRecords.forEach(record => {
+        records.forEach(record => {
             const def = kpiConfig.find(k => k.id === record.kpi_id);
             if (!def || def.target <= 0) return;
             if (!empAch[record.employee_id]) empAch[record.employee_id] = { sum: 0, count: 0 };
@@ -257,20 +272,23 @@ function renderKpiSummary() {
           <span class="badge ${badgeClass} rounded-pill">${emp.avg}%</span></li>`;
             });
         }
-    }
+    };
+
+    renderPerformers(monthlyRecords, 'd-kpi-performers-monthly');
+    renderPerformers(quarterlyRecords, 'd-kpi-performers-quarterly');
 
     // Render department cards
-    renderDeptKpiCards();
+    renderDeptKpiCards(monthlyRecords);
 }
 
 // ==================================================
 // DEPARTMENT KPI CARDS
 // ==================================================
-function renderDeptKpiCards() {
+function renderDeptKpiCards(records) {
     const container = document.getElementById('d-kpi-dept-cards');
     if (!container) return;
 
-    const { db, kpiRecords, kpiConfig } = state;
+    const { db, kpiConfig } = state;
 
     // Group employees by department
     const deptMap = {};
@@ -285,7 +303,7 @@ function renderDeptKpiCards() {
     const deptStats = {};
     Object.keys(deptMap).forEach(dept => {
         const empIds = deptMap[dept];
-        const deptRecords = kpiRecords.filter(r => empIds.includes(r.employee_id));
+        const deptRecords = records.filter(r => empIds.includes(r.employee_id));
         let totalAch = 0, achCount = 0, metCount = 0;
 
         deptRecords.forEach(record => {
@@ -362,19 +380,63 @@ function renderDeptKpiCards() {
 // DEPARTMENT KPI DRILL-DOWN MODAL
 // ==================================================
 export function openDeptKpiModal(dept) {
-    const { db, kpiRecords, kpiConfig } = state;
+    const { db, kpiRecords } = state;
 
     _currentDeptName = dept;
 
     // Get employees in this department
-    const empIds = Object.keys(db).filter(id => db[id].department === dept);
-    const deptRecords = kpiRecords.filter(r => empIds.includes(r.employee_id));
+    _currentDeptEmpIds = Object.keys(db).filter(id => db[id].department === dept);
+    _currentDeptRecords = kpiRecords.filter(r => _currentDeptEmpIds.includes(r.employee_id));
+
+    // Get unique months in the department records + current month
+    const today = new Date();
+    const currentMonthStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+    let distinctMonths = [...new Set(_currentDeptRecords.map(r => r.period))];
+    if (!distinctMonths.includes(currentMonthStr)) {
+        distinctMonths.push(currentMonthStr);
+    }
+    distinctMonths.sort().reverse();
+
+    // Render Tabs
+    const tabsHtml = distinctMonths.map(m => `
+        <li class="nav-item">
+            <button class="nav-link ${m === currentMonthStr ? 'active' : ''}" 
+                onclick="window.__app.renderDeptKpiTable('${m}', this)">
+                ${formatPeriod(m)}
+            </button>
+        </li>
+    `).join('');
+
+    const tabsEl = document.getElementById('deptKpiMonthTabs');
+    if (tabsEl) tabsEl.innerHTML = tabsHtml;
+
+    // Show modal
+    const modalEl = document.getElementById('deptKpiModal');
+    if (modalEl) {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+
+    // Render table
+    window.__app.renderDeptKpiTable(currentMonthStr, null);
+}
+
+export function renderDeptKpiTable(month, tabBtn) {
+    if (tabBtn) {
+        document.querySelectorAll('#deptKpiMonthTabs .nav-link').forEach(n => n.classList.remove('active'));
+        tabBtn.classList.add('active');
+    }
+
+    const { db, kpiConfig } = state;
+
+    // Filter by month
+    const monthRecords = _currentDeptRecords.filter(r => r.period === month);
 
     // Build row data
     const rows = [];
     let totalAch = 0, achCount = 0, metCount = 0;
 
-    deptRecords.forEach(record => {
+    monthRecords.forEach(record => {
         const emp = db[record.employee_id];
         const def = kpiConfig.find(k => k.id === record.kpi_id);
         const targets = emp?.kpi_targets || {};
@@ -397,6 +459,7 @@ export function openDeptKpiModal(dept) {
             value: record.value,
             target: target,
             achievement: achievement,
+            employee_id: record.employee_id
         });
     });
 
@@ -405,7 +468,7 @@ export function openDeptKpiModal(dept) {
     const avgAch = achCount > 0 ? Math.round(totalAch / achCount) : 0;
 
     // Update modal title
-    document.getElementById('deptKpiModalTitle').innerText = dept;
+    document.getElementById('deptKpiModalTitle').innerText = _currentDeptName;
 
     // Summary stats
     const statsEl = document.getElementById('deptKpiModalStats');
@@ -414,13 +477,13 @@ export function openDeptKpiModal(dept) {
         <div class="col-md-3">
             <div class="card border-0 bg-light"><div class="card-body text-center py-2">
                 <div class="text-muted small fw-bold text-uppercase">Employees</div>
-                <div class="fs-4 fw-bold">${empIds.length}</div>
+                <div class="fs-4 fw-bold">${_currentDeptEmpIds.length}</div>
             </div></div>
         </div>
         <div class="col-md-3">
             <div class="card border-0 bg-light"><div class="card-body text-center py-2">
                 <div class="text-muted small fw-bold text-uppercase">KPI Records</div>
-                <div class="fs-4 fw-bold">${deptRecords.length}</div>
+                <div class="fs-4 fw-bold">${monthRecords.length}</div>
             </div></div>
         </div>
         <div class="col-md-3">
@@ -442,9 +505,38 @@ export function openDeptKpiModal(dept) {
     if (tbody) {
         tbody.innerHTML = '';
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No KPI records for this department.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No KPI records for this month.</td></tr>';
         } else {
+            // Sort rows by employee name, then by period
+            rows.sort((a, b) => {
+                if (a.name !== b.name) return a.name.localeCompare(b.name);
+                return b.periodRaw.localeCompare(a.periodRaw);
+            });
+
+            // Compute overall percentage per employee
+            const empOverall = {};
             rows.forEach(r => {
+                if (!empOverall[r.name]) empOverall[r.name] = { sum: 0, count: 0 };
+                empOverall[r.name].sum += r.achievement;
+                empOverall[r.name].count++;
+            });
+
+            let currentEmp = null;
+
+            rows.forEach(r => {
+                if (currentEmp !== r.name) {
+                    const avg = empOverall[r.name].count > 0 ? Math.round(empOverall[r.name].sum / empOverall[r.name].count) : 0;
+                    tbody.innerHTML += `
+                    <tr class="table-light">
+                        <td colspan="5" class="fw-bold text-primary py-2 border-bottom border-primary-subtle">
+                            <i class="bi bi-person-fill me-2 fs-6"></i>${escapeHTML(r.name)}
+                            <span class="text-muted fw-normal ms-2 small">&mdash; ${escapeHTML(r.position)}</span>
+                            <span class="badge ${avg >= 100 ? 'bg-success' : avg >= 75 ? 'bg-primary' : avg >= 50 ? 'bg-warning text-dark' : 'bg-danger'} ms-2">Overall: ${avg}%</span>
+                        </td>
+                    </tr>`;
+                    currentEmp = r.name;
+                }
+
                 let achBadge = 'bg-secondary';
                 if (r.achievement >= 100) achBadge = 'bg-success';
                 else if (r.achievement >= 75) achBadge = 'bg-primary';
@@ -452,23 +544,17 @@ export function openDeptKpiModal(dept) {
                 else achBadge = 'bg-danger';
 
                 tbody.innerHTML += `<tr>
-                    <td class="fw-bold">${escapeHTML(r.name)}</td>
-                    <td class="small">${escapeHTML(r.position)}</td>
-                    <td>${escapeHTML(r.kpi)}</td>
-                    <td class="text-center">${escapeHTML(r.period)}</td>
-                    <td class="text-center fw-bold">${r.value} ${escapeHTML(r.unit)}</td>
-                    <td class="text-center">${r.target} ${escapeHTML(r.unit)}</td>
+                    <td class="ps-4">
+                        <i class="bi bi-arrow-return-right text-muted me-2 small"></i>
+                        <span class="fw-medium">${escapeHTML(r.kpi)}</span>
+                    </td>
+                    <td class="text-center small">${escapeHTML(r.period)}</td>
+                    <td class="text-center fw-bold">${formatNumber(r.value)} ${escapeHTML(r.unit)}</td>
+                    <td class="text-center text-muted small">${formatNumber(r.target)} ${escapeHTML(r.unit)}</td>
                     <td class="text-center"><span class="badge ${achBadge}">${r.achievement}%</span></td>
                 </tr>`;
             });
         }
-    }
-
-    // Show modal
-    const modalEl = document.getElementById('deptKpiModal');
-    if (modalEl) {
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        modal.show();
     }
 }
 
@@ -529,7 +615,7 @@ export async function exportDeptKpiPDF() {
     doc.text(`Records: ${totalRows}  |  Avg Achievement: ${avgAch}%  |  Met Target: ${met}/${totalRows}`, 14, 30);
 
     // Table
-    const tableRows = _currentDeptRows.map(r => [r.name, r.position, r.kpi, r.period, `${r.value}`, `${r.target}`, `${r.achievement}%`]);
+    const tableRows = _currentDeptRows.map(r => [r.name, r.position, r.kpi, r.period, `${formatNumber(r.value)}`, `${formatNumber(r.target)}`, `${r.achievement}%`]);
 
     doc.autoTable({
         startY: 35,
