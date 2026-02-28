@@ -25,15 +25,16 @@ export function initiateSelfAssessment(clickedId) {
         return;
     }
 
+    // One-time self assessment: do not allow re-submission/edit once submitted.
+    if ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0)) {
+        alert('You have already submitted your self-assessment. Re-submission is disabled.');
+        return;
+    }
+
     state.currentSession = {
         id: rec.id, name: rec.name, join_date: rec.join_date,
         seniority: rec.seniority, scores: [], position: rec.position,
     };
-
-    if (rec.self_scores && rec.self_scores.length > 0) {
-        state.currentSession.scores = rec.self_scores;
-        state.currentSession.isEditing = true;
-    }
 
     emit('nav:switchTab', 'tab-assessment');
 
@@ -98,7 +99,20 @@ export function renderPendingList() {
         }
 
         const startBtn = document.querySelector('#step-login .btn-primary');
-        if (startBtn) startBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Start Self-Assessment';
+        if (startBtn) {
+            const alreadySubmitted = rec && ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0));
+            if (alreadySubmitted) {
+                startBtn.innerHTML = '<i class="bi bi-check-circle"></i> Self-Assessment Submitted';
+                startBtn.disabled = true;
+                startBtn.classList.remove('btn-primary');
+                startBtn.classList.add('btn-secondary');
+            } else {
+                startBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Start Self-Assessment';
+                startBtn.disabled = false;
+                startBtn.classList.remove('btn-secondary');
+                startBtn.classList.add('btn-primary');
+            }
+        }
         return;
     }
 
@@ -171,6 +185,11 @@ export function startAssessment() {
     const rec = db[targetId];
     if (!rec) { alert('Employee Record not found in database.'); return; }
 
+    if (isEmployee() && ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0))) {
+        alert('You have already submitted your self-assessment. Re-submission is disabled.');
+        return;
+    }
+
     if (!state.currentSession.isEditing) {
         if (isManager() && !isEmployee() && rec.percentage > 0) {
             if (!confirm(`Warning: ${rec.name} has already been assessed. Overwrite?`)) return;
@@ -182,10 +201,7 @@ export function startAssessment() {
         };
 
         if (isEmployee()) {
-            if (rec.self_scores && rec.self_scores.length > 0) {
-                state.currentSession.scores = rec.self_scores;
-                state.currentSession.isEditing = true;
-            }
+            state.currentSession.isEditing = false;
         }
     } else {
         if (!isEmployee()) {
@@ -241,19 +257,6 @@ export function renderQuestions(isEdit = false) {
     const competencies = state.appConfig[position].competencies || [];
     const maxScale = parseInt(state.appSettings?.assessment_scale_max || '10');
 
-    // Show context for employee: manager's scores
-    if (isEmployee()) {
-        const rec = state.db[state.currentUser.id];
-        if (rec?.scores?.length > 0) {
-            area.innerHTML += `
-        <div class="alert alert-info mb-3">
-          <i class="bi bi-info-circle me-1"></i>
-          <strong>Manager's Assessment:</strong> Your manager has completed your assessment. 
-          Review their scores below and provide your self-assessment.
-        </div>`;
-        }
-    }
-
     competencies.forEach((comp, index) => {
         let oldVal = Math.round(maxScale / 2), oldNote = '';
         if (isEdit && state.currentSession.scores) {
@@ -261,22 +264,10 @@ export function renderQuestions(isEdit = false) {
             if (found) { oldVal = found.s; oldNote = found.n || ''; }
         }
 
-        // Show manager score for employees
-        let mgrScoreHtml = '';
-        if (isEmployee()) {
-            const rec = state.db[state.currentUser.id];
-            if (rec?.scores) {
-                const mgrScore = rec.scores.find(s => s.q === comp.name);
-                if (mgrScore) {
-                    mgrScoreHtml = `<div class="badge bg-primary ms-2">Manager Score: ${mgrScore.s}/${maxScale}</div>`;
-                }
-            }
-        }
-
         area.innerHTML += `
       <div class="card mb-3 shadow-sm border-0">
         <div class="card-body">
-          <label class="form-label fw-bold mb-1">${escapeHTML(comp.name)}${mgrScoreHtml}</label>
+          <label class="form-label fw-bold mb-1">${escapeHTML(comp.name)}</label>
           <p class="small text-muted mb-2">${escapeHTML(comp.desc || 'Rate proficiency level.')}</p>
           ${comp.rec ? `<p class="small text-info mb-2"><i class="bi bi-lightbulb me-1"></i>Recommended Training: ${escapeHTML(comp.rec)}</p>` : ''}
           <div class="row g-3">

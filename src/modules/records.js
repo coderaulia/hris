@@ -79,10 +79,14 @@ export function renderRecordsTable(filterKeys = null) {
         if (isEmployee()) {
             // Employee: can self-assess if manager has assessed them
             if (pct > 0) {
-                actions = `
+                if ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0)) {
+                    actions = '<span class="badge bg-success-subtle text-success border">Self Assessment Submitted</span>';
+                } else {
+                    actions = `
           <button class="btn btn-sm btn-primary shadow-sm" onclick="window.__app.initiateSelfAssessment('${escapeHTML(rec.id)}')">
             <i class="bi bi-pencil-square"></i> Self-Assess
           </button>`;
+                }
             } else {
                 actions = '<span class="badge bg-light text-muted border">Awaiting Manager</span>';
             }

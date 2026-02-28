@@ -434,6 +434,11 @@ export function renderDeptKpiTable(month, tabBtn) {
     // Filter by month
     _currentDeptMonth = month;
     const monthRecords = _currentDeptRecords.filter(r => r.period === month);
+    const monthRecordEmpIds = new Set(monthRecords.map(r => r.employee_id));
+    const noKpiEmpIds = _currentDeptEmpIds.filter(id => !monthRecordEmpIds.has(id));
+    const noKpiEmpNames = noKpiEmpIds.map(id => db[id]?.name || id).sort((a, b) => a.localeCompare(b));
+    const allEmpNames = _currentDeptEmpIds.map(id => db[id]?.name || id).sort((a, b) => a.localeCompare(b));
+    const employeesTooltipText = `Employees (${allEmpNames.length}): ${allEmpNames.join(', ')} | No KPI this period: ${noKpiEmpNames.length > 0 ? noKpiEmpNames.join(', ') : 'None'}`;
 
     // Build row data
     const rows = [];
@@ -478,13 +483,16 @@ export function renderDeptKpiTable(month, tabBtn) {
     if (statsEl) {
         statsEl.innerHTML = `
         <div class="col-md-4">
-            <div class="card border border-2 h-100"><div class="card-body p-3">
+            <div class="card border border-2 h-100" title="${escapeHTML(employeesTooltipText)}" style="cursor: help;"><div class="card-body p-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="text-muted small fw-bold text-uppercase">Total Employees</div>
                     <div class="bg-primary bg-opacity-10 text-primary rounded p-1"><i class="bi bi-people-fill" style="font-size: 0.7rem;"></i></div>
                 </div>
                 <div class="fs-2 fw-bold mb-1">${_currentDeptEmpIds.length}</div>
-                <div class="small text-success"><i class="bi bi-arrow-up-short"></i> Stable</div>
+                <div class="small ${noKpiEmpIds.length > 0 ? 'text-danger' : 'text-success'}">
+                    <i class="bi ${noKpiEmpIds.length > 0 ? 'bi-exclamation-triangle' : 'bi-check-circle'}"></i>
+                    ${noKpiEmpIds.length > 0 ? `${noKpiEmpIds.length} without KPI record` : 'All have KPI records'}
+                </div>
             </div></div>
         </div>
         <div class="col-md-4">
@@ -579,13 +587,71 @@ export function renderDeptKpiTable(month, tabBtn) {
     if (tbody) {
         tbody.innerHTML = '';
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">No KPI records for this month.</td></tr>';
+            if (noKpiEmpIds.length > 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-warning py-4 fw-semibold">No KPI records submitted in this period.</td></tr>';
+                noKpiEmpIds
+                    .map(id => ({ id, name: db[id]?.name || id, position: db[id]?.position || '-' }))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .forEach(emp => {
+                        const initials = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                        tbody.innerHTML += `
+                        <tr class="table-warning kpi-emp-row">
+                            <td colspan="5" class="py-3 px-4 border-bottom">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center fw-bold me-3" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                        ${initials}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="fw-bold emp-search-target">${escapeHTML(emp.name)}</span>
+                                        <span class="text-muted small">${escapeHTML(emp.position)}</span>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">No KPI Record (${formatPeriod(month)})</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+                    });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-5">No KPI records for this month.</td></tr>';
+            }
         } else {
             // Sort rows by employee name, then by period
             rows.sort((a, b) => {
                 if (a.name !== b.name) return a.name.localeCompare(b.name);
                 return b.periodRaw.localeCompare(a.periodRaw);
             });
+
+            // Show employees with no KPI records for selected month
+            if (noKpiEmpIds.length > 0) {
+                noKpiEmpIds
+                    .map(id => ({ id, name: db[id]?.name || id, position: db[id]?.position || '-' }))
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .forEach((emp, idx) => {
+                        const initials = emp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                        tbody.innerHTML += `
+                        <tr class="table-warning kpi-emp-row">
+                            <td colspan="5" class="py-3 px-4 border-bottom">
+                                <div class="d-flex align-items-center">
+                                    <div class="rounded-circle bg-danger bg-opacity-10 text-danger d-flex align-items-center justify-content-center fw-bold me-3" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                        ${initials}
+                                    </div>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="fw-bold emp-search-target">${escapeHTML(emp.name)}</span>
+                                        <span class="text-muted small">${escapeHTML(emp.position)}</span>
+                                    </div>
+                                    <div class="ms-auto">
+                                        <span class="badge bg-danger bg-opacity-10 text-danger border border-danger-subtle">No KPI Record (${formatPeriod(month)})</span>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>`;
+
+                        if (idx === noKpiEmpIds.length - 1) {
+                            tbody.innerHTML += '<tr><td colspan="5" class="py-1 bg-light border-bottom"></td></tr>';
+                        }
+                    });
+            }
 
             // Compute overall percentage per employee
             const empOverall = {};
