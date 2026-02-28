@@ -113,6 +113,37 @@ Since this app operates completely as a **Static Frontend Site (SPA)** connectin
 
 ---
 
+## 🤖 Automatic Deploy (GitHub Actions -> Hostinger)
+
+This repository now includes an automatic deploy workflow:
+
+- Workflow file: `.github/workflows/deploy-hostinger.yml`
+- Trigger: push to `main` (and manual trigger from Actions tab)
+- Process: install deps -> build (`dist/`) -> upload to Hostinger via FTPS
+
+### 1) Add GitHub Repository Secrets
+
+Open **GitHub -> Repository -> Settings -> Secrets and variables -> Actions -> New repository secret**.
+
+Add these secrets:
+
+- `HOSTINGER_FTP_HOST` (example: `ftp.yourdomain.com`)
+- `HOSTINGER_FTP_USER`
+- `HOSTINGER_FTP_PASSWORD`
+- `HOSTINGER_FTP_REMOTE_DIR` (example: `/public_html/`)
+
+### 2) Push to `main`
+
+Every push to `main` will automatically deploy the latest `dist/` build to your Hostinger folder.
+
+### 3) First-run checks
+
+- Ensure FTP account has write access to your target directory.
+- Ensure `HOSTINGER_FTP_REMOTE_DIR` points to the correct site root (for most cases: `/public_html/`).
+- If your repo default branch is not `main`, change the branch in `.github/workflows/deploy-hostinger.yml`.
+
+---
+
 ## 📘 User Roles & Workflows
 
 ### 1. Admins (Super Users)
