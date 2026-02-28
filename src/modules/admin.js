@@ -6,6 +6,7 @@
 import { state, emit, isAdmin } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, debugError } from '../lib/utils.js';
 import { saveConfig, deleteConfig, logActivity } from './data.js';
+import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 let editingPosition = null; // Track which position is being edited
@@ -153,6 +154,7 @@ export function loadPositionForEdit(posName) {
 // ---- SAVE POSITION CONFIG ----
 export async function savePositionConfig() {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('saving competency configuration'))) return;
 
     const posName = document.getElementById('admin-pos-name').value.trim();
     if (!posName) { await notify.warn('Please enter a Position Name.'); return; }
@@ -185,6 +187,7 @@ export async function savePositionConfig() {
 // ---- DELETE POSITION CONFIG ----
 export async function deletePositionConfig(posName) {
     if (!isAdmin()) return;
+    if (!(await requireRecentAuth('deleting competency configuration'))) return;
     if (await notify.confirm(`Delete configuration for "${posName}"?`, { confirmButtonText: 'Delete' })) {
         await notify.withLoading(async () => {
             await deleteConfig(posName);
@@ -229,6 +232,7 @@ export function triggerConfigImport() {
 
 export async function importConfigJSON(input) {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('importing competency configuration'))) return;
     const file = input.files[0];
     if (!file) return;
 

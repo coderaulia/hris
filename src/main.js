@@ -25,7 +25,7 @@ document.getElementById('component-settings').innerHTML = settingsHTML;
 document.getElementById('component-overlays').innerHTML = overlaysHTML;
 
 import { state, subscribe, emit, isAdmin, isManager, isEmployee, setReportFilters } from './lib/store.js';
-import { restoreSession, signIn, signOut } from './modules/auth.js';
+import { restoreSession, signIn, signOut, requestPasswordReset, promptChangePassword, enforcePasswordPolicyOnLogin } from './modules/auth.js';
 import { syncAll } from './modules/data.js';
 import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, exportEmployeeKpiPDF, searchDeptKpiModal } from './modules/dashboard.js';
 import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess } from './modules/records.js';
@@ -36,11 +36,18 @@ import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, 
 import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
 import { debugError, escapeHTML } from './lib/utils.js';
 import { getRoleScopedEmployeeIds } from './lib/reportFilters.js';
+import * as notify from './lib/notify.js';
+import { initMonitoring } from './lib/monitoring.js';
+
+const SESSION_IDLE_MINUTES = Number(import.meta.env.VITE_SESSION_TIMEOUT_MINUTES || 30);
+const SESSION_IDLE_MS = Math.max(5, SESSION_IDLE_MINUTES) * 60 * 1000;
+let _idleTimer = null;
+let _sessionEventsBound = false;
 
 // ---- Expose functions to onclick handlers ----
 window.__app = {
     // Auth
-    attemptLogin, doLogout: signOut,
+    attemptLogin, doLogout, forgotPassword, changeMyPassword,
 
     // Navigation
     switchTab, toggleTheme, toggleDashboardView, updateReportFilters, clearReportFilters,
@@ -75,6 +82,11 @@ window.__app = {
     // Settings
     renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleRecordsView,
 };
+
+function doLogout() {
+    clearSessionTimer();
+    signOut();
+}
 
 // ---- Tab Navigation ----
 function switchTab(tabId) {
@@ -111,6 +123,30 @@ function switchTab(tabId) {
         renderAdminList();
         renderKpiManager();
     }
+}
+
+function clearSessionTimer() {
+    if (_idleTimer) {
+        clearTimeout(_idleTimer);
+        _idleTimer = null;
+    }
+}
+
+function bindSessionActivity() {
+    if (_sessionEventsBound) return;
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(evt => {
+        window.addEventListener(evt, resetSessionTimer, { passive: true });
+    });
+    _sessionEventsBound = true;
+}
+
+function resetSessionTimer() {
+    if (!state.currentUser) return;
+    clearSessionTimer();
+    _idleTimer = setTimeout(async () => {
+        await notify.warn('Session timed out due to inactivity. Please login again.', 'Session Timeout');
+        doLogout();
+    }, SESSION_IDLE_MS);
 }
 
 function refreshActiveReports() {
@@ -284,7 +320,7 @@ async function attemptLogin() {
     try {
         await signIn(email, pass);
         await syncAll();
-        showApp();
+        await showApp();
     } catch (err) {
         if (errorEl) { errorEl.innerText = err.message || 'Invalid credentials.'; errorEl.classList.remove('hidden'); }
         btn.disabled = false;
@@ -292,8 +328,41 @@ async function attemptLogin() {
     }
 }
 
+async function forgotPassword() {
+    const rawEmail = document.getElementById('login-user')?.value?.trim() || '';
+    const email = await notify.input({
+        title: 'Reset Password',
+        input: 'email',
+        inputLabel: 'Enter your account email',
+        inputValue: rawEmail,
+        confirmButtonText: 'Send Reset Link',
+        validate: value => {
+            const v = String(value || '').trim();
+            if (!v) return 'Email is required.';
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Enter a valid email address.';
+            return null;
+        },
+    });
+    if (email === null) return;
+
+    try {
+        await notify.withLoading(async () => {
+            await requestPasswordReset(String(email).trim());
+        }, 'Sending Reset Link', 'Please wait...');
+        await notify.success('Password reset link sent. Check your email.');
+    } catch (err) {
+        await notify.error('Failed to send reset email: ' + (err.message || err));
+    }
+}
+
+async function changeMyPassword() {
+    if (!state.currentUser) return;
+    const ok = await promptChangePassword({ enforced: false, clearMustChange: true });
+    if (!ok) return;
+}
+
 // ---- Show App ----  
-function showApp() {
+async function showApp() {
     document.getElementById('login-view').classList.add('hidden');
     document.getElementById('main-app').classList.remove('hidden');
 
@@ -336,6 +405,11 @@ function showApp() {
 
     renderReportFilterOptions();
     clearReportFilters();
+    bindSessionActivity();
+    resetSessionTimer();
+
+    const passOk = await enforcePasswordPolicyOnLogin();
+    if (!passOk) return;
 
     // Default tab
     if (role === 'superadmin' || role === 'manager') {
@@ -353,6 +427,8 @@ subscribe('data:employees', () => {
 
 // ---- Initialize ----
 document.addEventListener('DOMContentLoaded', async function () {
+    initMonitoring();
+
     // Restore Theme
     const savedTheme = localStorage.getItem('appTheme') || 'light';
     document.documentElement.setAttribute('data-bs-theme', savedTheme);
@@ -364,7 +440,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         const user = await restoreSession();
         if (user) {
             await syncAll();
-            showApp();
+            await showApp();
         }
     } catch (err) {
         debugError('Session restore failed:', err);

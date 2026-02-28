@@ -7,6 +7,7 @@ import { escapeHTML, escapeInlineArg, formatPeriod, formatNumber, debugError, fo
 import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, logActivity } from './data.js';
 import * as notify from '../lib/notify.js';
 import { getFilteredEmployeeIds } from '../lib/reportFilters.js';
+import { requireRecentAuth } from './auth.js';
 
 // ---- RENDER KPI SETTINGS TAB ----
 export function renderKpiManager() {
@@ -397,6 +398,7 @@ export async function submitKpiRecord() {
 
 // ---- KPI DEFINITION CRUD ----
 export async function saveKpiDef() {
+    if (!(await requireRecentAuth('saving KPI definition'))) return;
     const name = document.getElementById('kpi-def-name')?.value?.trim();
     const description = document.getElementById('kpi-def-desc')?.value?.trim();
     const category = document.getElementById('kpi-def-category')?.value?.trim();
@@ -470,6 +472,7 @@ export function copyKpiDef(id) {
 }
 
 export async function removeKpiDef(id) {
+    if (!(await requireRecentAuth('deleting KPI definition'))) return;
     if (!(await notify.confirm('Delete this KPI definition?', { confirmButtonText: 'Delete' }))) return;
     try {
         const kpi = state.kpiConfig.find(k => k.id === id);
@@ -663,6 +666,7 @@ export function exportKpiJSON() {
 
 export async function importKpiJSON(input) {
     if (state.currentUser?.role !== 'superadmin') { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('importing KPI definitions'))) return;
     const file = input.files[0];
     if (!file) return;
 

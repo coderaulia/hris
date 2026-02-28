@@ -2,6 +2,8 @@
 // UTILITY FUNCTIONS
 // ==================================================
 
+import { captureError } from './monitoring.js';
+
 export function escapeHTML(str) {
     if (!str) return '';
     return String(str).replace(/[&<>"']/g, m => ({
@@ -33,6 +35,17 @@ export function debugError(...args) {
     if (import.meta.env.DEV) {
         console.error(...args);
     }
+    const firstErr = args.find(x => x instanceof Error);
+    const error = firstErr || new Error(args.map(a => {
+        if (typeof a === 'string') return a;
+        try { return JSON.stringify(a); } catch { return String(a); }
+    }).join(' | '));
+    captureError(error, {
+        debug_args: args.map(a => {
+            if (typeof a === 'string') return a;
+            try { return JSON.stringify(a); } catch { return String(a); }
+        }),
+    });
 }
 
 export function formatNumber(val) {

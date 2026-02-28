@@ -30,6 +30,7 @@ DO $$ BEGIN
   ALTER TABLE employees ADD COLUMN IF NOT EXISTS assessment_updated_at TIMESTAMPTZ;
   ALTER TABLE employees ADD COLUMN IF NOT EXISTS self_assessment_updated_by TEXT;
   ALTER TABLE employees ADD COLUMN IF NOT EXISTS self_assessment_updated_at TIMESTAMPTZ;
+  ALTER TABLE employees ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
 EXCEPTION WHEN others THEN NULL;
 END $$;
 
@@ -394,7 +395,9 @@ DROP TRIGGER IF EXISTS update_employees_modtime ON employees;
 CREATE TRIGGER update_employees_modtime BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 
 DROP TRIGGER IF EXISTS guard_employee_sensitive_update_trg ON employees;
-CREATE TRIGGER guard_employee_sensitive_update_trg BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION guard_employee_sensitive_update();
+-- NOTE:
+-- Create guard trigger AFTER seed/data migration section.
+-- If created here, ON CONFLICT upserts below can be blocked in SQL editor context.
 
 DROP TRIGGER IF EXISTS update_config_modtime ON competency_config;
 CREATE TRIGGER update_config_modtime BEFORE UPDATE ON competency_config FOR EACH ROW EXECUTE FUNCTION update_modified_column();
@@ -571,4 +574,8 @@ INSERT INTO competency_config (position_name, competencies) VALUES
 
 ON CONFLICT (position_name) DO UPDATE SET
   competencies = EXCLUDED.competencies;
+
+-- Enable sensitive update guard only after migration has completed.
+DROP TRIGGER IF EXISTS guard_employee_sensitive_update_trg ON employees;
+CREATE TRIGGER guard_employee_sensitive_update_trg BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION guard_employee_sensitive_update();
 

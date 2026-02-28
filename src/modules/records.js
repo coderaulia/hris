@@ -6,6 +6,7 @@ import { Chart } from 'chart.js/auto';
 import { state, emit, isAdmin, isEmployee, isManager } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey } from '../lib/utils.js';
 import { saveEmployee, logActivity } from './data.js';
+import { requireRecentAuth } from './auth.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from './assessment.js';
 import * as notify from '../lib/notify.js';
 import { getFilteredEmployeeIds } from '../lib/reportFilters.js';
@@ -489,6 +490,7 @@ export function closeReport() {
 
 export async function deleteRecordSafe(id) {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('deleting assessment record'))) return;
     const rec = state.db[id];
     if (!rec) return;
     if (await notify.confirm(`Delete assessment results for ${rec.name}?`, { confirmButtonText: 'Delete' })) {

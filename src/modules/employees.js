@@ -6,6 +6,7 @@
 import { state, emit, isAdmin } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } from '../lib/utils.js';
 import { saveEmployee, deleteEmployee as deleteEmpFromDB, logActivity } from './data.js';
+import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 export function renderEmployeeManager() {
@@ -138,7 +139,8 @@ export async function saveEmployeeData() {
         id, date_created: '-', date_updated: '-', date_next: '-',
         percentage: 0, scores: [], training_history: [], history: [],
         self_scores: [], self_percentage: 0, self_date: '',
-        kpi_targets: {}
+        kpi_targets: {},
+        must_change_password: false,
     };
     const oldSnapshot = isEdit ? { ...rec } : null;
 
@@ -230,6 +232,7 @@ export function resetEmployeeForm() {
 
 export async function deleteEmployeeData(id) {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('deleting employee data'))) return;
     if (await notify.confirm(`Delete ${state.db[id]?.name}? This removes all their data.`, { confirmButtonText: 'Delete' })) {
         const deleted = state.db[id];
         await notify.withLoading(async () => {
@@ -271,6 +274,7 @@ export function exportEmployeeCSV() {
 
 export async function importEmployeeCSV(input) {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('importing employee data'))) return;
     const file = input.files[0];
     if (!file) return;
 
@@ -320,6 +324,7 @@ export async function importEmployeeCSV(input) {
                     date_created: '-', date_updated: '-', date_next: '-',
                     self_scores: [], self_percentage: 0, self_date: '',
                     kpi_targets: {},
+                    must_change_password: false,
                 };
 
                 existing.name = name;

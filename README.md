@@ -23,6 +23,11 @@ This system replaces older, disconnected spreadsheets by centralizing authentica
 - **Data Exporting:** Every table and visualization can be instantly exported to Excel (`.xlsx`) or PDF.
 - **Traceability:** Activity logs track admin-sensitive changes and KPI/assessment edits with actor + timestamp metadata.
 
+### **4. Account & Security**
+- **Password Recovery:** Built-in forgot password flow via Supabase reset email.
+- **First Login Protection:** Temporary credentials can force mandatory password change on first login.
+- **Session Protection:** Idle timeout and re-authentication prompts for sensitive operations.
+
 ---
 
 ## 🏗 Architecture & Stack 
@@ -60,11 +65,11 @@ TNA/
 
 1. Log in to [Supabase](https://supabase.com) and create exactly **one new project**.
 2. Once the project dashboard is ready, navigate to the **SQL Editor** on the left menu.
-3. Open the `supabase-schema.sql` file from this project's root folder. Copy **everything** inside that file.
-4. Paste it into your Supabase SQL Editor and click **RUN**. This single script handles everything: 
+3. Open the `complete-setup.sql` file from this project's root folder. Copy **everything** inside that file.
+4. Paste it into your Supabase SQL Editor and click **RUN**. This single script handles everything:
    - Generates all Database Tables.
    - Triggers the necessary Row-Level Security (RLS) policies.
-   - Inserts vital initial Default Data (The overarching admin account, default competencies, and a default company configuration).
+   - Inserts baseline employee/competency sample data and app defaults.
 
 ### Phase 2: Connecting the Frontend
 
@@ -88,12 +93,8 @@ You must have **Node.js** installed on your computer.
    ```bash
    npm run dev
    ```
-3. The app will launch (typically at `http://localhost:5173`). 
-4. **Log in using the default Super Admin credential:**
-   - **Email:** `admin@hrsuite.com`
-   - **Password:** `admin123`
-
-*(Note: Ensure you change this default password via the Settings or Supabase dashboard before putting your app into actual production!)*
+3. The app will launch (typically at `http://localhost:5173`).
+4. Create your first superadmin login in Supabase Auth, then link that email in `employees.auth_email` and role `superadmin`.
 
 ---
 
@@ -134,7 +135,13 @@ Add these secrets:
 - `HOSTINGER_FTP_REMOTE_DIR` (example: `/public_html/`)
 - `VITE_SUPABASE_URL` (example: `https://your-project-id.supabase.co`)
 - `VITE_SUPABASE_ANON_KEY` (your Supabase anon public key)
+- `VITE_SESSION_TIMEOUT_MINUTES` (optional, default `30`)
+- `VITE_MONITOR_WEBHOOK_URL` (optional, frontend error webhook endpoint)
+- `VITE_SENTRY_DSN` (optional, if you provide Sentry script/SDK integration)
 - `SUPABASE_DB_URL` (for scheduled backup workflow, format: `postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres`)
+- `SITE_BASE_URL` (example: `https://hr.yourdomain.com`, used for post-deploy checks)
+- `SITE_HEALTHCHECK_URL` (optional override, example: `https://hr.yourdomain.com/healthz.json`)
+- `DEPLOY_NOTIFY_WEBHOOK_URL` (optional webhook for deploy success/failure notifications)
 
 ### 2) Push to `main`
 
@@ -145,6 +152,7 @@ Every push to `main` will automatically deploy the latest `dist/` build to your 
 - Ensure FTP account has write access to your target directory.
 - Ensure `HOSTINGER_FTP_REMOTE_DIR` points to the correct site root (for most cases: `/public_html/`).
 - If your repo default branch is not `main`, change the branch in `.github/workflows/deploy-hostinger.yml`.
+- Ensure `public/healthz.json` is reachable after deploy (`/healthz.json`).
 
 ### 4) Scheduled Supabase backup/export
 
@@ -185,4 +193,5 @@ Required secret:
 
 - **SQL Injection/XSS Prevention:** The system utilizes robust frontend sanitization via custom `escapeHTML` formatters natively across all list/render functions preventing DOM injections.
 - **Row Level Security:** Ensure that your Supabase instance doesn't have RLS disabled. The queries are formatted exclusively expecting the native secure SDK flow.
+- **Default Credentials:** No default production admin credential should be documented or shipped. Use unique credentials and force password rotation for temporary accounts.
 

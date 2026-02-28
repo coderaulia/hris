@@ -6,7 +6,7 @@
 import { state, emit, isAdmin } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, formatDateTime } from '../lib/utils.js';
 import { saveSetting, saveEmployee, fetchActivityLogs, logActivity } from './data.js';
-import { createAuthUser } from './auth.js';
+import { createAuthUser, requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 // ---- RENDER SETTINGS PAGE ----
@@ -51,6 +51,7 @@ function renderAppSettings() {
 }
 
 export async function saveAppSettings() {
+    if (!(await requireRecentAuth('saving application settings'))) return;
     const fields = ['app_name', 'company_name', 'company_short', 'department_label', 'assessment_scale_max', 'assessment_threshold'];
     const changed = {};
 
@@ -223,6 +224,7 @@ function collectDeptPositions() {
 }
 
 export async function saveOrgConfig() {
+    if (!(await requireRecentAuth('updating organization configuration'))) return;
     try {
         const levels = document.getElementById('settings-levels').value.trim();
         const deptMap = collectDeptPositions();
@@ -275,6 +277,9 @@ function renderUserManagement() {
         const authStatus = rec.auth_email
             ? `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${escapeHTML(rec.auth_email)}</span>`
             : '<span class="badge bg-light text-muted border">No login</span>';
+        const mustChangeBadge = rec.must_change_password
+            ? '<span class="badge bg-warning text-dark ms-1">Temp Password</span>'
+            : '';
 
         tbody.innerHTML += `
       <tr>
@@ -282,7 +287,7 @@ function renderUserManagement() {
         <td class="fw-bold">${escapeHTML(rec.name)}</td>
         <td>${escapeHTML(rec.position)}</td>
         <td class="text-center">${roleBadge}</td>
-        <td>${authStatus}</td>
+        <td>${authStatus}${mustChangeBadge}</td>
         <td class="text-end">
           <div class="btn-group btn-group-sm">
             <button class="btn btn-outline-primary" onclick="window.__app.editUserRole('${escapeInlineArg(rec.id)}')" title="Change Role"><i class="bi bi-shield-lock"></i></button>
@@ -295,6 +300,7 @@ function renderUserManagement() {
 
 // ---- EDIT USER ROLE ----
 export async function editUserRole(empId) {
+    if (!(await requireRecentAuth('changing user role'))) return;
     const rec = state.db[empId];
     if (!rec) return;
 
@@ -340,6 +346,7 @@ export async function editUserRole(empId) {
 
 // ---- SETUP USER LOGIN ----
 export async function setupUserLogin(empId) {
+    if (!(await requireRecentAuth('creating account credentials'))) return;
     const rec = state.db[empId];
     if (!rec) return;
 
@@ -382,6 +389,7 @@ export async function setupUserLogin(empId) {
 
         rec.auth_email = emailVal;
         if (authData?.user?.id) rec.auth_id = authData.user.id;
+        rec.must_change_password = true;
         await saveEmployee(rec);
         await logActivity({
             action: 'user.login.setup',
@@ -391,6 +399,7 @@ export async function setupUserLogin(empId) {
                 employee_name: rec.name,
                 auth_email: emailVal,
                 auth_user_id: authData?.user?.id || null,
+                must_change_password: true,
             },
         });
 
@@ -401,6 +410,7 @@ export async function setupUserLogin(empId) {
         // If user already exists, just update the email
         if (err.message?.includes('already registered') || err.message?.includes('already been registered')) {
             rec.auth_email = emailVal;
+            rec.must_change_password = true;
             await saveEmployee(rec);
             await logActivity({
                 action: 'user.login.email_update',
@@ -410,6 +420,7 @@ export async function setupUserLogin(empId) {
                     employee_name: rec.name,
                     auth_email: emailVal,
                     reason: 'auth_user_exists',
+                    must_change_password: true,
                 },
             });
             await notify.info(`Email updated for ${rec.name}. User already exists in auth system.`);
