@@ -5,6 +5,10 @@
 import { supabase } from '../lib/supabase.js';
 import { state, emit } from '../lib/store.js';
 
+function isVerifiedUser(user) {
+    return Boolean(user?.email_confirmed_at || user?.confirmed_at);
+}
+
 export async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
@@ -20,7 +24,7 @@ export async function signIn(email, password) {
 
     if (byAuthId) {
         profile = byAuthId;
-    } else {
+    } else if (isVerifiedUser(data.user)) {
         // Fallback: find by email
         const { data: byEmail } = await supabase
             .from('employees')
@@ -29,11 +33,16 @@ export async function signIn(email, password) {
             .maybeSingle();
 
         if (byEmail) {
+            if (byEmail.auth_id && byEmail.auth_id !== data.user.id) {
+                throw new Error('This email is already linked to another auth account. Contact administrator.');
+            }
             profile = byEmail;
             // Link auth_id for future logins
-            await supabase.from('employees')
-                .update({ auth_id: data.user.id })
-                .eq('employee_id', byEmail.employee_id);
+            if (!byEmail.auth_id) {
+                await supabase.from('employees')
+                    .update({ auth_id: data.user.id })
+                    .eq('employee_id', byEmail.employee_id);
+            }
         }
     }
 
@@ -62,7 +71,7 @@ export async function signIn(email, password) {
 export async function signOut() {
     await supabase.auth.signOut();
     state.currentUser = null;
-    sessionStorage.clear();
+    sessionStorage.removeItem('hr_user');
     emit('auth:logout');
     location.reload();
 }
@@ -89,13 +98,18 @@ export async function restoreSession() {
 
     if (byAuthId) {
         profile = byAuthId;
-    } else {
+    } else if (isVerifiedUser(session.user)) {
         const { data: byEmail } = await supabase
             .from('employees')
             .select('*')
             .eq('auth_email', session.user.email)
             .maybeSingle();
-        if (byEmail) profile = byEmail;
+        if (byEmail) {
+            if (byEmail.auth_id && byEmail.auth_id !== session.user.id) {
+                throw new Error('Account linkage mismatch. Please contact administrator.');
+            }
+            profile = byEmail;
+        }
     }
 
     let role = profile?.role || 'employee';
@@ -118,6 +132,10 @@ export async function restoreSession() {
 
 // Create a new Supabase auth user (superadmin only)
 export async function createAuthUser(email, password) {
+    if (state.currentUser?.role !== 'superadmin') {
+        throw new Error('Access denied. Superadmin only.');
+    }
+
     // Use Supabase admin API via edge function, or signup
     const { data, error } = await supabase.auth.signUp({
         email,

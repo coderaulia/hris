@@ -4,7 +4,7 @@
 // ==================================================
 
 import { state, emit, isAdmin } from '../lib/store.js';
-import { escapeHTML, getInputValue, getDepartment, safeCSV } from '../lib/utils.js';
+import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } from '../lib/utils.js';
 import { saveEmployee, deleteEmployee as deleteEmpFromDB } from './data.js';
 
 export function renderEmployeeManager() {
@@ -60,7 +60,7 @@ export function renderEmployeeManager() {
     sortedIds.forEach(id => {
         const rec = db[id];
         if (rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead'))) {
-            mgrSelect.innerHTML += `<option value="${rec.id}">${escapeHTML(rec.name)} (${escapeHTML(rec.position)})</option>`;
+            mgrSelect.innerHTML += `<option value="${escapeHTML(rec.id)}">${escapeHTML(rec.name)} (${escapeHTML(rec.position)})</option>`;
         }
     });
     if (currentMgrVal) mgrSelect.value = currentMgrVal;
@@ -91,8 +91,8 @@ export function renderEmployeeManager() {
         const mgrIcon = isMgr ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '';
 
         const actions = isAdmin() ? `
-      <button class="btn btn-sm btn-outline-primary border-0" onclick="window.__app.loadEmployeeForEdit('${rec.id}')"><i class="bi bi-pencil"></i></button>
-      <button class="btn btn-sm btn-outline-danger border-0" onclick="window.__app.deleteEmployeeData('${rec.id}')"><i class="bi bi-trash"></i></button>
+      <button class="btn btn-sm btn-outline-primary border-0" onclick="window.__app.loadEmployeeForEdit('${escapeInlineArg(rec.id)}')"><i class="bi bi-pencil"></i></button>
+      <button class="btn btn-sm btn-outline-danger border-0" onclick="window.__app.deleteEmployeeData('${escapeInlineArg(rec.id)}')"><i class="bi bi-trash"></i></button>
     ` : '';
 
         tbody.innerHTML += `

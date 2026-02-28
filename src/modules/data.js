@@ -4,12 +4,12 @@
 
 import { supabase } from '../lib/supabase.js';
 import { state, emit } from '../lib/store.js';
-import { getDepartment } from '../lib/utils.js';
+import { getDepartment, debugError } from '../lib/utils.js';
 
 // ---- APP SETTINGS ----
 export async function fetchSettings() {
     const { data, error } = await supabase.from('app_settings').select('*');
-    if (error) { console.error('Fetch settings error:', error); return {}; }
+    if (error) { debugError('Fetch settings error:', error); return {}; }
 
     const settings = {};
     (data || []).forEach(row => { settings[row.key] = row.value; });
@@ -30,7 +30,7 @@ export async function saveSetting(key, value) {
 // ---- EMPLOYEES / DB ----
 export async function fetchEmployees() {
     const { data, error } = await supabase.from('employees').select('*');
-    if (error) { console.error('Fetch employees error:', error); return; }
+    if (error) { debugError('Fetch employees error:', error); return; }
 
     const db = {};
     (data || []).forEach(row => {
@@ -95,7 +95,7 @@ export async function saveEmployee(rec) {
         .from('employees')
         .upsert(payload, { onConflict: 'employee_id' });
 
-    if (error) { console.error('Save employee error:', error); throw error; }
+    if (error) { debugError('Save employee error:', error); throw error; }
 
     state.db[rec.id] = rec;
     emit('data:employees', state.db);
@@ -107,7 +107,7 @@ export async function deleteEmployee(id) {
         .delete()
         .eq('employee_id', id);
 
-    if (error) { console.error('Delete employee error:', error); throw error; }
+    if (error) { debugError('Delete employee error:', error); throw error; }
     delete state.db[id];
     emit('data:employees', state.db);
 }
@@ -115,7 +115,7 @@ export async function deleteEmployee(id) {
 // ---- CONFIG ----
 export async function fetchConfig() {
     const { data, error } = await supabase.from('competency_config').select('*');
-    if (error) { console.error('Fetch config error:', error); return; }
+    if (error) { debugError('Fetch config error:', error); return; }
 
     const config = {};
     (data || []).forEach(row => {
@@ -149,7 +149,7 @@ export async function deleteConfig(posName) {
 // ---- KPI ----
 export async function fetchKpiDefinitions() {
     const { data, error } = await supabase.from('kpi_definitions').select('*').order('category');
-    if (error) { console.error('Fetch KPI defs error:', error); return []; }
+    if (error) { debugError('Fetch KPI defs error:', error); return []; }
     state.kpiConfig = data || [];
     emit('data:kpiConfig', state.kpiConfig);
     return state.kpiConfig;
@@ -182,7 +182,7 @@ export async function fetchKpiRecords(filters = {}) {
     if (filters.employee_id) query = query.eq('employee_id', filters.employee_id);
     if (filters.period) query = query.eq('period', filters.period);
     const { data, error } = await query.order('period', { ascending: false });
-    if (error) { console.error('Fetch KPI records error:', error); return []; }
+    if (error) { debugError('Fetch KPI records error:', error); return []; }
     state.kpiRecords = data || [];
     emit('data:kpiRecords', state.kpiRecords);
     return state.kpiRecords;

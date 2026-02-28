@@ -3,7 +3,7 @@
 // ==================================================
 
 import { state, emit } from '../lib/store.js';
-import { escapeHTML, formatPeriod, formatNumber } from '../lib/utils.js';
+import { escapeHTML, escapeInlineArg, formatPeriod, formatNumber, debugError } from '../lib/utils.js';
 import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords } from './data.js';
 
 // ---- RENDER KPI SETTINGS TAB ----
@@ -46,9 +46,9 @@ function renderKpiDefinitions() {
             <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target ? formatNumber(kpi.target) : '-'} ${escapeHTML(kpi.unit || '')}</span>
           </div>
           ${isAdmin ? `<div class="btn-group btn-group-sm">
-            <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${kpi.id}')" title="Copy KPI"><i class="bi bi-files"></i></button>
-            <button class="btn btn-outline-primary" onclick="window.__app.editKpiDef('${kpi.id}')" title="Edit KPI"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-outline-danger" onclick="window.__app.removeKpiDef('${kpi.id}')" title="Delete KPI"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${escapeInlineArg(kpi.id)}')" title="Copy KPI"><i class="bi bi-files"></i></button>
+            <button class="btn btn-outline-primary" onclick="window.__app.editKpiDef('${escapeInlineArg(kpi.id)}')" title="Edit KPI"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-outline-danger" onclick="window.__app.removeKpiDef('${escapeInlineArg(kpi.id)}')" title="Delete KPI"><i class="bi bi-trash"></i></button>
           </div>` : ''}
         </div>`;
         });
@@ -137,7 +137,7 @@ export function onKpiEmployeeChange() {
             </div>
             <div class="ms-2 d-flex gap-1 align-items-center" style="width: 140px;">
                 <input type="number" class="form-control form-control-sm text-end target-custom-input"
-                    data-kpi="${kpi.id}" value="${val}" placeholder="${kpi.target}">
+                    data-kpi="${escapeHTML(kpi.id)}" value="${val}" placeholder="${kpi.target}">
                 <span class="small text-muted" style="width: 40px;">${escapeHTML(kpi.unit || '')}</span>
             </div>
         </div>`;
@@ -213,7 +213,7 @@ export function startKpiInput() {
 
         applicableKpis.forEach(kpi => {
             const effectiveTarget = targets[kpi.id] !== undefined ? targets[kpi.id] : kpi.target;
-            kpiSelect.innerHTML += `<option value = "${kpi.id}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option> `;
+            kpiSelect.innerHTML += `<option value = "${escapeHTML(kpi.id)}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option> `;
         });
     }
 
@@ -325,8 +325,8 @@ export async function renderKpiHistory() {
         <td class="text-end">
           ${currentUser.role !== 'employee' ? `
             <div class="btn-group btn-group-sm" role="group">
-                <button class="btn btn-outline-primary" onclick="window.__app.editKpiRecord('${record.id}')" title="Edit KPI Record"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-outline-danger" onclick="window.__app.removeKpiRecord('${record.id}')" title="Delete KPI Record"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-outline-primary" onclick="window.__app.editKpiRecord('${escapeInlineArg(record.id)}')" title="Edit KPI Record"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-outline-danger" onclick="window.__app.removeKpiRecord('${escapeInlineArg(record.id)}')" title="Delete KPI Record"><i class="bi bi-trash"></i></button>
             </div>
           ` : ''}
         </td>
@@ -605,7 +605,7 @@ export async function importKpiJSON(input) {
             alert(`Imported ${count} KPIs successfully!`);
         } catch (err) {
             alert('Invalid JSON file. Error: ' + err.message);
-            console.error(err);
+            debugError(err);
         }
         input.value = '';
     };

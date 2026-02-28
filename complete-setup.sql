@@ -318,8 +318,30 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+-- Prevent privilege/scope escalation through broad UPDATE policy.
+-- Non-superadmin users may update assessment-related data but must not
+-- modify identity/authorization fields.
+CREATE OR REPLACE FUNCTION guard_employee_sensitive_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NOT is_superadmin() THEN
+    IF NEW.role IS DISTINCT FROM OLD.role
+       OR NEW.department IS DISTINCT FROM OLD.department
+       OR NEW.manager_id IS DISTINCT FROM OLD.manager_id
+       OR NEW.auth_email IS DISTINCT FROM OLD.auth_email
+       OR NEW.auth_id IS DISTINCT FROM OLD.auth_id THEN
+      RAISE EXCEPTION 'Access denied: sensitive employee fields are superadmin-only.';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
 DROP TRIGGER IF EXISTS update_employees_modtime ON employees;
 CREATE TRIGGER update_employees_modtime BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS guard_employee_sensitive_update_trg ON employees;
+CREATE TRIGGER guard_employee_sensitive_update_trg BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION guard_employee_sensitive_update();
 
 DROP TRIGGER IF EXISTS update_config_modtime ON competency_config;
 CREATE TRIGGER update_config_modtime BEFORE UPDATE ON competency_config FOR EACH ROW EXECUTE FUNCTION update_modified_column();

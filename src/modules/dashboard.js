@@ -4,7 +4,7 @@
 
 import { Chart } from 'chart.js/auto';
 import { state } from '../lib/store.js';
-import { getDepartment, formatPeriod, escapeHTML, formatNumber } from '../lib/utils.js';
+import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber } from '../lib/utils.js';
 
 let chartDistInstance = null;
 let chartStatusInstance = null;
@@ -355,7 +355,7 @@ function renderDeptKpiCards(records) {
         container.innerHTML += `
         <div class="col-md-4 col-lg-3">
             <div class="card border-0 shadow-sm h-100 dept-kpi-card" role="button"
-                 onclick="window.__app.openDeptKpiModal('${escapeHTML(dept)}')"
+                 onclick="window.__app.openDeptKpiModal('${escapeInlineArg(dept)}')"
                  style="background: ${c.bg}; border-left: 4px solid ${c.border} !important; transition: transform .15s, box-shadow .15s;">
                 <div class="card-body py-3 px-3">
                     <div class="d-flex align-items-center mb-2">
@@ -403,7 +403,7 @@ export function openDeptKpiModal(dept) {
     const tabsHtml = distinctMonths.map(m => `
         <li class="nav-item">
             <button class="nav-link ${m === currentMonthStr ? 'active' : ''}" 
-                onclick="window.__app.renderDeptKpiTable('${m}', this)">
+                onclick="window.__app.renderDeptKpiTable('${escapeInlineArg(m)}', this)">
                 ${formatPeriod(m)}
             </button>
         </li>
@@ -688,7 +688,7 @@ export function renderDeptKpiTable(month, tabBtn) {
                                         ${avg}% Avg
                                     </div>
                                     <button class="btn btn-sm btn-outline-primary py-0 px-2"
-                                        onclick="window.__app.exportEmployeeKpiPDF('${escapeHTML(r.employee_id)}')"
+                                        onclick="window.__app.exportEmployeeKpiPDF('${escapeInlineArg(r.employee_id)}')"
                                         title="Export ${escapeHTML(r.name)} report">
                                         <i class="bi bi-file-earmark-pdf me-1"></i> PDF
                                     </button>

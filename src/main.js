@@ -34,6 +34,7 @@ import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositio
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
 import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
 import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
+import { debugError } from './lib/utils.js';
 
 // ---- Expose functions to onclick handlers ----
 window.__app = {
@@ -45,7 +46,7 @@ window.__app = {
 
     // Assessment
     renderPendingList, loadPendingEmployee, startAssessment, renderQuestions,
-    reviewAssessment, finalSubmit, goBack, initiateSelfAssessment,
+    reviewAssessment, finalSubmit, goBack,
 
     // Records
     renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog,
@@ -71,7 +72,7 @@ window.__app = {
     removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
 
     // Settings
-    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleDashboardView, toggleRecordsView,
+    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleRecordsView,
 };
 
 // ---- Tab Navigation ----
@@ -257,6 +258,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             showApp();
         }
     } catch (err) {
-        console.error('Session restore failed:', err);
+        debugError('Session restore failed:', err);
     }
 });

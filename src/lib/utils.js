@@ -9,6 +9,32 @@ export function escapeHTML(str) {
     }[m]));
 }
 
+// Escape a value for use inside inline handler string literals like:
+// onclick="fn('...')"
+export function escapeInlineArg(str) {
+    if (str === null || str === undefined) return '';
+    const jsSafe = String(str)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\r/g, '\\r')
+        .replace(/\n/g, '\\n')
+        .replace(/\u2028/g, '\\u2028')
+        .replace(/\u2029/g, '\\u2029');
+
+    // Protect the surrounding HTML attribute context.
+    return jsSafe
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+export function debugError(...args) {
+    if (import.meta.env.DEV) {
+        console.error(...args);
+    }
+}
+
 export function formatNumber(val) {
     if (val === null || val === undefined || val === '') return '-';
     const num = Number(val);

@@ -4,7 +4,7 @@
 // ==================================================
 
 import { state, emit, isAdmin } from '../lib/store.js';
-import { escapeHTML } from '../lib/utils.js';
+import { escapeHTML, escapeInlineArg } from '../lib/utils.js';
 import { saveSetting, saveEmployee, deleteEmployee, fetchEmployees } from './data.js';
 import { createAuthUser } from './auth.js';
 
@@ -73,7 +73,7 @@ export function applyBranding() {
     if (headerSub) {
         const dept = appSettings.department_label || 'Human Resources Department';
         const userName = state.currentUser?.name || '';
-        headerSub.innerHTML = `${dept} &middot; <span class="fw-bold">${escapeHTML(userName)}</span>`;
+        headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span class="fw-bold">${escapeHTML(userName)}</span>`;
     }
 
     const loginCompany = document.getElementById('login-company');
@@ -253,8 +253,8 @@ function renderUserManagement() {
         <td>${authStatus}</td>
         <td class="text-end">
           <div class="btn-group btn-group-sm">
-            <button class="btn btn-outline-primary" onclick="window.__app.editUserRole('${escapeHTML(rec.id)}')" title="Change Role"><i class="bi bi-shield-lock"></i></button>
-            <button class="btn btn-outline-success" onclick="window.__app.setupUserLogin('${escapeHTML(rec.id)}')" title="Setup Login"><i class="bi bi-key"></i></button>
+            <button class="btn btn-outline-primary" onclick="window.__app.editUserRole('${escapeInlineArg(rec.id)}')" title="Change Role"><i class="bi bi-shield-lock"></i></button>
+            <button class="btn btn-outline-success" onclick="window.__app.setupUserLogin('${escapeInlineArg(rec.id)}')" title="Setup Login"><i class="bi bi-key"></i></button>
           </div>
         </td>
       </tr>`;
@@ -308,7 +308,7 @@ export async function setupUserLogin(empId) {
         if (authData?.user?.id) rec.auth_id = authData.user.id;
         await saveEmployee(rec);
 
-        alert(`Login created for ${rec.name}!\nEmail: ${email}\nPassword: ${password}\n\nNote: User may need to confirm email (check Supabase auth settings).`);
+        alert(`Login created for ${rec.name}.\nEmail: ${email}\nTemporary password has been set.\n\nAsk the user to change the password immediately.`);
         renderUserManagement();
     } catch (err) {
         // If user already exists, just update the email

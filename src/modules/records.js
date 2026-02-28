@@ -4,7 +4,7 @@
 
 import { Chart } from 'chart.js/auto';
 import { state, emit, isAdmin, isEmployee, isManager } from '../lib/store.js';
-import { escapeHTML, getDisplayDate } from '../lib/utils.js';
+import { escapeHTML, escapeInlineArg, getDisplayDate } from '../lib/utils.js';
 import { saveEmployee } from './data.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from './assessment.js';
 
@@ -83,7 +83,7 @@ export function renderRecordsTable(filterKeys = null) {
                     actions = '<span class="badge bg-success-subtle text-success border">Self Assessment Submitted</span>';
                 } else {
                     actions = `
-          <button class="btn btn-sm btn-primary shadow-sm" onclick="window.__app.initiateSelfAssessment('${escapeHTML(rec.id)}')">
+          <button class="btn btn-sm btn-primary shadow-sm" onclick="window.__app.initiateSelfAssessment('${escapeInlineArg(rec.id)}')">
             <i class="bi bi-pencil-square"></i> Self-Assess
           </button>`;
                 }
@@ -93,8 +93,8 @@ export function renderRecordsTable(filterKeys = null) {
         } else {
             // Manager/Admin actions
             actions = `
-        <button class="btn btn-outline-secondary" onclick="window.__app.editRecordSafe('${escapeHTML(rec.id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
-        ${isAdmin() ? `<button class="btn btn-outline-danger" onclick="window.__app.deleteRecordSafe('${escapeHTML(rec.id)}')" title="Delete"><i class="bi bi-trash"></i></button>` : ''}`;
+        <button class="btn btn-outline-secondary" onclick="window.__app.editRecordSafe('${escapeInlineArg(rec.id)}')" title="Edit"><i class="bi bi-pencil"></i></button>
+        ${isAdmin() ? `<button class="btn btn-outline-danger" onclick="window.__app.deleteRecordSafe('${escapeInlineArg(rec.id)}')" title="Delete"><i class="bi bi-trash"></i></button>` : ''}`;
         }
 
         tbody.innerHTML += `
@@ -116,8 +116,8 @@ export function renderRecordsTable(filterKeys = null) {
         </td>
         <td class="text-end">
           <div class="btn-group btn-group-sm shadow-sm" role="group">
-            <button class="btn btn-outline-success" onclick="window.__app.openTrainingLog('${escapeHTML(rec.id)}')" title="Training"><i class="bi bi-mortarboard"></i></button>
-            ${pct > 0 ? `<button class="btn btn-outline-primary" onclick="window.__app.openReportByVal('${escapeHTML(rec.id)}')" title="Report"><i class="bi bi-eye"></i></button>` : ''}
+            <button class="btn btn-outline-success" onclick="window.__app.openTrainingLog('${escapeInlineArg(rec.id)}')" title="Training"><i class="bi bi-mortarboard"></i></button>
+            ${pct > 0 ? `<button class="btn btn-outline-primary" onclick="window.__app.openReportByVal('${escapeInlineArg(rec.id)}')" title="Report"><i class="bi bi-eye"></i></button>` : ''}
             ${actions}
           </div>
         </td>
@@ -342,7 +342,7 @@ function renderTrainingHistory() {
             statusBadge = '<span class="badge bg-danger">Rejected</span>';
         }
 
-        const endDate = item.end ? item.end : '<span class="badge bg-warning text-dark" style="font-size: 0.6em;">Ongoing</span>';
+        const endDate = item.end ? escapeHTML(item.end) : '<span class="badge bg-warning text-dark" style="font-size: 0.6em;">Ongoing</span>';
 
         let controls = '';
         if (!isEmployee()) {
@@ -357,7 +357,7 @@ function renderTrainingHistory() {
         tbody.innerHTML += `
       <tr>
         <td><div class="fw-bold">${escapeHTML(item.course)}</div>${statusBadge}</td>
-        <td class="small">${item.start || '-'}</td>
+        <td class="small">${escapeHTML(item.start || '-')}</td>
         <td class="small">${endDate}</td>
         <td class="text-end">${controls}</td>
       </tr>`;

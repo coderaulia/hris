@@ -4,7 +4,7 @@
 // ==================================================
 
 import { state, emit, isAdmin } from '../lib/store.js';
-import { escapeHTML } from '../lib/utils.js';
+import { escapeHTML, escapeInlineArg, debugError } from '../lib/utils.js';
 import { saveConfig, deleteConfig } from './data.js';
 
 let editingPosition = null; // Track which position is being edited
@@ -31,6 +31,7 @@ export function renderAdminList() {
         const comps = appConfig[pos].competencies || [];
         const compCount = comps.length;
         const safePos = escapeHTML(pos);
+        const safePosInline = escapeInlineArg(pos);
         const isActive = editingPosition === pos;
 
         let preview = '';
@@ -42,8 +43,8 @@ export function renderAdminList() {
 
         const actions = isAdmin() ? `
       <div class="d-flex gap-1">
-        <button class="btn btn-sm btn-outline-primary" onclick="window.__app.loadPositionForEdit('${safePos}')" title="Edit"><i class="bi bi-pencil"></i></button>
-        <button class="btn btn-sm btn-outline-danger" onclick="window.__app.deletePositionConfig('${safePos}')" title="Delete"><i class="bi bi-trash"></i></button>
+        <button class="btn btn-sm btn-outline-primary" onclick="window.__app.loadPositionForEdit('${safePosInline}')" title="Edit"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-sm btn-outline-danger" onclick="window.__app.deletePositionConfig('${safePosInline}')" title="Delete"><i class="bi bi-trash"></i></button>
       </div>` : '';
 
         listEl.innerHTML += `
@@ -224,7 +225,7 @@ export async function importConfigJSON(input) {
             alert(`Imported ${count} position configs successfully!`);
         } catch (err) {
             alert('Invalid JSON file.');
-            console.error(err);
+            debugError(err);
         }
         input.value = '';
     };
