@@ -131,6 +131,8 @@ Add these secrets:
 - `HOSTINGER_FTP_USER`
 - `HOSTINGER_FTP_PASSWORD`
 - `HOSTINGER_FTP_REMOTE_DIR` (example: `/public_html/`)
+- `VITE_SUPABASE_URL` (example: `https://your-project-id.supabase.co`)
+- `VITE_SUPABASE_ANON_KEY` (your Supabase anon public key)
 
 ### 2) Push to `main`
 
