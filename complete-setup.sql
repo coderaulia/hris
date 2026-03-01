@@ -165,10 +165,16 @@ $$;
 DROP POLICY IF EXISTS "Allow read settings" ON app_settings;
 DROP POLICY IF EXISTS "Allow write settings" ON app_settings;
 DROP POLICY IF EXISTS "Read settings" ON app_settings;
+DROP POLICY IF EXISTS "Read branding settings (anon)" ON app_settings;
 DROP POLICY IF EXISTS "Superadmin manage settings" ON app_settings;
 CREATE POLICY "Read settings"
 ON app_settings FOR SELECT TO authenticated
 USING (true);
+CREATE POLICY "Read branding settings (anon)"
+ON app_settings FOR SELECT TO anon
+USING (
+  key IN ('app_name', 'company_name', 'company_short', 'department_label')
+);
 CREATE POLICY "Superadmin manage settings"
 ON app_settings FOR ALL TO authenticated
 USING (is_superadmin())

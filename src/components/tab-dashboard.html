@@ -23,7 +23,7 @@
                     <div class="card-body">
                         <div class="stat-icon bg-primary-subtle"><i class="bi bi-people-fill text-primary"></i>
                         </div>
-                        <small class="text-muted text-uppercase fw-bold">Total Employees</small>
+                        <small class="text-muted text-uppercase fw-bold">Total Employees (Competencies)</small>
                         <div class="fs-2 fw-bold" id="d-total-emp">0</div>
                         <div class="small" id="d-total-sub">Records</div>
                     </div>
@@ -99,8 +99,18 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-4">
+            <div class="col">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-primary-subtle"><i class="bi bi-people-fill text-primary"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Total Employees (KPI)</small>
+                        <div class="fs-2 fw-bold" id="d-kpi-emp">0</div>
+                        <div class="small text-muted" id="d-kpi-emp-sub">With KPI records: 0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
                         <div class="stat-icon bg-info-subtle"><i class="bi bi-bullseye text-info"></i></div>
@@ -109,7 +119,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
                         <div class="stat-icon bg-primary-subtle"><i class="bi bi-journal-check text-primary"></i></div>
@@ -118,7 +128,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
                         <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
@@ -128,7 +138,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
                         <div class="stat-icon bg-warning-subtle"><i class="bi bi-check2-all text-warning"></i>
@@ -151,7 +161,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white border-bottom py-3">
-                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Monthly Top</h6>
+                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Monthly Top Performer</h6>
                     </div>
                     <div class="card-body p-2">
                         <ul class="list-group list-group-flush small" id="d-kpi-performers-monthly">
@@ -163,7 +173,7 @@
             <div class="col-md-3">
                 <div class="card shadow-sm border-0 h-100">
                     <div class="card-header bg-white border-bottom py-3">
-                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Quarterly Top</h6>
+                        <h6 class="fw-bold m-0"><i class="bi bi-trophy-fill text-warning me-1"></i> Quarterly Top Performer</h6>
                     </div>
                     <div class="card-body p-2">
                         <ul class="list-group list-group-flush small" id="d-kpi-performers-quarterly">

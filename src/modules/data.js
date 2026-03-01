@@ -7,6 +7,29 @@ import { state, emit } from '../lib/store.js';
 import { getDepartment, debugError } from '../lib/utils.js';
 import * as notify from '../lib/notify.js';
 
+const SETTINGS_CACHE_KEY = 'tna_app_settings_cache_v1';
+
+function writeSettingsCache(settings) {
+    if (typeof localStorage === 'undefined') return;
+    try {
+        localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings || {}));
+    } catch {
+        // Ignore storage quota and private-mode errors.
+    }
+}
+
+function readSettingsCache() {
+    if (typeof localStorage === 'undefined') return {};
+    try {
+        const raw = localStorage.getItem(SETTINGS_CACHE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
 function getErrMsg(error) {
     if (!error) return 'Unknown error';
     if (typeof error === 'string') return error;
@@ -119,11 +142,15 @@ export async function fetchSettings() {
         const settings = {};
         (data || []).forEach(row => { settings[row.key] = row.value; });
         state.appSettings = settings;
+        writeSettingsCache(settings);
         emit('data:settings', settings);
         return settings;
     } catch (error) {
         debugError('Fetch settings error:', error);
-        return {};
+        const cachedSettings = readSettingsCache();
+        state.appSettings = cachedSettings;
+        emit('data:settings', cachedSettings);
+        return cachedSettings;
     }
 }
 
@@ -136,6 +163,7 @@ export async function saveSetting(key, value) {
         { interactiveRetry: true, retries: 1 }
     );
     state.appSettings[key] = value;
+    writeSettingsCache(state.appSettings);
     emit('data:settings', state.appSettings);
 }
 

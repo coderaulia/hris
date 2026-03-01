@@ -186,6 +186,8 @@ function renderKpiSummary() {
     const scopedRecords = kpiRecords.filter(r => visibleIds.has(r.employee_id));
     const monthlyRecords = scopedRecords.filter(r => r.period === selectedMonth);
     const quarterlyRecords = scopedRecords.filter(r => qPeriods.includes(r.period));
+    const totalScopedEmployees = visibleIds.size;
+    const employeesWithMonthlyKpi = new Set(monthlyRecords.map(r => r.employee_id)).size;
 
     // KPI Overview Cards (Current Month)
     const totalKpis = kpiConfig.length;
@@ -213,6 +215,9 @@ function renderKpiSummary() {
 
     const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
 
+    setTxt('d-kpi-emp', totalScopedEmployees);
+    const kpiEmpSub = document.getElementById('d-kpi-emp-sub');
+    if (kpiEmpSub) kpiEmpSub.innerText = `With KPI records: ${employeesWithMonthlyKpi}`;
     setTxt('d-kpi-total', totalKpis);
     setTxt('d-kpi-records', totalRecords);
     setTxt('d-kpi-avg', avgAchievement + '%');

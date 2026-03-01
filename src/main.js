@@ -26,7 +26,7 @@ document.getElementById('component-overlays').innerHTML = overlaysHTML;
 
 import { state, subscribe, emit, isAdmin, isManager, isEmployee, setReportFilters } from './lib/store.js';
 import { restoreSession, signIn, signOut, requestPasswordReset, promptChangePassword, enforcePasswordPolicyOnLogin } from './modules/auth.js';
-import { syncAll } from './modules/data.js';
+import { syncAll, fetchSettings } from './modules/data.js';
 import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, exportEmployeeKpiPDF, searchDeptKpiModal } from './modules/dashboard.js';
 import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess } from './modules/records.js';
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
@@ -421,6 +421,7 @@ async function showApp() {
 
 // ---- Subscribe to events ----
 subscribe('nav:switchTab', switchTab);
+subscribe('data:settings', applyBranding);
 subscribe('data:employees', () => {
     renderReportFilterOptions();
 });
@@ -434,6 +435,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.documentElement.setAttribute('data-bs-theme', savedTheme);
     const themeBtn = document.getElementById('theme-toggle');
     if (themeBtn) themeBtn.innerHTML = savedTheme === 'dark' ? '<i class="bi bi-sun"></i>' : '<i class="bi bi-moon-stars"></i>';
+
+    // Load branding before login screen is used.
+    await fetchSettings();
+    applyBranding();
 
     // Try restore session
     try {

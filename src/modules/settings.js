@@ -88,21 +88,31 @@ export async function saveAppSettings() {
 // Apply branding to UI
 export function applyBranding() {
     const { appSettings } = state;
+    const appName = appSettings.app_name || 'HR Performance Suite';
+    const companyName = appSettings.company_name || '';
+    const companyShort = appSettings.company_short || '';
+    const companyLabel = companyName && companyShort
+        ? `${companyName} (${companyShort})`
+        : (companyName || companyShort || 'Company');
+
     const headerTitle = document.getElementById('app-header-title');
-    if (headerTitle) headerTitle.innerText = appSettings.app_name || 'HR Performance Suite';
+    if (headerTitle) headerTitle.innerText = appName;
 
     const headerSub = document.getElementById('app-header-subtitle');
     if (headerSub) {
         const dept = appSettings.department_label || 'Human Resources Department';
         const userName = state.currentUser?.name || '';
-        headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span class="fw-bold">${escapeHTML(userName)}</span>`;
+        const role = state.currentUser?.role || 'employee';
+        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : 'Employee';
+        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : 'bg-secondary';
+        headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span id="user-display-name" class="fw-bold">${escapeHTML(userName)}</span> <span id="user-role-badge" class="badge ms-2 ${roleClass}">${roleLabel}</span>`;
     }
 
     const loginCompany = document.getElementById('login-company');
-    if (loginCompany) loginCompany.innerText = appSettings.company_name || 'Company';
+    if (loginCompany) loginCompany.innerText = companyLabel;
 
     const loginApp = document.getElementById('login-app-name');
-    if (loginApp) loginApp.innerText = appSettings.app_name || 'HR Performance Suite';
+    if (loginApp) loginApp.innerText = appName;
 }
 
 // ---- ORG SETTINGS ----
