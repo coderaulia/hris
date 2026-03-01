@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HR Performance Suite - User Manual</title>
+    <meta name="description" content="User manual for HR Performance Suite.">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.svg">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+
+        .manual-shell {
+            max-width: 980px;
+        }
+
+        .manual-card {
+            border: 0;
+            border-radius: 14px;
+            box-shadow: 0 0.5rem 1.1rem rgba(0, 0, 0, 0.08);
+        }
+
+        .manual-section h2 {
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container py-4 py-md-5 manual-shell">
+        <div class="manual-card card">
+            <div class="card-body p-4 p-md-5">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <h1 class="h3 mb-1">HR Performance Suite Manual</h1>
+                        <p class="text-muted mb-0">Quick guide for daily use by Employee, Manager, and Super Admin.</p>
+                    </div>
+                    <a class="btn btn-outline-secondary" href="/" role="button">
+                        <i class="bi bi-arrow-left me-1"></i>Back to App
+                    </a>
+                </div>
+
+                <div class="alert alert-info mb-4" role="alert">
+                    <strong>Tip:</strong> Features are role-based. If a tab is missing, your account role may not have access.
+                </div>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">1. Login & Account</h2>
+                    <ul>
+                        <li>Enter your registered email and password, then select <strong>Sign In</strong>.</li>
+                        <li>If needed, use <strong>Forgot Password</strong> on the login page to request a reset link.</li>
+                        <li>After login, use <strong>Password</strong> in the top-right header to change your password.</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">2. Navigation Tabs</h2>
+                    <ul>
+                        <li><strong>Dashboard:</strong> Summary views for assessment and KPI performance.</li>
+                        <li><strong>Employees:</strong> Employee data management (Super Admin only).</li>
+                        <li><strong>Assessment & KPI:</strong> Run performance assessments and KPI workflow.</li>
+                        <li><strong>Records:</strong> View assessment records, KPI history, and training logs.</li>
+                        <li><strong>Settings:</strong> App configuration, users, competencies, KPI definitions, and organization setup (Super Admin only).</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">3. Common Workflow</h2>
+                    <ol>
+                        <li>Check data and updates in <strong>Dashboard</strong>.</li>
+                        <li>Select employee and run manager assessment in <strong>Assessment & KPI</strong>.</li>
+                        <li>Input KPI achievements for the same period in <strong>Assessment & KPI</strong>.</li>
+                        <li>Validate final data in <strong>Records</strong> (Assessment Records and KPI Records).</li>
+                        <li>Use exports for reporting and maintain setup in <strong>Settings</strong> (if authorized).</li>
+                    </ol>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">4. How To Do Assessment</h2>
+                    <ol>
+                        <li>Open <strong>Assessment & KPI</strong> tab.</li>
+                        <li>From <strong>Select Employee</strong>, choose the employee to assess.</li>
+                        <li>Click <strong>Assess Competencies</strong>.</li>
+                        <li>Choose <strong>Position</strong>, fill competency scores/answers, then click <strong>Review Answers</strong>.</li>
+                        <li>Check results on <strong>Review Submission</strong>, then click <strong>Final Submit</strong>.</li>
+                        <li>Verify the saved result in <strong>Records &gt; Assessment Records</strong>.</li>
+                    </ol>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">5. How To Input KPI Achievement</h2>
+                    <ol>
+                        <li>Open <strong>Assessment & KPI</strong> tab and select employee.</li>
+                        <li>Click <strong>Input KPI Achievement</strong>.</li>
+                        <li>Select <strong>KPI Metric</strong> and <strong>Period</strong>.</li>
+                        <li>Enter KPI value:
+                            <ul>
+                                <li>For normal metrics, fill <strong>Final Value</strong>.</li>
+                                <li>For percentage metrics, fill <strong>Attained</strong> and <strong>Total</strong> so percentage is calculated.</li>
+                            </ul>
+                        </li>
+                        <li>Add optional notes, then click <strong>Submit Achievement</strong>.</li>
+                        <li>Verify the entry in <strong>Records &gt; KPI Records</strong>.</li>
+                    </ol>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">6. Report Filters</h2>
+                    <ul>
+                        <li>Use top filters (Department, Manager, Period) to scope Dashboard and Records outputs.</li>
+                        <li>Select <strong>Clear</strong> to reset all filters.</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">7. Exports & Imports</h2>
+                    <ul>
+                        <li>Export options are available in relevant modules (CSV, JSON, Excel, PDF).</li>
+                        <li>Before importing files, verify format and required columns/fields.</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section mb-4">
+                    <h2 class="fw-bold">8. Session & Security</h2>
+                    <ul>
+                        <li>Inactive sessions are logged out automatically after timeout.</li>
+                        <li>Always log out from shared devices.</li>
+                    </ul>
+                </section>
+
+                <section class="manual-section">
+                    <h2 class="fw-bold">9. Troubleshooting</h2>
+                    <ul class="mb-0">
+                        <li>Data not visible: confirm your role and selected filters.</li>
+                        <li>Cannot save/update: check required fields and network connection.</li>
+                        <li>Access issue persists: contact your system administrator.</li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </main>
+</body>
+
+</html>
