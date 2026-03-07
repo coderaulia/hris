@@ -4,7 +4,7 @@
 
 import { state, emit } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, formatPeriod, formatNumber, debugError, formatDateTime } from '../lib/utils.js';
-import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, logActivity } from './data.js';
+import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, logActivity, getEmployeeKpiTarget, normalizeKpiTargetStore, buildKpiTargetStore } from './data.js';
 import * as notify from '../lib/notify.js';
 import { getFilteredEmployeeIds } from '../lib/reportFilters.js';
 import { requireRecentAuth } from './auth.js';
@@ -15,17 +15,94 @@ export function renderKpiManager() {
     renderKpiTargetConfig();
 }
 
+function canEditKpiSettings() {
+    return state.currentUser?.role === 'superadmin' || state.currentUser?.role === 'manager';
+}
+
+function getManagerScopePositionSet() {
+    if (state.currentUser?.role !== 'manager') return null;
+    const mgrId = state.currentUser?.id;
+    const ownDept = state.db[mgrId]?.department || '';
+    const positions = new Set();
+
+    if (ownDept) {
+        try {
+            const deptMap = JSON.parse(state.appSettings?.dept_positions || '{}');
+            const scopedPositions = Array.isArray(deptMap[ownDept]) ? deptMap[ownDept] : [];
+            scopedPositions.forEach(pos => {
+                if (pos) positions.add(pos);
+            });
+        } catch {
+            // ignore malformed dept_positions payload
+        }
+    }
+
+    Object.values(state.db || {}).forEach(emp => {
+        if (!emp || !emp.position || emp.role !== 'employee') return;
+        if (emp.manager_id === mgrId || (ownDept && emp.department === ownDept)) {
+            positions.add(emp.position);
+        }
+    });
+
+    return positions;
+}
+
+function getManagerScopeEmployeeIds() {
+    if (state.currentUser?.role !== 'manager') return null;
+    const mgrId = state.currentUser?.id;
+    const ownDept = state.db[mgrId]?.department || '';
+    const ids = new Set();
+
+    Object.entries(state.db || {}).forEach(([id, emp]) => {
+        if (!emp || emp.role !== 'employee') return;
+        if (emp.manager_id === mgrId || (ownDept && emp.department === ownDept)) {
+            ids.add(id);
+        }
+    });
+
+    return ids;
+}
+
+function canManageEmployeeTarget(empId) {
+    if (state.currentUser?.role === 'superadmin') return true;
+    if (state.currentUser?.role !== 'manager') return false;
+    const scopedIds = getManagerScopeEmployeeIds();
+    return scopedIds?.has(empId) || false;
+}
+
+function getSelectedTargetPeriod() {
+    const input = document.getElementById('kpi-target-period');
+    return input?.value || '';
+}
+
+function getCurrentPeriodKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function onKpiTargetPeriodChange() {
+    onKpiEmployeeChange();
+}
+
 // ---- KPI DEFINITIONS (Admin only) ----
 function renderKpiDefinitions() {
     const container = document.getElementById('kpi-definitions-list');
     if (!container) return;
     container.innerHTML = '';
 
-    const isAdmin = state.currentUser?.role === 'superadmin';
-    const defs = state.kpiConfig || [];
+    const isEditor = canEditKpiSettings();
+    let defs = state.kpiConfig || [];
+
+    if (state.currentUser?.role === 'manager') {
+        const managedPositions = getManagerScopePositionSet();
+        defs = defs.filter(kpi => {
+            const cat = kpi.category || 'General';
+            return cat === 'General' || managedPositions?.has(cat);
+        });
+    }
 
     if (defs.length === 0) {
-        container.innerHTML = '<div class="text-muted text-center py-3 fst-italic">No KPIs defined yet. Admin can add new KPIs above.</div>';
+        container.innerHTML = '<div class="text-muted text-center py-3 fst-italic">No KPIs defined yet. You can add a new KPI definition above.</div>';
         return;
     }
 
@@ -48,7 +125,7 @@ function renderKpiDefinitions() {
             <span class="text-muted small ms-2">${escapeHTML(kpi.description || '')}</span>
             <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target ? formatNumber(kpi.target) : '-'} ${escapeHTML(kpi.unit || '')}</span>
           </div>
-          ${isAdmin ? `<div class="btn-group btn-group-sm">
+          ${isEditor ? `<div class="btn-group btn-group-sm">
             <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${escapeInlineArg(kpi.id)}')" title="Copy KPI"><i class="bi bi-files"></i></button>
             <button class="btn btn-outline-primary" onclick="window.__app.editKpiDef('${escapeInlineArg(kpi.id)}')" title="Edit KPI"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-outline-danger" onclick="window.__app.removeKpiDef('${escapeInlineArg(kpi.id)}')" title="Delete KPI"><i class="bi bi-trash"></i></button>
@@ -69,32 +146,41 @@ function renderKpiTargetConfig() {
     empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
     const { currentUser, db } = state;
 
-    let keys = Object.keys(db);
+    let keys = Object.keys(db).filter(id => db[id]?.role === 'employee');
     if (currentUser.role === 'manager') {
-        const mgrRec = db[currentUser.id];
-        if (mgrRec?.department) {
-            keys = keys.filter(id => db[id].department === mgrRec.department);
-        }
+        const scopedIds = getManagerScopeEmployeeIds();
+        keys = keys.filter(id => scopedIds?.has(id));
     }
     keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
     keys.forEach(id => {
         empSelect.innerHTML += `<option value="${escapeHTML(id)}">${escapeHTML(db[id].name)} (${escapeHTML(db[id].position)})</option>`;
     });
 
+    const periodInput = document.getElementById('kpi-target-period');
+    if (periodInput && !periodInput.value) {
+        periodInput.value = getCurrentPeriodKey();
+    }
+
     const defSelect = document.getElementById('kpi-def-category');
     if (defSelect) {
         const currentVal = defSelect.value;
         defSelect.innerHTML = '<option value="">-- Apply to Position (Global if blank) --</option>';
         const allPositions = new Set();
+        const managerPositions = state.currentUser?.role === 'manager' ? getManagerScopePositionSet() : null;
+
         if (state.appConfig) Object.keys(state.appConfig).forEach(pos => allPositions.add(pos));
         try {
             const deptMap = JSON.parse(state.appSettings?.dept_positions || '{}');
             Object.values(deptMap).forEach(positions => positions.forEach(pos => allPositions.add(pos)));
         } catch { /* ignore */ }
 
-        [...allPositions].sort().forEach(pos => {
-            defSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
-        });
+        [...allPositions]
+            .filter(pos => !managerPositions || managerPositions.has(pos))
+            .sort()
+            .forEach(pos => {
+                defSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
+            });
+
         if (currentVal) defSelect.value = currentVal;
     }
 }
@@ -107,6 +193,18 @@ export function onKpiEmployeeChange() {
 
     if (!empId) {
         listDiv.innerHTML = '<div class="text-muted small fst-italic">Please select an employee...</div>';
+        saveBtn.classList.add('hidden');
+        return;
+    }
+
+    if (!canEditKpiSettings()) {
+        listDiv.innerHTML = '<div class="alert alert-danger py-2 small m-0">Access denied.</div>';
+        saveBtn.classList.add('hidden');
+        return;
+    }
+
+    if (!canManageEmployeeTarget(empId)) {
+        listDiv.innerHTML = '<div class="alert alert-warning py-2 small m-0">Manager can only manage KPI targets for team members.</div>';
         saveBtn.classList.add('hidden');
         return;
     }
@@ -126,17 +224,25 @@ export function onKpiEmployeeChange() {
         saveBtn.classList.add('hidden');
         return;
     }
-
-    const targets = emp.kpi_targets || {};
+    const period = getSelectedTargetPeriod();
+    const { defaultTargets, monthlyTargets } = normalizeKpiTargetStore(emp.kpi_targets || {});
+    const periodTargets = period && monthlyTargets[period] ? monthlyTargets[period] : {};
     let html = '';
 
     applicableKpis.forEach(kpi => {
-        const val = targets[kpi.id] !== undefined ? targets[kpi.id] : '';
+        const monthlyValue = periodTargets[kpi.id];
+        const defaultValue = defaultTargets[kpi.id];
+        const val = monthlyValue !== undefined ? monthlyValue : '';
+        const fallbackLabel = monthlyValue === undefined && defaultValue !== undefined
+            ? `<div class="text-info" style="font-size: 10px;">Default override: ${formatNumber(defaultValue)} ${escapeHTML(kpi.unit || '')}</div>`
+            : '';
+
         html += `
         <div class="d-flex justify-content-between align-items-center bg-white border rounded px-2 py-1">
             <div class="flex-grow-1">
                 <div class="small fw-bold text-truncate" style="max-width: 250px;" title="${escapeHTML(kpi.name)}">${escapeHTML(kpi.name)}</div>
                 <div class="text-muted" style="font-size: 10px;">Global Default: ${formatNumber(kpi.target)} ${escapeHTML(kpi.unit || '')}</div>
+                ${fallbackLabel}
             </div>
             <div class="ms-2 d-flex gap-1 align-items-center" style="width: 140px;">
                 <input type="number" class="form-control form-control-sm text-end target-custom-input"
@@ -153,7 +259,10 @@ export function onKpiEmployeeChange() {
 export async function saveKpiTargets() {
     const empId = document.getElementById('kpi-employee-select')?.value;
     if (!empId) return;
+    if (!canEditKpiSettings()) { await notify.error('Access Denied'); return; }
+    if (!canManageEmployeeTarget(empId)) { await notify.error('Manager can only update targets for team members.'); return; }
 
+    const period = getSelectedTargetPeriod();
     const inputs = document.querySelectorAll('.target-custom-input');
     const targets = {};
 
@@ -166,28 +275,40 @@ export async function saveKpiTargets() {
 
     const emp = state.db[empId];
     if (emp) {
-        emp.kpi_targets = targets;
+        const normalized = normalizeKpiTargetStore(emp.kpi_targets || {});
+        if (period) {
+            if (Object.keys(targets).length > 0) {
+                normalized.monthlyTargets[period] = targets;
+            } else {
+                delete normalized.monthlyTargets[period];
+            }
+        } else {
+            normalized.defaultTargets = targets;
+        }
+
+        emp.kpi_targets = buildKpiTargetStore(normalized.defaultTargets, normalized.monthlyTargets);
+
         try {
             const { saveEmployee } = await import('./data.js');
             await notify.withLoading(async () => {
                 await saveEmployee(emp);
-            }, 'Saving KPI Targets', `Updating personalized targets for ${emp.name}...`);
+            }, 'Saving KPI Targets', `Updating personalized targets for ${emp.name || emp.id}...`);
             await logActivity({
                 action: 'kpi.targets.update',
                 entityType: 'employee',
                 entityId: emp.id,
                 details: {
                     employee_name: emp.name,
+                    period: period || 'default',
                     targets: Object.keys(targets).length,
                 },
             });
-            await notify.success('Employee personalized KPI targets saved successfully!');
+            await notify.success('Employee monthly KPI targets saved successfully!');
         } catch (e) {
             await notify.error('Error saving custom targets: ' + e.message);
         }
     }
 }
-
 // ---- START KPI INPUT (from Assessment Tab) ----
 export function startKpiInput() {
     const targetId = document.getElementById('inp-id')?.value?.trim();
@@ -208,7 +329,10 @@ export function startKpiInput() {
         const yyyy = today.getFullYear();
         const mm = String(today.getMonth() + 1).padStart(2, '0');
         periodInput.max = `${yyyy}-${mm}`;
+        if (!periodInput.value) periodInput.value = `${yyyy}-${mm}`;
     }
+
+    const activePeriod = periodInput?.value || getCurrentPeriodKey();
 
     const kpiSelect = document.getElementById('kpi-metric-select');
     if (kpiSelect) {
@@ -218,7 +342,6 @@ export function startKpiInput() {
 
         const { kpiConfig } = state;
         const empPos = rec.position || '';
-        const targets = rec.kpi_targets || {};
 
         const applicableKpis = (kpiConfig || []).filter(kpi => {
             const pos = kpi.category || 'General';
@@ -226,12 +349,11 @@ export function startKpiInput() {
         });
 
         applicableKpis.forEach(kpi => {
-            const effectiveTarget = targets[kpi.id] !== undefined ? targets[kpi.id] : kpi.target;
+            const effectiveTarget = getEmployeeKpiTarget(rec, kpi.id, activePeriod);
             kpiSelect.innerHTML += `<option value = "${escapeHTML(kpi.id)}" data-unit="${escapeHTML(kpi.unit || '')}" data-target="${effectiveTarget || ''}" > ${escapeHTML(kpi.name)}</option> `;
         });
     }
 
-    // Auto-fetch small history inside assessment routing
     const histBody = document.getElementById('kpi-quick-history');
     if (histBody) {
         const empRecords = (state.kpiRecords || []).filter(r => r.employee_id === rec.id).slice(0, 5);
@@ -241,7 +363,7 @@ export function startKpiInput() {
         } else {
             empRecords.forEach(r => {
                 const kpiDef = (state.kpiConfig || []).find(k => k.id === r.kpi_id);
-                const t = targets[r.kpi_id] !== undefined ? targets[r.kpi_id] : (kpiDef?.target || 0);
+                const t = getEmployeeKpiTarget(rec, r.kpi_id, r.period);
                 const ach = t > 0 ? Math.round((r.value / t) * 100) : 0;
                 let bg = ach >= 100 ? 'bg-success' : ach >= 75 ? 'bg-primary' : ach >= 50 ? 'bg-warning text-dark' : 'bg-danger';
                 histBody.innerHTML += `<tr>
@@ -255,7 +377,6 @@ export function startKpiInput() {
         }
     }
 }
-
 // ---- KPI HISTORY TABLE (now in Records tab) ----
 export async function renderKpiHistory() {
     const tbody = document.getElementById('kpi-history-body');
@@ -308,8 +429,7 @@ export async function renderKpiHistory() {
     records.forEach(record => {
         const emp = db[record.employee_id];
         const kpiDef = kpiConfig.find(k => k.id === record.kpi_id);
-        const targets = emp?.kpi_targets || {};
-        const target = targets[record.kpi_id] !== undefined ? targets[record.kpi_id] : (kpiDef?.target || 0);
+        const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
 
         let achBadge = 'bg-secondary';
@@ -398,6 +518,7 @@ export async function submitKpiRecord() {
 
 // ---- KPI DEFINITION CRUD ----
 export async function saveKpiDef() {
+    if (!canEditKpiSettings()) { await notify.error('Access Denied'); return; }
     if (!(await requireRecentAuth('saving KPI definition'))) return;
     const name = document.getElementById('kpi-def-name')?.value?.trim();
     const description = document.getElementById('kpi-def-desc')?.value?.trim();
@@ -408,6 +529,15 @@ export async function saveKpiDef() {
     if (!name) { await notify.warn('Please enter a KPI name.'); return; }
 
     const editingId = document.getElementById('kpi-def-edit-id')?.value;
+
+    if (state.currentUser?.role === 'manager') {
+        const managedPositions = getManagerScopePositionSet();
+        const resolvedCategory = category || 'General';
+        if (resolvedCategory !== 'General' && !managedPositions?.has(resolvedCategory)) {
+            await notify.error('Manager can only edit KPI definitions for team positions.');
+            return;
+        }
+    }
 
     const kpi = {
         name, description, category: category || 'General', target, unit,
@@ -438,6 +568,7 @@ export async function saveKpiDef() {
 }
 
 export function editKpiDef(id) {
+    if (!canEditKpiSettings()) return;
     const kpi = state.kpiConfig.find(k => k.id === id);
     if (!kpi) return;
 
@@ -452,6 +583,7 @@ export function editKpiDef(id) {
 }
 
 export function copyKpiDef(id) {
+    if (!canEditKpiSettings()) return;
     const kpi = state.kpiConfig.find(k => k.id === id);
     if (!kpi) return;
 
@@ -472,10 +604,19 @@ export function copyKpiDef(id) {
 }
 
 export async function removeKpiDef(id) {
+    if (!canEditKpiSettings()) { await notify.error('Access Denied'); return; }
     if (!(await requireRecentAuth('deleting KPI definition'))) return;
     if (!(await notify.confirm('Delete this KPI definition?', { confirmButtonText: 'Delete' }))) return;
     try {
         const kpi = state.kpiConfig.find(k => k.id === id);
+        if (state.currentUser?.role === 'manager') {
+            const managedPositions = getManagerScopePositionSet();
+            const resolvedCategory = kpi?.category || 'General';
+            if (resolvedCategory !== 'General' && !managedPositions?.has(resolvedCategory)) {
+                await notify.error('Manager can only delete KPI definitions for team positions.');
+                return;
+            }
+        }
         await notify.withLoading(async () => {
             await deleteKpiDefinition(id);
         }, 'Deleting KPI Definition', 'Removing KPI definition...');
@@ -756,4 +897,3 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
-

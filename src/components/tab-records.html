@@ -13,6 +13,12 @@
                         <i class="bi bi-graph-up-arrow me-1"></i>KPI Records
                     </button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-target="records-probation"
+                        onclick="window.__app.toggleRecordsView('records-probation', this)">
+                        <i class="bi bi-shield-check me-1"></i>Probation & PIP
+                    </button>
+                </li>
             </ul>
 
             <!-- ASSESSMENT RECORDS VIEW -->
@@ -85,6 +91,78 @@
                                 </thead>
                                 <tbody id="kpi-history-body"></tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PROBATION & PIP VIEW -->
+            <div id="records-probation" class="hidden">
+                <div class="card shadow-sm border-0 mb-3">
+                    <div class="card-header bg-white border-bottom py-2">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <h6 class="m-0 fw-bold"><i class="bi bi-shield-check me-1"></i> Probation & Performance Improvement</h6>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <input type="month" id="probation-period-filter" class="form-control form-control-sm" style="max-width:160px;"
+                                    onchange="window.__app.renderProbationPipView()" title="KPI period for PIP generation">
+                                <input type="number" id="pip-threshold-input" class="form-control form-control-sm" style="max-width:120px;" min="0" max="200" step="1" value="70"
+                                    title="Score threshold (below this creates PIP)">
+                                <button class="btn btn-sm btn-outline-primary" onclick="window.__app.generateProbationDrafts()">
+                                    <i class="bi bi-magic me-1"></i>Generate Probation Drafts
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" onclick="window.__app.generatePipPlans()">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Generate PIP
+                                </button>
+                                <button class="btn btn-sm btn-outline-success" onclick="window.__app.exportProbationCsv()">
+                                    <i class="bi bi-download me-1"></i>Export Probation CSV
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-lg-6">
+                                <div class="card border h-100">
+                                    <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                                        <h6 class="m-0 fw-bold small"><i class="bi bi-clipboard-check me-1"></i>Probation Reviews</h6>
+                                        <span class="badge bg-secondary" id="probation-count-badge">0</span>
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover mb-0 align-middle">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th>Employee</th>
+                                                    <th class="text-center">Final</th>
+                                                    <th class="text-center">Decision</th>
+                                                    <th class="text-end">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="probation-reviews-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-lg-6">
+                                <div class="card border h-100">
+                                    <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                                        <h6 class="m-0 fw-bold small"><i class="bi bi-kanban me-1"></i>PIP Plans</h6>
+                                        <span class="badge bg-secondary" id="pip-count-badge">0</span>
+                                    </div>
+                                    <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
+                                        <table class="table table-sm table-hover mb-0 align-middle">
+                                            <thead class="table-light sticky-top">
+                                                <tr>
+                                                    <th>Employee</th>
+                                                    <th>Period</th>
+                                                    <th class="text-center">Status</th>
+                                                    <th class="text-end">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="pip-plans-body"></tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

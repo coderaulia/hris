@@ -10,20 +10,69 @@ import { createAuthUser, requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 // ---- RENDER SETTINGS PAGE ----
-export async function renderSettings() {
-    if (!isAdmin()) return;
-    renderAppSettings();
-    renderUserManagement();
-    renderOrgSettings();
-    await renderActivityLog();
-
-    // Default to general tab if none active
-    setTimeout(() => {
-        const activeNav = document.querySelector('#settingsPills .nav-link.active');
-        if (activeNav) window.__app.toggleSettingsView(activeNav.dataset.target, activeNav);
-    }, 50);
+function canAccessSettings() {
+    return isAdmin() || state.currentUser?.role === 'manager';
 }
 
+function applySettingsRoleVisibility() {
+    const navButtons = document.querySelectorAll('#settingsPills .nav-link');
+    const allPanels = ['set-general', 'set-users', 'set-competencies', 'set-kpi', 'set-org'];
+
+    if (isAdmin()) {
+        navButtons.forEach(btn => btn.closest('.nav-item')?.classList.remove('hidden'));
+        allPanels.forEach(id => document.getElementById(id)?.classList.remove('hidden'));
+        return;
+    }
+
+    const managerAllowed = new Set(['set-competencies', 'set-kpi']);
+    navButtons.forEach(btn => {
+        const navItem = btn.closest('.nav-item');
+        const target = btn.dataset.target;
+        if (!navItem) return;
+        if (managerAllowed.has(target)) navItem.classList.remove('hidden');
+        else navItem.classList.add('hidden');
+    });
+
+    allPanels.forEach(id => {
+        const panel = document.getElementById(id);
+        if (!panel) return;
+        if (managerAllowed.has(id)) panel.classList.remove('hidden');
+        else panel.classList.add('hidden');
+    });
+}
+
+export async function renderSettings() {
+    if (!canAccessSettings()) return;
+
+    applySettingsRoleVisibility();
+
+    if (isAdmin()) {
+        renderAppSettings();
+        renderUserManagement();
+        renderOrgSettings();
+        await renderActivityLog();
+    }
+
+    setTimeout(() => {
+        const activeNav = document.querySelector('#settingsPills .nav-link.active');
+        const activeTarget = activeNav?.dataset?.target || '';
+        const managerAllowed = activeTarget === 'set-competencies' || activeTarget === 'set-kpi';
+        const activeVisible = !activeNav?.closest('.nav-item')?.classList.contains('hidden');
+
+        if (activeNav && (isAdmin() || managerAllowed) && activeVisible) {
+            window.__app.toggleSettingsView(activeTarget, activeNav);
+            return;
+        }
+
+        const fallback = isAdmin()
+            ? document.querySelector('#settingsPills .nav-link[data-target="set-general"]')
+            : document.querySelector('#settingsPills .nav-link[data-target="set-kpi"]');
+
+        if (fallback) {
+            window.__app.toggleSettingsView(fallback.dataset.target, fallback);
+        }
+    }, 50);
+}
 // ---- APP SETTINGS ----
 function renderAppSettings() {
     const { appSettings } = state;

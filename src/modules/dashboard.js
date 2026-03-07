@@ -7,6 +7,7 @@ import { state } from '../lib/store.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../lib/utils.js';
 import * as notify from '../lib/notify.js';
 import { getFilteredEmployeeIds } from '../lib/reportFilters.js';
+import { calculateEmployeeWeightedKpiScore, getEmployeeKpiTarget } from './data.js';
 
 let chartDistInstance = null;
 let chartStatusInstance = null;
@@ -262,24 +263,71 @@ function renderKpiSummary() {
         });
     }
 
-    // Helper for rendering top performers list
+        // Helper for rendering top performers list
+    const hasWeightConfig = (state.kpiWeightProfiles || []).some(profile => profile?.active !== false)
+        && (state.kpiWeightItems || []).length > 0;
+
+    const monthlyTitle = document.getElementById('d-kpi-performers-monthly-title');
+    const quarterlyTitle = document.getElementById('d-kpi-performers-quarterly-title');
+    if (monthlyTitle) {
+        monthlyTitle.innerHTML = hasWeightConfig
+            ? '<i class="bi bi-trophy-fill text-warning me-1"></i> Monthly Leaderboard (Points)'
+            : '<i class="bi bi-trophy-fill text-warning me-1"></i> Monthly Top Performer';
+    }
+    if (quarterlyTitle) {
+        quarterlyTitle.innerHTML = hasWeightConfig
+            ? '<i class="bi bi-trophy-fill text-warning me-1"></i> Quarterly Leaderboard (Points)'
+            : '<i class="bi bi-trophy-fill text-warning me-1"></i> Quarterly Top Performer';
+    }
+
     const renderPerformers = (records, elId) => {
         const perfList = document.getElementById(elId);
         if (!perfList) return;
         perfList.innerHTML = '';
 
-        const empAch = {};
+        const byEmp = {};
         records.forEach(record => {
-            const def = kpiConfig.find(k => k.id === record.kpi_id);
-            if (!def || def.target <= 0) return;
-            if (!empAch[record.employee_id]) empAch[record.employee_id] = { sum: 0, count: 0 };
-            empAch[record.employee_id].sum += (record.value / def.target) * 100;
-            empAch[record.employee_id].count++;
+            if (!byEmp[record.employee_id]) byEmp[record.employee_id] = [];
+            byEmp[record.employee_id].push(record);
         });
 
-        const empList = Object.entries(empAch)
-            .map(([id, data]) => ({ id, avg: Math.round(data.sum / data.count), name: db[id]?.name || id }))
-            .sort((a, b) => b.avg - a.avg)
+        const empList = Object.keys(byEmp)
+            .map(id => {
+                const empRecords = byEmp[id] || [];
+
+                if (hasWeightConfig) {
+                    const weighted = calculateEmployeeWeightedKpiScore(id, empRecords);
+                    return {
+                        id,
+                        name: db[id]?.name || id,
+                        score: weighted.score,
+                        weighted: weighted.weighted,
+                        hasData: weighted.metric_count > 0,
+                    };
+                }
+
+                let sum = 0;
+                let count = 0;
+                empRecords.forEach(record => {
+                    const emp = db[id];
+                    const def = kpiConfig.find(k => k.id === record.kpi_id);
+                    const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
+                    if (target > 0) {
+                        sum += (record.value / target) * 100;
+                        count++;
+                    }
+                });
+
+                return {
+                    id,
+                    name: db[id]?.name || id,
+                    score: count > 0 ? Math.round(sum / count) : 0,
+                    weighted: false,
+                    hasData: count > 0,
+                };
+            })
+            .filter(emp => emp.hasData)
+            .sort((a, b) => b.score - a.score)
             .slice(0, 5);
 
         if (empList.length === 0) {
@@ -287,10 +335,14 @@ function renderKpiSummary() {
         } else {
             empList.forEach((emp, i) => {
                 const icon = i === 0 ? '<i class="bi bi-trophy-fill text-warning me-1"></i>' : '';
-                let badgeClass = emp.avg >= 100 ? 'bg-success' : emp.avg >= 75 ? 'bg-primary' : emp.avg >= 50 ? 'bg-warning text-dark' : 'bg-danger';
+                const scoreVal = Number(emp.score || 0);
+                const scoreLabel = emp.weighted
+                    ? `${Number.isInteger(scoreVal) ? formatNumber(scoreVal) : scoreVal.toFixed(1)} pts`
+                    : `${Math.round(scoreVal)}%`;
+                let badgeClass = scoreVal >= 100 ? 'bg-success' : scoreVal >= 75 ? 'bg-primary' : scoreVal >= 50 ? 'bg-warning text-dark' : 'bg-danger';
                 perfList.innerHTML += `<li class="list-group-item d-flex justify-content-between align-items-center">
           <span>${icon}<span class="fw-bold">${escapeHTML(emp.name)}</span></span>
-          <span class="badge ${badgeClass} rounded-pill">${emp.avg}%</span></li>`;
+          <span class="badge ${badgeClass} rounded-pill">${scoreLabel}</span></li>`;
             });
         }
     };
@@ -332,8 +384,7 @@ function renderDeptKpiCards(records) {
         deptRecords.forEach(record => {
             const def = kpiConfig.find(k => k.id === record.kpi_id);
             const emp = db[record.employee_id];
-            const targets = emp?.kpi_targets || {};
-            const target = targets[record.kpi_id] !== undefined ? targets[record.kpi_id] : (def?.target || 0);
+            const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
             if (target > 0) {
                 const ach = (record.value / target) * 100;
                 totalAch += ach;
@@ -473,8 +524,7 @@ export function renderDeptKpiTable(month, tabBtn) {
     monthRecords.forEach(record => {
         const emp = db[record.employee_id];
         const def = kpiConfig.find(k => k.id === record.kpi_id);
-        const targets = emp?.kpi_targets || {};
-        const target = targets[record.kpi_id] !== undefined ? targets[record.kpi_id] : (def?.target || 0);
+        const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
 
         if (target > 0) {
@@ -568,7 +618,7 @@ export function renderDeptKpiTable(month, tabBtn) {
                 if (!monthCounts[r.period]) { monthCounts[r.period] = 0; monthAchs[r.period] = 0; }
 
                 const def = kpiConfig.find(k => k.id === r.kpi_id);
-                const t = (db[r.employee_id]?.kpi_targets || {})[r.kpi_id] !== undefined ? db[r.employee_id]?.kpi_targets[r.kpi_id] : (def?.target || 0);
+                const t = getEmployeeKpiTarget(db[r.employee_id], r.kpi_id, r.period);
                 if (t > 0) {
                     monthAchs[r.period] += (r.value / t) * 100;
                     monthCounts[r.period]++;
@@ -1176,4 +1226,8 @@ export async function exportEmployeeKpiPDF(employeeId) {
     const safeDept = _currentDeptName.replace(/[^a-zA-Z0-9]/g, '_');
     doc.save(`KPI_Employee_${safeDept}_${safeEmp}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
+
+
+
+
 

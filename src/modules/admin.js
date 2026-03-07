@@ -3,13 +3,52 @@
 // (Superadmin only)
 // ==================================================
 
-import { state, emit, isAdmin } from '../lib/store.js';
+import { state, emit, isAdmin, isManager } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, debugError } from '../lib/utils.js';
 import { saveConfig, deleteConfig, logActivity } from './data.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 let editingPosition = null; // Track which position is being edited
+
+function canManageCompetencies() {
+    return isAdmin() || isManager();
+}
+
+function getManagerTeamPositions() {
+    if (!isManager() || isAdmin()) return null;
+    const managerId = state.currentUser?.id;
+    const ownDept = state.db[managerId]?.department || '';
+    const positions = new Set();
+
+    if (ownDept) {
+        try {
+            const deptMap = JSON.parse(state.appSettings?.dept_positions || '{}');
+            const scopedPositions = Array.isArray(deptMap[ownDept]) ? deptMap[ownDept] : [];
+            scopedPositions.forEach(pos => {
+                if (pos) positions.add(pos);
+            });
+        } catch {
+            // ignore malformed dept_positions payload
+        }
+    }
+
+    Object.values(state.db || {}).forEach(emp => {
+        if (!emp || !emp.position || emp.role !== 'employee') return;
+        if (emp.manager_id === managerId || (ownDept && emp.department === ownDept)) {
+            positions.add(emp.position);
+        }
+    });
+
+    return positions;
+}
+
+function canManagePosition(posName) {
+    if (isAdmin()) return true;
+    if (!isManager()) return false;
+    const managed = getManagerTeamPositions();
+    return managed?.has(posName) || false;
+}
 
 // ---- RENDER POSITION LIST (right side) ----
 export function renderAdminList() {
@@ -18,7 +57,7 @@ export function renderAdminList() {
     listEl.innerHTML = '';
 
     const formEl = document.getElementById('admin-form-panel');
-    if (formEl) formEl.style.display = isAdmin() ? 'block' : 'none';
+    if (formEl) formEl.style.display = canManageCompetencies() ? 'block' : 'none';
 
     const { appConfig } = state;
 
@@ -27,7 +66,11 @@ export function renderAdminList() {
         return;
     }
 
-    const positions = Object.keys(appConfig).sort();
+    let positions = Object.keys(appConfig).sort();
+    if (isManager() && !isAdmin()) {
+        const managed = getManagerTeamPositions();
+        positions = positions.filter(pos => managed?.has(pos));
+    }
 
     positions.forEach(pos => {
         const comps = appConfig[pos].competencies || [];
@@ -43,7 +86,7 @@ export function renderAdminList() {
             preview = `<div class="small text-muted mt-1">${previewComps}${more}</div>`;
         }
 
-        const actions = isAdmin() ? `
+        const actions = canManagePosition(pos) ? `
       <div class="d-flex gap-1">
         <button class="btn btn-sm btn-outline-primary" onclick="window.__app.loadPositionForEdit('${safePosInline}')" title="Edit"><i class="bi bi-pencil"></i></button>
         <button class="btn btn-sm btn-outline-danger" onclick="window.__app.deletePositionConfig('${safePosInline}')" title="Delete"><i class="bi bi-trash"></i></button>
@@ -138,7 +181,7 @@ export function removeCompetencyRow(index) {
 
 // ---- LOAD POSITION FOR EDIT ----
 export function loadPositionForEdit(posName) {
-    if (!isAdmin()) return;
+    if (!canManagePosition(posName)) return;
     const config = state.appConfig[posName];
     if (!config) return;
 
@@ -153,11 +196,16 @@ export function loadPositionForEdit(posName) {
 
 // ---- SAVE POSITION CONFIG ----
 export async function savePositionConfig() {
-    if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!canManageCompetencies()) { await notify.error('Access Denied'); return; }
     if (!(await requireRecentAuth('saving competency configuration'))) return;
 
     const posName = document.getElementById('admin-pos-name').value.trim();
     if (!posName) { await notify.warn('Please enter a Position Name.'); return; }
+
+    if (!isAdmin() && !canManagePosition(posName)) {
+        await notify.error('Manager can only edit competency config for team member positions.');
+        return;
+    }
 
     const competencies = collectCompetenciesFromEditor();
     if (competencies.length === 0) { await notify.warn('Please add at least one competency.'); return; }
@@ -186,7 +234,7 @@ export async function savePositionConfig() {
 
 // ---- DELETE POSITION CONFIG ----
 export async function deletePositionConfig(posName) {
-    if (!isAdmin()) return;
+    if (!canManagePosition(posName)) return;
     if (!(await requireRecentAuth('deleting competency configuration'))) return;
     if (await notify.confirm(`Delete configuration for "${posName}"?`, { confirmButtonText: 'Delete' })) {
         await notify.withLoading(async () => {

@@ -28,11 +28,11 @@ import { state, subscribe, emit, isAdmin, isManager, isEmployee, setReportFilter
 import { restoreSession, signIn, signOut, requestPasswordReset, promptChangePassword, enforcePasswordPolicyOnLogin } from './modules/auth.js';
 import { syncAll, fetchSettings } from './modules/data.js';
 import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, exportEmployeeKpiPDF, searchDeptKpiModal } from './modules/dashboard.js';
-import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess } from './modules/records.js';
+import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess, renderProbationPipView, generateProbationDrafts, reviewProbation, exportProbationCsv, generatePipPlans, updatePipPlanStatus } from './modules/records.js';
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
-import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
+import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
 import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
 import { debugError, escapeHTML } from './lib/utils.js';
 import { getRoleScopedEmployeeIds } from './lib/reportFilters.js';
@@ -61,6 +61,7 @@ window.__app = {
     closeReport, searchRecords, deleteRecordSafe, editRecordSafe,
     saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem,
     resetTrainingForm, fillTrainingRec, toggleOngoing,
+    renderProbationPipView, generateProbationDrafts, reviewProbation, exportProbationCsv, generatePipPlans, updatePipPlanStatus,
     initiateSelfAssessment: recordSelfAssess,
 
     // Admin
@@ -77,7 +78,7 @@ window.__app = {
 
     // KPI
     renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord,
-    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
+    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
 
     // Settings
     renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleRecordsView,
@@ -115,6 +116,7 @@ function switchTab(tabId) {
     if (tabId === 'tab-records') {
         renderRecordsTable();
         renderKpiHistory();
+        renderProbationPipView();
     }
     if (tabId === 'tab-assessment') renderPendingList();
     if (tabId === 'tab-employees') renderEmployeeManager();
@@ -253,6 +255,7 @@ function clearReportFilters() {
 
 // ---- Sub-View Toggle (Settings) ----
 function toggleSettingsView(viewId, btn) {
+    if (state.currentUser?.role === 'manager' && !['set-competencies', 'set-kpi'].includes(viewId)) return;
     ['set-general', 'set-users', 'set-competencies', 'set-kpi', 'set-org'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -280,7 +283,7 @@ function toggleDashboardView(viewId, btn) {
 
 // ---- Sub-View Toggle (Records) ----
 function toggleRecordsView(viewId, btn) {
-    ['records-assessment', 'records-kpi'].forEach(id => {
+    ['records-assessment', 'records-kpi', 'records-probation'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
@@ -289,6 +292,7 @@ function toggleRecordsView(viewId, btn) {
     if (target) target.classList.remove('hidden');
     if (btn) btn.classList.add('active');
     if (viewId === 'records-kpi') renderKpiHistory();
+    if (viewId === 'records-probation') renderProbationPipView();
 }
 
 // ---- Theme Toggle ----
@@ -379,7 +383,7 @@ async function showApp() {
     // Role-based navigation
     const navConfig = {
         superadmin: ['nav-dashboard', 'nav-employees', 'nav-assessment', 'nav-records', 'nav-settings'],
-        manager: ['nav-dashboard', 'nav-assessment', 'nav-records'],
+        manager: ['nav-dashboard', 'nav-assessment', 'nav-records', 'nav-settings'],
         employee: ['nav-records'],
     };
 

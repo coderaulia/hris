@@ -585,3 +585,450 @@ ON CONFLICT (position_name) DO UPDATE SET
 DROP TRIGGER IF EXISTS guard_employee_sensitive_update_trg ON employees;
 CREATE TRIGGER guard_employee_sensitive_update_trg BEFORE UPDATE ON employees FOR EACH ROW EXECUTE FUNCTION guard_employee_sensitive_update();
 
+
+-- ==================================================
+-- 6. NORMALIZATION EXTENSIONS (ASSESSMENT/TRAINING/SCORING + PIP/PROBATION)
+-- ==================================================
+
+-- ---------- TABLES ----------
+CREATE TABLE IF NOT EXISTS employee_assessments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  assessment_type TEXT NOT NULL CHECK (assessment_type IN ('manager', 'self')),
+  percentage NUMERIC NOT NULL DEFAULT 0,
+  seniority TEXT DEFAULT '',
+  assessed_at TIMESTAMPTZ,
+  assessed_by TEXT,
+  source_date TEXT DEFAULT '-',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, assessment_type)
+);
+
+CREATE TABLE IF NOT EXISTS employee_assessment_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assessment_id UUID NOT NULL REFERENCES employee_assessments(id) ON DELETE CASCADE,
+  competency_name TEXT NOT NULL,
+  score NUMERIC NOT NULL DEFAULT 0,
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (assessment_id, competency_name)
+);
+
+CREATE TABLE IF NOT EXISTS employee_assessment_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  assessment_type TEXT NOT NULL DEFAULT 'manager' CHECK (assessment_type IN ('manager', 'self')),
+  assessed_on TEXT DEFAULT '-',
+  percentage NUMERIC NOT NULL DEFAULT 0,
+  seniority TEXT DEFAULT '',
+  position TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, assessment_type, assessed_on, percentage, seniority, position)
+);
+
+CREATE TABLE IF NOT EXISTS employee_training_records (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  course TEXT NOT NULL,
+  start_date TEXT DEFAULT '',
+  end_date TEXT DEFAULT '',
+  provider TEXT DEFAULT '',
+  status TEXT DEFAULT 'ongoing' CHECK (status IN ('planned', 'ongoing', 'completed', 'approved')),
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, course, start_date, end_date, provider, status)
+);
+
+CREATE TABLE IF NOT EXISTS employee_performance_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  period TEXT NOT NULL,
+  score_type TEXT NOT NULL DEFAULT 'kpi_weighted',
+  total_score NUMERIC NOT NULL DEFAULT 0,
+  detail JSONB NOT NULL DEFAULT '{}'::jsonb,
+  calculated_by TEXT,
+  calculated_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (employee_id, period, score_type)
+);
+
+CREATE TABLE IF NOT EXISTS kpi_weight_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_name TEXT NOT NULL,
+  department TEXT DEFAULT '',
+  position TEXT DEFAULT '',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (profile_name, department, position)
+);
+
+CREATE TABLE IF NOT EXISTS kpi_weight_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES kpi_weight_profiles(id) ON DELETE CASCADE,
+  kpi_id UUID NOT NULL REFERENCES kpi_definitions(id) ON DELETE CASCADE,
+  weight_pct NUMERIC NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (profile_id, kpi_id)
+);
+
+CREATE TABLE IF NOT EXISTS probation_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  review_period_start DATE,
+  review_period_end DATE,
+  quantitative_score NUMERIC NOT NULL DEFAULT 0,
+  qualitative_score NUMERIC NOT NULL DEFAULT 0,
+  final_score NUMERIC NOT NULL DEFAULT 0,
+  decision TEXT NOT NULL DEFAULT 'pending' CHECK (decision IN ('pending', 'pass', 'extend', 'fail')),
+  manager_notes TEXT DEFAULT '',
+  reviewed_by TEXT,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS probation_qualitative_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  probation_review_id UUID NOT NULL REFERENCES probation_reviews(id) ON DELETE CASCADE,
+  item_name TEXT NOT NULL,
+  score NUMERIC NOT NULL DEFAULT 0,
+  note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (probation_review_id, item_name)
+);
+
+CREATE TABLE IF NOT EXISTS pip_plans (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id TEXT NOT NULL REFERENCES employees(employee_id) ON DELETE CASCADE,
+  trigger_reason TEXT DEFAULT '',
+  trigger_period TEXT DEFAULT '',
+  start_date DATE,
+  target_end_date DATE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'extended', 'escalated', 'cancelled')),
+  owner_manager_id TEXT,
+  summary TEXT DEFAULT '',
+  closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS pip_actions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pip_plan_id UUID NOT NULL REFERENCES pip_plans(id) ON DELETE CASCADE,
+  action_title TEXT NOT NULL,
+  action_detail TEXT DEFAULT '',
+  due_date DATE,
+  progress_pct NUMERIC NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done', 'blocked')),
+  checkpoint_note TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ---------- RLS ENABLE ----------
+ALTER TABLE employee_assessments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_assessment_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_assessment_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_training_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employee_performance_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kpi_weight_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kpi_weight_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE probation_reviews ENABLE ROW LEVEL SECURITY;
+ALTER TABLE probation_qualitative_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pip_plans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pip_actions ENABLE ROW LEVEL SECURITY;
+
+-- Access helper for normalized tables
+CREATE OR REPLACE FUNCTION can_access_employee(target_employee_id TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (
+    is_superadmin()
+    OR target_employee_id = auth_employee_id()
+    OR EXISTS (
+      SELECT 1
+      FROM public.employees e
+      WHERE e.employee_id = target_employee_id
+        AND (
+          e.manager_id = auth_employee_id()
+          OR (is_manager() AND e.department = auth_department())
+        )
+    )
+  );
+$$;
+
+-- ---------- POLICIES ----------
+DROP POLICY IF EXISTS "Access employee assessments by scope" ON employee_assessments;
+CREATE POLICY "Access employee assessments by scope"
+ON employee_assessments FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Access employee assessment scores by scope" ON employee_assessment_scores;
+CREATE POLICY "Access employee assessment scores by scope"
+ON employee_assessment_scores FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM employee_assessments ea
+    WHERE ea.id = employee_assessment_scores.assessment_id
+      AND can_access_employee(ea.employee_id)
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM employee_assessments ea
+    WHERE ea.id = employee_assessment_scores.assessment_id
+      AND can_access_employee(ea.employee_id)
+  )
+);
+
+DROP POLICY IF EXISTS "Access employee assessment history by scope" ON employee_assessment_history;
+CREATE POLICY "Access employee assessment history by scope"
+ON employee_assessment_history FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Access employee training records by scope" ON employee_training_records;
+CREATE POLICY "Access employee training records by scope"
+ON employee_training_records FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Access employee performance scores by scope" ON employee_performance_scores;
+CREATE POLICY "Access employee performance scores by scope"
+ON employee_performance_scores FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Read KPI weight profiles" ON kpi_weight_profiles;
+DROP POLICY IF EXISTS "Superadmin manage KPI weight profiles" ON kpi_weight_profiles;
+CREATE POLICY "Read KPI weight profiles"
+ON kpi_weight_profiles FOR SELECT TO authenticated
+USING (true);
+CREATE POLICY "Superadmin manage KPI weight profiles"
+ON kpi_weight_profiles FOR ALL TO authenticated
+USING (is_superadmin())
+WITH CHECK (is_superadmin());
+
+DROP POLICY IF EXISTS "Read KPI weight items" ON kpi_weight_items;
+DROP POLICY IF EXISTS "Superadmin manage KPI weight items" ON kpi_weight_items;
+CREATE POLICY "Read KPI weight items"
+ON kpi_weight_items FOR SELECT TO authenticated
+USING (true);
+CREATE POLICY "Superadmin manage KPI weight items"
+ON kpi_weight_items FOR ALL TO authenticated
+USING (is_superadmin())
+WITH CHECK (is_superadmin());
+
+DROP POLICY IF EXISTS "Access probation reviews by scope" ON probation_reviews;
+CREATE POLICY "Access probation reviews by scope"
+ON probation_reviews FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Access probation qualitative items by scope" ON probation_qualitative_items;
+CREATE POLICY "Access probation qualitative items by scope"
+ON probation_qualitative_items FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM probation_reviews pr
+    WHERE pr.id = probation_qualitative_items.probation_review_id
+      AND can_access_employee(pr.employee_id)
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM probation_reviews pr
+    WHERE pr.id = probation_qualitative_items.probation_review_id
+      AND can_access_employee(pr.employee_id)
+  )
+);
+
+DROP POLICY IF EXISTS "Access PIP plans by scope" ON pip_plans;
+CREATE POLICY "Access PIP plans by scope"
+ON pip_plans FOR ALL TO authenticated
+USING (can_access_employee(employee_id))
+WITH CHECK (can_access_employee(employee_id));
+
+DROP POLICY IF EXISTS "Access PIP actions by scope" ON pip_actions;
+CREATE POLICY "Access PIP actions by scope"
+ON pip_actions FOR ALL TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM pip_plans pp
+    WHERE pp.id = pip_actions.pip_plan_id
+      AND can_access_employee(pp.employee_id)
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM pip_plans pp
+    WHERE pp.id = pip_actions.pip_plan_id
+      AND can_access_employee(pp.employee_id)
+  )
+);
+
+-- ---------- INDEXES ----------
+CREATE INDEX IF NOT EXISTS idx_employee_assessments_employee ON employee_assessments(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_assessments_assessed_at ON employee_assessments(assessed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_employee_assessment_scores_assessment ON employee_assessment_scores(assessment_id);
+CREATE INDEX IF NOT EXISTS idx_employee_assessment_history_employee ON employee_assessment_history(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_training_records_employee ON employee_training_records(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employee_performance_scores_employee_period ON employee_performance_scores(employee_id, period);
+CREATE INDEX IF NOT EXISTS idx_probation_reviews_employee ON probation_reviews(employee_id);
+CREATE INDEX IF NOT EXISTS idx_probation_reviews_decision ON probation_reviews(decision);
+CREATE INDEX IF NOT EXISTS idx_pip_plans_employee_status ON pip_plans(employee_id, status);
+CREATE INDEX IF NOT EXISTS idx_pip_actions_plan_status ON pip_actions(pip_plan_id, status);
+CREATE INDEX IF NOT EXISTS idx_kpi_weight_items_profile ON kpi_weight_items(profile_id);
+CREATE INDEX IF NOT EXISTS idx_kpi_weight_items_kpi ON kpi_weight_items(kpi_id);
+
+-- ---------- TRIGGERS ----------
+DROP TRIGGER IF EXISTS update_employee_assessments_modtime ON employee_assessments;
+CREATE TRIGGER update_employee_assessments_modtime BEFORE UPDATE ON employee_assessments FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_employee_assessment_scores_modtime ON employee_assessment_scores;
+CREATE TRIGGER update_employee_assessment_scores_modtime BEFORE UPDATE ON employee_assessment_scores FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_employee_training_records_modtime ON employee_training_records;
+CREATE TRIGGER update_employee_training_records_modtime BEFORE UPDATE ON employee_training_records FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_employee_performance_scores_modtime ON employee_performance_scores;
+CREATE TRIGGER update_employee_performance_scores_modtime BEFORE UPDATE ON employee_performance_scores FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_kpi_weight_profiles_modtime ON kpi_weight_profiles;
+CREATE TRIGGER update_kpi_weight_profiles_modtime BEFORE UPDATE ON kpi_weight_profiles FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_kpi_weight_items_modtime ON kpi_weight_items;
+CREATE TRIGGER update_kpi_weight_items_modtime BEFORE UPDATE ON kpi_weight_items FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_probation_reviews_modtime ON probation_reviews;
+CREATE TRIGGER update_probation_reviews_modtime BEFORE UPDATE ON probation_reviews FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_probation_qualitative_items_modtime ON probation_qualitative_items;
+CREATE TRIGGER update_probation_qualitative_items_modtime BEFORE UPDATE ON probation_qualitative_items FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_pip_plans_modtime ON pip_plans;
+CREATE TRIGGER update_pip_plans_modtime BEFORE UPDATE ON pip_plans FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+DROP TRIGGER IF EXISTS update_pip_actions_modtime ON pip_actions;
+CREATE TRIGGER update_pip_actions_modtime BEFORE UPDATE ON pip_actions FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+
+-- ---------- LEGACY DATA MIGRATION (FROM employees JSON FIELDS) ----------
+INSERT INTO employee_assessments (employee_id, assessment_type, percentage, seniority, assessed_at, assessed_by, source_date)
+SELECT
+  e.employee_id,
+  'manager',
+  COALESCE(e.percentage, 0),
+  COALESCE(e.seniority, ''),
+  e.assessment_updated_at,
+  e.assessment_updated_by,
+  COALESCE(NULLIF(e.date_updated, ''), COALESCE(NULLIF(e.date_created, ''), '-'))
+FROM employees e
+WHERE COALESCE(e.percentage, 0) > 0
+   OR jsonb_array_length(COALESCE(e.scores, '[]'::jsonb)) > 0
+ON CONFLICT (employee_id, assessment_type)
+DO UPDATE SET
+  percentage = EXCLUDED.percentage,
+  seniority = EXCLUDED.seniority,
+  assessed_at = EXCLUDED.assessed_at,
+  assessed_by = EXCLUDED.assessed_by,
+  source_date = EXCLUDED.source_date,
+  updated_at = NOW();
+
+INSERT INTO employee_assessments (employee_id, assessment_type, percentage, seniority, assessed_at, assessed_by, source_date)
+SELECT
+  e.employee_id,
+  'self',
+  COALESCE(e.self_percentage, 0),
+  COALESCE(e.seniority, ''),
+  e.self_assessment_updated_at,
+  e.self_assessment_updated_by,
+  COALESCE(NULLIF(e.self_date, ''), '-')
+FROM employees e
+WHERE COALESCE(e.self_percentage, 0) > 0
+   OR jsonb_array_length(COALESCE(e.self_scores, '[]'::jsonb)) > 0
+ON CONFLICT (employee_id, assessment_type)
+DO UPDATE SET
+  percentage = EXCLUDED.percentage,
+  seniority = EXCLUDED.seniority,
+  assessed_at = EXCLUDED.assessed_at,
+  assessed_by = EXCLUDED.assessed_by,
+  source_date = EXCLUDED.source_date,
+  updated_at = NOW();
+
+INSERT INTO employee_assessment_scores (assessment_id, competency_name, score, note)
+SELECT
+  ea.id,
+  score_item ->> 'q',
+  CASE WHEN COALESCE(score_item ->> 's', '') ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN (score_item ->> 's')::numeric ELSE 0 END,
+  COALESCE(score_item ->> 'n', '')
+FROM employees e
+JOIN employee_assessments ea ON ea.employee_id = e.employee_id AND ea.assessment_type = 'manager'
+CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.scores, '[]'::jsonb)) score_item
+WHERE COALESCE(score_item ->> 'q', '') <> ''
+ON CONFLICT (assessment_id, competency_name)
+DO UPDATE SET
+  score = EXCLUDED.score,
+  note = EXCLUDED.note,
+  updated_at = NOW();
+
+INSERT INTO employee_assessment_scores (assessment_id, competency_name, score, note)
+SELECT
+  ea.id,
+  score_item ->> 'q',
+  CASE WHEN COALESCE(score_item ->> 's', '') ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN (score_item ->> 's')::numeric ELSE 0 END,
+  COALESCE(score_item ->> 'n', '')
+FROM employees e
+JOIN employee_assessments ea ON ea.employee_id = e.employee_id AND ea.assessment_type = 'self'
+CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.self_scores, '[]'::jsonb)) score_item
+WHERE COALESCE(score_item ->> 'q', '') <> ''
+ON CONFLICT (assessment_id, competency_name)
+DO UPDATE SET
+  score = EXCLUDED.score,
+  note = EXCLUDED.note,
+  updated_at = NOW();
+
+INSERT INTO employee_assessment_history (employee_id, assessment_type, assessed_on, percentage, seniority, position)
+SELECT
+  e.employee_id,
+  'manager',
+  COALESCE(hist_item ->> 'date', '-'),
+  CASE WHEN COALESCE(hist_item ->> 'score', '') ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN (hist_item ->> 'score')::numeric ELSE 0 END,
+  COALESCE(hist_item ->> 'seniority', COALESCE(e.seniority, '')),
+  COALESCE(hist_item ->> 'position', COALESCE(e.position, ''))
+FROM employees e
+CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.history, '[]'::jsonb)) hist_item
+ON CONFLICT (employee_id, assessment_type, assessed_on, percentage, seniority, position)
+DO NOTHING;
+
+INSERT INTO employee_training_records (employee_id, course, start_date, end_date, provider, status, notes)
+SELECT
+  e.employee_id,
+  COALESCE(train_item ->> 'course', ''),
+  COALESCE(train_item ->> 'start', ''),
+  COALESCE(train_item ->> 'end', ''),
+  COALESCE(train_item ->> 'provider', ''),
+  CASE
+    WHEN lower(COALESCE(train_item ->> 'status', 'ongoing')) IN ('planned', 'ongoing', 'completed', 'approved')
+      THEN lower(COALESCE(train_item ->> 'status', 'ongoing'))
+    ELSE 'ongoing'
+  END,
+  ''
+FROM employees e
+CROSS JOIN LATERAL jsonb_array_elements(COALESCE(e.training_history, '[]'::jsonb)) train_item
+WHERE COALESCE(train_item ->> 'course', '') <> ''
+ON CONFLICT (employee_id, course, start_date, end_date, provider, status)
+DO UPDATE SET
+  notes = EXCLUDED.notes,
+  updated_at = NOW();

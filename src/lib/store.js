@@ -7,6 +7,13 @@ export const state = {
     appConfig: {},    // Competency config { positionName: { competencies: [...] } }
     kpiConfig: [],    // KPI definitions
     kpiRecords: [],   // KPI records
+    kpiWeightProfiles: [],
+    kpiWeightItems: [],
+    employeePerformanceScores: [],
+    probationReviews: [],
+    probationQualitativeItems: [],
+    pipPlans: [],
+    pipActions: [],
     activityLogs: [], // Admin/activity logs
     appSettings: {},  // App settings { app_name, company_name, ... }
     reportFilters: {

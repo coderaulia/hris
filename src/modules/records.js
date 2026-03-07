@@ -4,8 +4,8 @@
 
 import { Chart } from 'chart.js/auto';
 import { state, emit, isAdmin, isEmployee, isManager } from '../lib/store.js';
-import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey } from '../lib/utils.js';
-import { saveEmployee, logActivity } from './data.js';
+import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../lib/utils.js';
+import { saveEmployee, logActivity, buildProbationDraft, saveProbationReview, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore } from './data.js';
 import { requireRecentAuth } from './auth.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from './assessment.js';
 import * as notify from '../lib/notify.js';
@@ -536,4 +536,481 @@ export async function editRecordSafe(id) {
 
 export function initiateSelfAssessment(id) {
     _initSelfAssess(id);
+}
+
+
+function getCurrentPeriodKey() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function getProbationPeriodFilter() {
+    const input = document.getElementById('probation-period-filter');
+    const val = input?.value || '';
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(val) ? val : getCurrentPeriodKey();
+}
+
+function getPipThreshold() {
+    const raw = document.getElementById('pip-threshold-input')?.value;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    return Number(state.appSettings?.pip_threshold || 70) || 70;
+}
+
+function scoreBadgeClass(score) {
+    if (score >= 100) return 'bg-success';
+    if (score >= 75) return 'bg-primary';
+    if (score >= 50) return 'bg-warning text-dark';
+    return 'bg-danger';
+}
+
+export function renderProbationPipView() {
+    const probationBody = document.getElementById('probation-reviews-body');
+    const pipBody = document.getElementById('pip-plans-body');
+    if (!probationBody || !pipBody) return;
+
+    const scoped = new Set(getFilteredEmployeeIds());
+
+    const probationRows = (state.probationReviews || [])
+        .filter(row => scoped.has(row.employee_id))
+        .sort((a, b) => String(b.reviewed_at || b.created_at || '').localeCompare(String(a.reviewed_at || a.created_at || '')));
+
+    probationBody.innerHTML = '';
+    if (probationRows.length === 0) {
+        probationBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No probation reviews.</td></tr>';
+    } else {
+        probationRows.forEach(row => {
+            const emp = state.db[row.employee_id];
+            const decision = String(row.decision || 'pending').toLowerCase();
+            const decisionClass = decision === 'pass'
+                ? 'bg-success'
+                : decision === 'extend'
+                    ? 'bg-warning text-dark'
+                    : decision === 'fail'
+                        ? 'bg-danger'
+                        : 'bg-secondary';
+
+            probationBody.innerHTML += `
+            <tr>
+                <td>
+                    <div class="fw-bold">${escapeHTML(emp?.name || row.employee_id)}</div>
+                    <div class="small text-muted">${escapeHTML(row.review_period_start || '-')} to ${escapeHTML(row.review_period_end || '-')}</div>
+                </td>
+                <td class="text-center">
+                    <span class="badge ${scoreBadgeClass(Number(row.final_score || 0))}">${formatNumber(Number(row.final_score || 0).toFixed(1))}</span>
+                </td>
+                <td class="text-center"><span class="badge ${decisionClass}">${escapeHTML(decision)}</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.__app.reviewProbation('${escapeInlineArg(row.id)}')" title="Review">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    const pipRows = (state.pipPlans || [])
+        .filter(row => scoped.has(row.employee_id))
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+    pipBody.innerHTML = '';
+    if (pipRows.length === 0) {
+        pipBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No PIP plans.</td></tr>';
+    } else {
+        pipRows.forEach(plan => {
+            const emp = state.db[plan.employee_id];
+            const status = String(plan.status || 'active');
+            const statusClass = status === 'completed'
+                ? 'bg-success'
+                : status === 'extended'
+                    ? 'bg-warning text-dark'
+                    : status === 'escalated'
+                        ? 'bg-danger'
+                        : status === 'cancelled'
+                            ? 'bg-secondary'
+                            : 'bg-primary';
+
+            pipBody.innerHTML += `
+            <tr>
+                <td>
+                    <div class="fw-bold">${escapeHTML(emp?.name || plan.employee_id)}</div>
+                    <div class="small text-muted">${escapeHTML(plan.trigger_reason || '-')}</div>
+                </td>
+                <td>${escapeHTML(plan.trigger_period || '-')}</td>
+                <td class="text-center"><span class="badge ${statusClass}">${escapeHTML(status)}</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-outline-primary" onclick="window.__app.updatePipPlanStatus('${escapeInlineArg(plan.id)}')" title="Update Status">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    const probationBadge = document.getElementById('probation-count-badge');
+    if (probationBadge) probationBadge.innerText = String(probationRows.length);
+
+    const pipBadge = document.getElementById('pip-count-badge');
+    if (pipBadge) pipBadge.innerText = String(pipRows.length);
+
+    const periodInput = document.getElementById('probation-period-filter');
+    if (periodInput && !periodInput.value) periodInput.value = getCurrentPeriodKey();
+
+    const thresholdInput = document.getElementById('pip-threshold-input');
+    if (thresholdInput && !thresholdInput.value) {
+        thresholdInput.value = String(Number(state.appSettings?.pip_threshold || 70) || 70);
+    }
+}
+
+export async function generateProbationDrafts() {
+    if (!isManager() && !isAdmin()) {
+        await notify.error('Access denied.');
+        return;
+    }
+
+    const scoped = getFilteredEmployeeIds();
+    const now = new Date();
+    let created = 0;
+    let skipped = 0;
+
+    for (const empId of scoped) {
+        const emp = state.db[empId];
+        if (!emp || emp.role !== 'employee' || !emp.join_date) {
+            skipped++;
+            continue;
+        }
+
+        const join = new Date(emp.join_date);
+        if (Number.isNaN(join.getTime())) {
+            skipped++;
+            continue;
+        }
+
+        const probationEnd = new Date(join);
+        probationEnd.setMonth(probationEnd.getMonth() + 3);
+        if (now < probationEnd) {
+            skipped++;
+            continue;
+        }
+
+        const draft = buildProbationDraft(empId);
+        if (!draft.review_period_start || draft.metric_count <= 0) {
+            skipped++;
+            continue;
+        }
+
+        const already = (state.probationReviews || []).some(r =>
+            r.employee_id === empId && r.review_period_start === draft.review_period_start
+        );
+        if (already) {
+            skipped++;
+            continue;
+        }
+
+        await saveProbationReview({
+            employee_id: empId,
+            review_period_start: draft.review_period_start,
+            review_period_end: draft.review_period_end,
+            quantitative_score: draft.quantitative_score,
+            qualitative_score: 0,
+            final_score: draft.quantitative_score,
+            decision: 'pending',
+            manager_notes: 'Auto-generated probation draft from first 3 months KPI result.',
+        }, []);
+
+        created++;
+    }
+
+    await logActivity({
+        action: 'probation.draft.generate',
+        entityType: 'probation_review',
+        entityId: 'bulk',
+        details: { created, skipped },
+    });
+
+    renderProbationPipView();
+    await notify.success(`Probation draft generation complete. Created: ${created}, Skipped: ${skipped}.`);
+}
+
+export async function reviewProbation(reviewId) {
+    if (!isManager() && !isAdmin()) {
+        await notify.error('Access denied.');
+        return;
+    }
+
+    const review = (state.probationReviews || []).find(r => r.id === reviewId);
+    if (!review) {
+        await notify.error('Probation review not found.');
+        return;
+    }
+
+    const qualitativeRaw = await notify.input({
+        title: 'Qualitative Score',
+        input: 'number',
+        inputLabel: 'Manager qualitative score (0-100)',
+        inputValue: String(Number(review.qualitative_score || 0)),
+        confirmButtonText: 'Next',
+        validate: value => {
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 0 || n > 100) return 'Score must be 0-100.';
+            return null;
+        },
+    });
+    if (qualitativeRaw === null) return;
+
+    const decision = await notify.input({
+        title: 'Probation Decision',
+        input: 'select',
+        inputOptions: {
+            pending: 'Pending',
+            pass: 'Pass',
+            extend: 'Extend',
+            fail: 'Fail',
+        },
+        inputValue: String(review.decision || 'pending'),
+        confirmButtonText: 'Next',
+    });
+    if (decision === null) return;
+
+    const notes = await notify.input({
+        title: 'Manager Notes',
+        input: 'textarea',
+        inputValue: String(review.manager_notes || ''),
+        confirmButtonText: 'Save',
+    });
+    if (notes === null) return;
+
+    const qualitativeScore = Number(qualitativeRaw);
+    const finalScore = (Number(review.quantitative_score || 0) * 0.7) + (qualitativeScore * 0.3);
+
+    await saveProbationReview({
+        ...review,
+        qualitative_score: qualitativeScore,
+        final_score: finalScore,
+        decision,
+        manager_notes: notes,
+    }, [
+        {
+            item_name: 'Manager Qualitative Assessment',
+            score: qualitativeScore,
+            note: notes,
+        },
+    ]);
+
+    await logActivity({
+        action: 'probation.review.update',
+        entityType: 'probation_review',
+        entityId: reviewId,
+        details: {
+            qualitative_score: qualitativeScore,
+            decision,
+        },
+    });
+
+    renderProbationPipView();
+    await notify.success('Probation review updated.');
+}
+
+export function exportProbationCsv() {
+    const scoped = new Set(getFilteredEmployeeIds());
+    const rows = (state.probationReviews || []).filter(r => scoped.has(r.employee_id));
+
+    const header = [
+        'Review_ID',
+        'Employee_ID',
+        'Employee_Name',
+        'Review_Period_Start',
+        'Review_Period_End',
+        'Quantitative_Score',
+        'Qualitative_Score',
+        'Final_Score',
+        'Decision',
+        'Manager_Notes',
+        'Reviewed_At',
+    ];
+
+    const lines = [header.join(',')];
+    rows.forEach(row => {
+        const emp = state.db[row.employee_id];
+        const vals = [
+            row.id || '',
+            row.employee_id || '',
+            emp?.name || row.employee_id || '',
+            row.review_period_start || '',
+            row.review_period_end || '',
+            row.quantitative_score ?? 0,
+            row.qualitative_score ?? 0,
+            row.final_score ?? 0,
+            row.decision || '',
+            (row.manager_notes || '').replace(/\r?\n/g, ' '),
+            row.reviewed_at || '',
+        ].map(v => {
+            const s = String(v ?? '');
+            if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+                return `"${s.replace(/"/g, '""')}"`;
+            }
+            return s;
+        });
+        lines.push(vals.join(','));
+    });
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `probation_reviews_${getCurrentPeriodKey()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+export async function generatePipPlans() {
+    if (!isManager() && !isAdmin()) {
+        await notify.error('Access denied.');
+        return;
+    }
+
+    const period = getProbationPeriodFilter();
+    const threshold = getPipThreshold();
+    const scoped = getFilteredEmployeeIds();
+
+    let created = 0;
+    let skipped = 0;
+
+    for (const empId of scoped) {
+        const employee = state.db[empId];
+        if (!employee || employee.role !== 'employee') {
+            skipped++;
+            continue;
+        }
+
+        const periodRecords = (state.kpiRecords || []).filter(r => r.employee_id === empId && r.period === period);
+        if (periodRecords.length === 0) {
+            skipped++;
+            continue;
+        }
+
+        const summary = calculateEmployeeWeightedKpiScore(empId, periodRecords);
+        const score = Number(summary.score || 0);
+        if (score >= threshold) {
+            skipped++;
+            continue;
+        }
+
+        const existing = (state.pipPlans || []).find(plan =>
+            plan.employee_id === empId
+            && plan.trigger_period === period
+            && ['active', 'extended'].includes(String(plan.status || 'active'))
+        );
+        if (existing) {
+            skipped++;
+            continue;
+        }
+
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 30);
+
+        const plan = await savePipPlan({
+            employee_id: empId,
+            trigger_reason: `KPI score ${score.toFixed(1)} below threshold ${threshold}`,
+            trigger_period: period,
+            start_date: startDate.toISOString().slice(0, 10),
+            target_end_date: endDate.toISOString().slice(0, 10),
+            status: 'active',
+            summary: 'Auto-generated PIP based on KPI performance below threshold.',
+        });
+
+        await savePipActions(plan.id, [
+            {
+                action_title: 'Weekly coaching check-in',
+                action_detail: 'Manager and employee weekly review of KPI blockers and improvement plan.',
+                due_date: endDate.toISOString().slice(0, 10),
+                progress_pct: 0,
+                status: 'todo',
+                checkpoint_note: '',
+            },
+            {
+                action_title: 'Submit KPI recovery target',
+                action_detail: 'Employee submits measurable recovery target and execution steps.',
+                due_date: endDate.toISOString().slice(0, 10),
+                progress_pct: 0,
+                status: 'todo',
+                checkpoint_note: '',
+            },
+        ]);
+
+        created++;
+    }
+
+    await logActivity({
+        action: 'pip.generate.from_kpi',
+        entityType: 'pip_plan',
+        entityId: period,
+        details: {
+            threshold,
+            created,
+            skipped,
+            period,
+        },
+    });
+
+    renderProbationPipView();
+    await notify.success(`PIP generation complete. Created: ${created}, Skipped: ${skipped}.`);
+}
+
+export async function updatePipPlanStatus(planId) {
+    if (!isManager() && !isAdmin()) {
+        await notify.error('Access denied.');
+        return;
+    }
+
+    const plan = (state.pipPlans || []).find(p => p.id === planId);
+    if (!plan) {
+        await notify.error('PIP plan not found.');
+        return;
+    }
+
+    const status = await notify.input({
+        title: 'Update PIP Status',
+        input: 'select',
+        inputOptions: {
+            active: 'Active',
+            completed: 'Completed',
+            extended: 'Extended',
+            escalated: 'Escalated',
+            cancelled: 'Cancelled',
+        },
+        inputValue: String(plan.status || 'active'),
+        confirmButtonText: 'Next',
+    });
+    if (status === null) return;
+
+    const note = await notify.input({
+        title: 'PIP Summary / Update Note',
+        input: 'textarea',
+        inputValue: String(plan.summary || ''),
+        confirmButtonText: 'Save',
+    });
+    if (note === null) return;
+
+    await savePipPlan({
+        ...plan,
+        status,
+        summary: note,
+        closed_at: ['completed', 'cancelled'].includes(String(status)) ? new Date().toISOString() : null,
+    });
+
+    await logActivity({
+        action: 'pip.status.update',
+        entityType: 'pip_plan',
+        entityId: planId,
+        details: {
+            status,
+        },
+    });
+
+    renderProbationPipView();
+    await notify.success('PIP plan updated.');
 }

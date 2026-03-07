@@ -199,6 +199,12 @@
                                             personalized target values for their role KPIs. If blank, global
                                             default applies.</p>
                                         <div class="mb-3">
+                                            <label class="small fw-bold">Target Month</label>
+                                            <input type="month" id="kpi-target-period" class="form-control form-control-sm"
+                                                onchange="window.__app.onKpiTargetPeriodChange()">
+                                            <div class="text-muted" style="font-size: 11px;">Monthly override: fill KPI value(s) for selected month. Leave blank to use default target.</div>
+                                        </div>
+                                        <div class="mb-3">
                                             <label class="small fw-bold">Select Employee</label>
                                             <select id="kpi-employee-select" class="form-select form-select-sm"
                                                 onchange="window.__app.onKpiEmployeeChange()"></select>
