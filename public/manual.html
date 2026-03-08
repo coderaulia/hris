@@ -105,7 +105,7 @@
                 </section>
 
                 <section class="manual-section mb-4">
-                    <h2 class="fw-bold">6. KPI Definition & Monthly Target Config</h2>
+                    <h2 class="fw-bold">6. KPI Definition, Monthly Target Config & Probation Rules</h2>
                     <ol>
                         <li>Open <strong>Settings &gt; KPI Management</strong>.</li>
                         <li>To add/edit KPI definition, fill KPI name, category/position, target, and unit, then save.</li>
@@ -113,6 +113,8 @@
                         <li>In <strong>Employee Targets Config</strong>, select target month and employee.</li>
                         <li>Input monthly target override per KPI, then click <strong>Save Employee Targets</strong>.</li>
                         <li>Leave fields blank to fall back to global/default KPI target.</li>
+                        <li>Open <strong>Settings &gt; General</strong> to configure probation scoring policy (Work/Managing/Attitude weights, pass threshold, attendance deduction JSON rules).</li>
+                        <li>Weight values are normalized by system to keep total score policy-safe (100).</li>
                     </ol>
                 </section>
 
@@ -121,9 +123,9 @@
                     <ol>
                         <li>Open <strong>Records &gt; Probation &amp; PIP</strong>.</li>
                         <li>Click <strong>Generate Probation Drafts</strong> for employees reaching probation end.</li>
-                        <li>Use <strong>Review Form</strong> to fill monthly manager inputs: managing task score, qualitative text, and notes.</li>
+                        <li>Use <strong>Review Form</strong> to fill monthly manager inputs: managing task score and qualitative text.</li>
                         <li><strong>Work Performance</strong> score is calculated from KPI records by probation date window.</li>
-                        <li><strong>Attendance / Attitude</strong> score is managed via <strong>Add Attendance Entry</strong> (HR/Super Admin), then auto-recomputed.</li>
+                        <li><strong>Attendance / Attitude</strong> score is managed via <strong>Add Attendance Entry</strong> (HR/Super Admin), using deduction suggestions from configured attendance rules, then auto-recomputed.</li>
                         <li>Set decision: <strong>Pending</strong>, <strong>Pass</strong>, <strong>Extend</strong>, or <strong>Fail</strong>.</li>
                         <li>Click <strong>Export Probation Excel</strong> to download monthly sheets (Bulan 1-3 + Rekap).</li>
                         <li>For low KPI performance, click <strong>Generate PIP</strong> and track status in PIP Plans.</li>

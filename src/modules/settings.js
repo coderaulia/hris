@@ -5,7 +5,7 @@
 
 import { state, emit, isAdmin } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, formatDateTime } from '../lib/utils.js';
-import { saveSetting, saveEmployee, fetchActivityLogs, logActivity } from './data.js';
+import { saveSetting, saveEmployee, fetchActivityLogs, logActivity, getDefaultProbationAttendanceRulesJson } from './data.js';
 import { createAuthUser, requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
@@ -76,6 +76,7 @@ export async function renderSettings() {
 // ---- APP SETTINGS ----
 function renderAppSettings() {
     const { appSettings } = state;
+    const attendanceTemplate = JSON.stringify(JSON.parse(getDefaultProbationAttendanceRulesJson()));
     const fields = [
         { key: 'app_name', label: 'Application Name', placeholder: 'e.g. HR Performance Suite' },
         { key: 'company_name', label: 'Company Name', placeholder: 'e.g. Warna Emas Indonesia' },
@@ -84,6 +85,10 @@ function renderAppSettings() {
         { key: 'assessment_scale_max', label: 'Assessment Scale Max', placeholder: '10' },
         { key: 'assessment_threshold', label: 'Training Threshold (score below this triggers recommendation)', placeholder: '7' },
         { key: 'probation_pass_threshold', label: 'Probation Pass Threshold (minimum final score)', placeholder: '75' },
+        { key: 'probation_weight_work', label: 'Probation Work Weight', placeholder: '50' },
+        { key: 'probation_weight_managing', label: 'Probation Managing Weight', placeholder: '30' },
+        { key: 'probation_weight_attitude', label: 'Probation Attitude Weight', placeholder: '20' },
+        { key: 'probation_attendance_rules_json', label: 'Probation Attendance Deduction Rules JSON', placeholder: '{"monthly_cap":20,"events":{...}}', defaultValue: attendanceTemplate },
     ];
 
     const container = document.getElementById('settings-app-fields');
@@ -91,26 +96,46 @@ function renderAppSettings() {
     container.innerHTML = '';
 
     fields.forEach(f => {
+        const value = appSettings[f.key] || f.defaultValue || '';
+        const isJsonField = f.key === 'probation_attendance_rules_json';
+        const control = isJsonField
+            ? `<textarea class="form-control font-monospace small" id="setting-${f.key}" rows="4" placeholder="${f.placeholder}">${escapeHTML(value)}</textarea>`
+            : `<input type="text" class="form-control" id="setting-${f.key}" value="${escapeHTML(value)}" placeholder="${f.placeholder}">`;
+
         container.innerHTML += `
-      <div class="col-md-6 mb-3">
+      <div class="${isJsonField ? 'col-12' : 'col-md-6'} mb-3">
         <label class="form-label small fw-bold text-muted">${f.label}</label>
-        <input type="text" class="form-control" id="setting-${f.key}" 
-          value="${escapeHTML(appSettings[f.key] || '')}" placeholder="${f.placeholder}">
+        ${control}
       </div>`;
     });
 }
 
 export async function saveAppSettings() {
     if (!(await requireRecentAuth('saving application settings'))) return;
-    const fields = ['app_name', 'company_name', 'company_short', 'department_label', 'assessment_scale_max', 'assessment_threshold', 'probation_pass_threshold'];
+    const fields = ['app_name', 'company_name', 'company_short', 'department_label', 'assessment_scale_max', 'assessment_threshold', 'probation_pass_threshold', 'probation_weight_work', 'probation_weight_managing', 'probation_weight_attitude', 'probation_attendance_rules_json'];
     const changed = {};
 
     try {
         await notify.withLoading(async () => {
+            const numericKeys = new Set(['assessment_scale_max', 'assessment_threshold', 'probation_pass_threshold', 'probation_weight_work', 'probation_weight_managing', 'probation_weight_attitude']);
             for (const key of fields) {
                 const el = document.getElementById(`setting-${key}`);
                 if (!el) continue;
-                const newVal = el.value.trim();
+                let newVal = el.value.trim();
+                if (numericKeys.has(key) && newVal) {
+                    const n = Number(newVal);
+                    if (!Number.isFinite(n) || n < 0) {
+                        throw new Error(`${key.replaceAll('_', ' ')} must be a non-negative number.`);
+                    }
+                }
+                if (key === 'probation_attendance_rules_json' && newVal) {
+                    const parsed = JSON.parse(newVal);
+                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                        throw new Error('Probation attendance rules must be a valid JSON object.');
+                    }
+                    newVal = JSON.stringify(parsed);
+                    el.value = newVal;
+                }
                 const prevVal = state.appSettings[key] || '';
                 if (newVal !== prevVal) {
                     changed[key] = { from: prevVal, to: newVal };

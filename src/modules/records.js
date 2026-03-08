@@ -6,7 +6,7 @@ import { Chart } from 'chart.js/auto';
 import Swal from 'sweetalert2';
 import { state, emit, isAdmin, isEmployee, isManager } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../lib/utils.js';
-import { saveEmployee, logActivity, buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getEmployeeKpiTarget } from './data.js';
+import { saveEmployee, logActivity, buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getEmployeeKpiTarget, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction } from './data.js';
 import { requireRecentAuth } from './auth.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from './assessment.js';
 import * as notify from '../lib/notify.js';
@@ -559,10 +559,11 @@ function getPipThreshold() {
 }
 
 function getProbationPassThreshold() {
+    const rules = getProbationRules();
     const raw = document.getElementById('probation-pass-threshold-input')?.value;
     const parsed = Number(raw);
-    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
-    return Number(state.appSettings?.probation_pass_threshold || 75) || 75;
+    if (Number.isFinite(parsed) && parsed >= 0) return Math.min(parsed, Number(rules.total_weight || 100));
+    return Number(rules.pass_threshold || 75) || 75;
 }
 function scoreBadgeClass(score) {
     if (score >= 90) return 'bg-success';
@@ -575,6 +576,16 @@ function toFixedScore(value, digits = 2) {
     const num = Number(value);
     if (!Number.isFinite(num)) return '0';
     return num.toFixed(digits);
+}
+
+function formatScoreLabel(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '0';
+    return Number.isInteger(num) ? String(num) : num.toFixed(1);
+}
+
+function getProbationRules() {
+    return getProbationRuleConfig();
 }
 
 function getErrorMessage(error, fallback = 'Unknown error') {
@@ -635,26 +646,7 @@ function monthAttendanceSummary(reviewId, monthNo) {
 }
 
 function suggestAttendanceDeduction(eventType, qty) {
-    const amount = Math.max(0, Math.round(Number(qty) || 0));
-    if (eventType === 'late_in' || eventType === 'missed_clock_out') {
-        if (amount >= 15) return 5;
-        if (amount >= 9) return 3;
-        if (amount >= 3) return 1;
-        return 0;
-    }
-    if (eventType === 'discipline') {
-        return Math.min(10, amount * 2);
-    }
-    if (eventType === 'event_absent') {
-        return Math.min(10, amount);
-    }
-    if (eventType === 'absent') {
-        if (amount >= 5) return 5;
-        if (amount >= 3) return 3;
-        if (amount >= 1) return 1;
-        return 0;
-    }
-    return 0;
+    return suggestProbationAttendanceDeduction(eventType, qty, getProbationRules());
 }
 
 async function ensureProbationMonthlyRows(review, options = {}) {
@@ -818,7 +810,7 @@ export function renderProbationPipView() {
 
     const passThresholdInput = document.getElementById('probation-pass-threshold-input');
     if (passThresholdInput && !passThresholdInput.value) {
-        passThresholdInput.value = String(Number(state.appSettings?.probation_pass_threshold || 75) || 75);
+        passThresholdInput.value = String(Number(getProbationRules().pass_threshold || 75) || 75);
     }
 }
 
@@ -908,7 +900,15 @@ export async function reviewProbation(reviewId) {
     try {
     const seeded = await ensureProbationMonthlyRows(review);
     const rows = seeded.monthly_rows || [];
+    const rules = getProbationRules();
     const passThreshold = getProbationPassThreshold();
+    const workWeightLabel = formatScoreLabel(rules.work_weight);
+    const managingWeightLabel = formatScoreLabel(rules.managing_weight);
+    const attitudeWeightLabel = formatScoreLabel(rules.attitude_weight);
+    const totalWeightLabel = formatScoreLabel(rules.total_weight);
+    const managingMax = Number(rules.managing_weight || 0);
+    const totalMax = Number(rules.total_weight || 100);
+    const managingRubric = rules.managing_rubric || {};
 
     const htmlRows = rows.map(row => `
         <tr>
@@ -917,7 +917,7 @@ export async function reviewProbation(reviewId) {
                 <div class="text-muted">${escapeHTML(row.period_start)} to ${escapeHTML(row.period_end)}</div>
             </td>
             <td><input id="pr-work-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.work_performance_score, 2)}" readonly></td>
-            <td><input id="pr-manage-${row.month_no}" class="form-control form-control-sm text-end" type="number" min="0" max="30" step="0.1" value="${toFixedScore(row.managing_task_score, 2)}" placeholder="0-30" title="Manager input (0-30). Suggested rubric: Responsibility 0-12, Innovation 0-12, Communication 0-6."></td>
+            <td><input id="pr-manage-${row.month_no}" class="form-control form-control-sm text-end" type="number" min="0" max="${managingWeightLabel}" step="0.1" value="${toFixedScore(row.managing_task_score, 2)}" placeholder="0-${managingWeightLabel}" title="Manager input (0-${managingWeightLabel}). Suggested rubric: Responsibility 0-${formatScoreLabel(managingRubric.responsibility_max)}, Innovation 0-${formatScoreLabel(managingRubric.innovation_max)}, Communication 0-${formatScoreLabel(managingRubric.communication_max)}."></td>
             <td><input id="pr-att-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.attitude_score, 2)}" readonly></td>
             <td><input id="pr-ded-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.attendance_deduction, 2)}" readonly></td>
             <td><textarea id="pr-qual-${row.month_no}" class="form-control form-control-sm" rows="2" placeholder="Qualitative summary: achievements, behavior, and quality of execution">${escapeHTML(row.manager_qualitative_text || '')}</textarea></td>
@@ -939,20 +939,20 @@ export async function reviewProbation(reviewId) {
                 <div class="mb-2"><strong>Window:</strong> ${escapeHTML(seeded.review_period_start || '-')} to ${escapeHTML(seeded.review_period_end || '-')}</div>
                 <div class="alert alert-light border py-2 px-3 mb-3">
                     <div class="fw-bold mb-1">Manager Scoring Hints</div>
-                    <div class="small mb-1"><strong>Work (50):</strong> auto-generated from KPI records in each probation window (read-only).</div>
-                    <div class="small mb-1"><strong>Managing (30):</strong> manager input. Suggested rubric: Responsibility 0-12, Innovation 0-12, Communication 0-6.</div>
-                    <div class="small mb-1"><strong>Attitude (20):</strong> auto-calculated from attendance deductions (read-only).</div>
+                    <div class="small mb-1"><strong>Work (${workWeightLabel}):</strong> auto-generated from KPI records in each probation window (read-only).</div>
+                    <div class="small mb-1"><strong>Managing (${managingWeightLabel}):</strong> manager input. Suggested rubric: Responsibility 0-${formatScoreLabel(managingRubric.responsibility_max)}, Innovation 0-${formatScoreLabel(managingRubric.innovation_max)}, Communication 0-${formatScoreLabel(managingRubric.communication_max)}.</div>
+                    <div class="small mb-1"><strong>Attitude (${attitudeWeightLabel}):</strong> auto-calculated from attendance deductions (read-only).</div>
                     <div class="small mb-1"><strong>Qualitative Score (summary):</strong> average of monthly (Managing + Attitude).</div>
-                    <div class="small"><strong>Pass Rule:</strong> decision <strong>Pass</strong> requires final score >= ${toFixedScore(passThreshold, 1)}.</div>
+                    <div class="small"><strong>Pass Rule:</strong> decision <strong>Pass</strong> requires final score >= ${toFixedScore(passThreshold, 1)} (max ${totalWeightLabel}).</div>
                 </div>
                 <div class="table-responsive border rounded mb-3" style="max-height:380px; overflow:auto;">
                     <table class="table table-sm align-middle mb-0" style="table-layout:fixed; min-width:1280px;">
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th style="width:190px;">Month</th>
-                                <th style="width:115px;">Work<br><span class="text-muted">(50)</span></th>
-                                <th style="width:115px;">Managing<br><span class="text-muted">(30)</span></th>
-                                <th style="width:115px;">Attitude<br><span class="text-muted">(20)</span></th>
+                                <th style="width:115px;">Work<br><span class="text-muted">(${workWeightLabel})</span></th>
+                                <th style="width:115px;">Managing<br><span class="text-muted">(${managingWeightLabel})</span></th>
+                                <th style="width:115px;">Attitude<br><span class="text-muted">(${attitudeWeightLabel})</span></th>
                                 <th style="width:115px;">Deduction</th>
                                 <th style="width:520px;">Qualitative Text</th>
                                 <th style="width:115px;">Total</th>
@@ -982,14 +982,14 @@ export async function reviewProbation(reviewId) {
             for (const row of rows) {
                 const manage = Number(document.getElementById(`pr-manage-${row.month_no}`)?.value);
                 const qual = (document.getElementById(`pr-qual-${row.month_no}`)?.value || '').trim();
-                if (!Number.isFinite(manage) || manage < 0 || manage > 30) {
-                    Swal.showValidationMessage(`Managing Task score for Month ${row.month_no} must be between 0 and 30.`);
+                if (!Number.isFinite(manage) || manage < 0 || manage > managingMax) {
+                    Swal.showValidationMessage(`Managing Task score for Month ${row.month_no} must be between 0 and ${formatScoreLabel(managingMax)}.`);
                     return false;
                 }
                 collectedRows.push({
                     ...row,
                     probation_review_id: review.id,
-                    managing_task_score: Math.max(0, Math.min(30, manage)),
+                    managing_task_score: Math.max(0, Math.min(managingMax, manage)),
                     manager_qualitative_text: qual,
                 });
             }
@@ -1001,7 +1001,7 @@ export async function reviewProbation(reviewId) {
                 const work = Number(item.work_performance_score || 0);
                 const manageScore = Number(item.managing_task_score || 0);
                 const attitude = Number(item.attitude_score || 0);
-                return Math.max(0, Math.min(100, work + manageScore + attitude));
+                return Math.max(0, Math.min(totalMax, work + manageScore + attitude));
             });
             const projectedFinal = projectedTotals.length
                 ? projectedTotals.reduce((sum, score) => sum + score, 0) / projectedTotals.length
@@ -1079,6 +1079,9 @@ export async function addProbationAttendanceEntry(reviewId = '') {
 
     try {
     const seeded = await ensureProbationMonthlyRows(review);
+    const rules = getProbationRules();
+    const eventOptions = getProbationAttendanceEventOptions(rules);
+    const defaultEvent = Object.keys(eventOptions)[0] || 'other';
     const monthOptions = {};
     (seeded.monthly_rows || []).forEach(row => {
         monthOptions[String(row.month_no)] = `Month ${row.month_no} (${row.period_start} to ${row.period_end})`;
@@ -1108,15 +1111,8 @@ export async function addProbationAttendanceEntry(reviewId = '') {
     const eventType = await notify.input({
         title: 'Attendance Event Type',
         input: 'select',
-        inputOptions: {
-            late_in: 'Late Clock In',
-            missed_clock_out: 'Missed Clock Out',
-            absent: 'Absence',
-            event_absent: 'Event/Meeting Absence',
-            discipline: 'Discipline Violation',
-            other: 'Other',
-        },
-        inputValue: 'late_in',
+        inputOptions: eventOptions,
+        inputValue: defaultEvent,
         confirmButtonText: 'Next',
     });
     if (eventType === null) return;
@@ -1141,11 +1137,12 @@ export async function addProbationAttendanceEntry(reviewId = '') {
         title: 'Deduction Points',
         input: 'number',
         inputValue: String(suggested),
-        inputLabel: 'You can override suggested deduction points.',
+        inputLabel: `Suggested by policy. Max monthly deduction: ${formatScoreLabel(rules.attendance?.monthly_cap)}.`,
         confirmButtonText: 'Next',
         validate: value => {
             const n = Number(value);
             if (!Number.isFinite(n) || n < 0) return 'Deduction must be >= 0';
+            if (n > Number(rules.attendance?.monthly_cap || rules.attitude_weight || 0)) return `Deduction cannot exceed ${formatScoreLabel(rules.attendance?.monthly_cap || rules.attitude_weight || 0)}.`;
             return null;
         },
     });
@@ -1242,13 +1239,17 @@ export async function exportProbationPdf() {
         const directorName = state.appSettings?.director_name || 'Director';
         const company = state.appSettings?.company_name || 'Company';
         const appName = state.appSettings?.app_name || 'HR Performance Suite';
+        const rules = getProbationRules();
+        const passThreshold = Number(rules.pass_threshold || 75) || 75;
+        const workWeightLabel = formatScoreLabel(rules.work_weight);
+        const managingWeightLabel = formatScoreLabel(rules.managing_weight);
+        const attitudeWeightLabel = formatScoreLabel(rules.attitude_weight);
         const generatedAt = new Date();
         const generatedDate = generatedAt.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: 'long',
             year: 'numeric',
         });
-        const passThreshold = Number(state.appSettings?.probation_pass_threshold || 75) || 75;
 
         const { jsPDF } = await import('jspdf');
         const autoTableMod = await import('jspdf-autotable');
@@ -1294,9 +1295,9 @@ export async function exportProbationPdf() {
             head: [[
                 'Month',
                 'Period',
-                'Work (50)',
-                'Managing (30)',
-                'Attitude (20)',
+                `Work (${workWeightLabel})`,
+                `Managing (${managingWeightLabel})`,
+                `Attitude (${attitudeWeightLabel})`,
                 'Deduction',
                 'Total',
                 'Qualitative',
@@ -1341,9 +1342,9 @@ export async function exportProbationPdf() {
             startY: contextTop,
             head: [['Score Context (For Director)']],
             body: [[
-                'Work (50): auto-generated from KPI records (target vs actual achievement) within probation window.\n'
-                + 'Managing (30): manager score input based on responsibility, innovation, and communication.\n'
-                + 'Attitude (20): auto-calculated from attendance deductions (20 - deduction points).\n'
+                `Work (${workWeightLabel}): auto-generated from KPI records (target vs actual achievement) within probation window.\n`
+                + `Managing (${managingWeightLabel}): manager score input based on responsibility, innovation, and communication.\n`
+                + `Attitude (${attitudeWeightLabel}): auto-calculated from attendance deductions (${attitudeWeightLabel} - deduction points, min 0).\n`
                 + 'See attachment below for Work score details.',
             ]],
             theme: 'grid',
@@ -1553,6 +1554,10 @@ export async function exportProbationCsv() {
         const attendanceRows = getAttendanceRows(review.id);
         const company = state.appSettings?.company_name || 'Company';
         const appName = state.appSettings?.app_name || 'HR Performance Suite';
+        const rules = getProbationRules();
+        const workWeightLabel = formatScoreLabel(rules.work_weight);
+        const managingWeightLabel = formatScoreLabel(rules.managing_weight);
+        const attitudeWeightLabel = formatScoreLabel(rules.attitude_weight);
 
         const ExcelJS = await import('exceljs');
         const wb = new ExcelJS.Workbook();
@@ -1577,9 +1582,9 @@ export async function exportProbationCsv() {
             ws.addRow(['Month Window', `${monthRow.period_start} to ${monthRow.period_end}`]);
             ws.addRow([]);
             ws.addRow(['No', 'Tugas & tanggung Jawab', 'Realisasi', 'Penilaian Qualitative', 'Catatan']);
-            ws.addRow([1, 'Work Performance (50 points)', Number(monthRow.work_performance_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
-            ws.addRow([2, 'Managing Task (30 points)', Number(monthRow.managing_task_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
-            ws.addRow([3, 'Attitude (20 points)', Number(monthRow.attitude_score || 0), `Attendance deduction: ${toFixedScore(monthRow.attendance_deduction || 0, 2)}`, monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow([1, `Work Performance (${workWeightLabel} points)`, Number(monthRow.work_performance_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow([2, `Managing Task (${managingWeightLabel} points)`, Number(monthRow.managing_task_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow([3, `Attitude (${attitudeWeightLabel} points)`, Number(monthRow.attitude_score || 0), `Attendance deduction: ${toFixedScore(monthRow.attendance_deduction || 0, 2)}`, monthAttendanceSummary(review.id, monthRow.month_no)]);
             ws.addRow(['', 'Score Rata-rata', Number(monthRow.monthly_total || 0), '', '']);
 
             const headRow = ws.getRow(9);
@@ -1621,7 +1626,7 @@ export async function exportProbationCsv() {
         recap.addRow(['Nama', employee.name, '', 'Jabatan', employee.position || '-']);
         recap.addRow(['Mulai Probation', review.review_period_start || draft.review_period_start || '-', '', 'Akhir Probation', review.review_period_end || draft.review_period_end || '-']);
         recap.addRow([]);
-        recap.addRow(['No', 'Task', 'Period', 'Work (50)', 'Managing (30)', 'Attitude (20)', 'Total', 'Qualitative']);
+        recap.addRow(['No', 'Task', 'Period', `Work (${workWeightLabel})`, `Managing (${managingWeightLabel})`, `Attitude (${attitudeWeightLabel})`, 'Total', 'Qualitative']);
 
         (draft.monthly_rows || []).forEach(row => {
             recap.addRow([

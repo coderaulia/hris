@@ -9,6 +9,63 @@ import * as notify from '../lib/notify.js';
 
 const SETTINGS_CACHE_KEY = 'tna_app_settings_cache_v1';
 
+const DEFAULT_PROBATION_WEIGHTS = Object.freeze({
+    work: 50,
+    managing: 30,
+    attitude: 20,
+});
+
+const DEFAULT_PROBATION_ATTENDANCE_RULES = Object.freeze({
+    monthly_cap: 20,
+    events: {
+        late_in: {
+            label: 'Late Clock In',
+            mode: 'tiered',
+            tiers: [
+                { min_qty: 15, points: 5 },
+                { min_qty: 9, points: 3 },
+                { min_qty: 3, points: 1 },
+            ],
+        },
+        missed_clock_out: {
+            label: 'Missed Clock Out',
+            mode: 'tiered',
+            tiers: [
+                { min_qty: 15, points: 5 },
+                { min_qty: 9, points: 3 },
+                { min_qty: 3, points: 1 },
+            ],
+        },
+        absent: {
+            label: 'Absence',
+            mode: 'tiered',
+            tiers: [
+                { min_qty: 5, points: 5 },
+                { min_qty: 3, points: 3 },
+                { min_qty: 1, points: 1 },
+            ],
+        },
+        event_absent: {
+            label: 'Event/Meeting Absence',
+            mode: 'per_qty',
+            per_qty: 1,
+            max_points: 10,
+        },
+        discipline: {
+            label: 'Discipline Violation',
+            mode: 'per_qty',
+            per_qty: 2,
+            max_points: 10,
+        },
+        other: {
+            label: 'Other',
+            mode: 'per_qty',
+            per_qty: 0,
+            max_points: 20,
+        },
+    },
+});
+
 function writeSettingsCache(settings) {
     if (typeof localStorage === 'undefined') return;
     try {
@@ -845,6 +902,206 @@ function roundScore(value) {
     return Math.round(toNumber(value, 0) * 100) / 100;
 }
 
+function parseJsonObject(rawValue) {
+    if (!rawValue) return {};
+    if (typeof rawValue === 'object' && !Array.isArray(rawValue)) return rawValue;
+    if (typeof rawValue !== 'string') return {};
+
+    const trimmed = rawValue.trim();
+    if (!trimmed) return {};
+
+    try {
+        const parsed = JSON.parse(trimmed);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+        return {};
+    }
+}
+
+function sanitizeTier(rawTier) {
+    const minQty = Math.max(0, Math.round(toNumber(rawTier?.min_qty, NaN)));
+    const points = roundScore(Math.max(0, toNumber(rawTier?.points, NaN)));
+    if (!Number.isFinite(minQty) || !Number.isFinite(points)) return null;
+    return { min_qty: minQty, points };
+}
+
+function normalizeAttendanceEventRule(eventKey, rawRule, fallbackRule = {}) {
+    const fallbackLabel = String(fallbackRule?.label || eventKey || 'Other').trim() || 'Other';
+    const candidate = rawRule && typeof rawRule === 'object' && !Array.isArray(rawRule) ? rawRule : {};
+    const modeRaw = String(candidate.mode || '').trim().toLowerCase();
+    const hasTiers = Array.isArray(candidate.tiers);
+    const mode = (modeRaw === 'tiered' || hasTiers) ? 'tiered' : 'per_qty';
+    const label = String(candidate.label || fallbackLabel).trim() || fallbackLabel;
+
+    if (mode === 'tiered') {
+        const fallbackTiers = asArray(fallbackRule.tiers).map(sanitizeTier).filter(Boolean);
+        const tiers = asArray(candidate.tiers).map(sanitizeTier).filter(Boolean);
+        const source = tiers.length > 0 ? tiers : fallbackTiers;
+        const dedup = {};
+        source.forEach(item => {
+            dedup[item.min_qty] = item.points;
+        });
+        const normalizedTiers = Object.entries(dedup)
+            .map(([min_qty, points]) => ({ min_qty: Number(min_qty), points: roundScore(points) }))
+            .sort((a, b) => b.min_qty - a.min_qty);
+
+        if (normalizedTiers.length > 0) {
+            return { label, mode: 'tiered', tiers: normalizedTiers };
+        }
+    }
+
+    const fallbackPerQty = Math.max(0, toNumber(fallbackRule.per_qty, 0));
+    const fallbackMax = Math.max(0, toNumber(fallbackRule.max_points, 20));
+    return {
+        label,
+        mode: 'per_qty',
+        per_qty: roundScore(Math.max(0, toNumber(candidate.per_qty, fallbackPerQty))),
+        max_points: roundScore(Math.max(0, toNumber(candidate.max_points, fallbackMax))),
+    };
+}
+
+function cloneDefaultAttendanceRules() {
+    return JSON.parse(JSON.stringify(DEFAULT_PROBATION_ATTENDANCE_RULES));
+}
+
+function getRawProbationAttendanceRules() {
+    const raw = state.appSettings?.probation_attendance_rules_json;
+    if (!raw) return {};
+
+    const parsed = parseJsonObject(raw);
+    if (Object.keys(parsed).length > 0) return parsed;
+
+    if (typeof raw === 'string' && raw.trim()) {
+        debugError('Invalid probation_attendance_rules_json. Falling back to defaults.');
+    }
+
+    return {};
+}
+
+function normalizeProbationWeights(rawWork, rawManaging, rawAttitude) {
+    let work = roundScore(clamp(toNumber(rawWork, DEFAULT_PROBATION_WEIGHTS.work), 0, 100));
+    let managing = roundScore(clamp(toNumber(rawManaging, DEFAULT_PROBATION_WEIGHTS.managing), 0, 100));
+    let attitude = roundScore(clamp(toNumber(rawAttitude, DEFAULT_PROBATION_WEIGHTS.attitude), 0, 100));
+
+    const rawSum = work + managing + attitude;
+    if (rawSum <= 0) {
+        work = DEFAULT_PROBATION_WEIGHTS.work;
+        managing = DEFAULT_PROBATION_WEIGHTS.managing;
+        attitude = DEFAULT_PROBATION_WEIGHTS.attitude;
+    } else if (Math.abs(rawSum - 100) > 0.01) {
+        const scale = 100 / rawSum;
+        work = roundScore(work * scale);
+        managing = roundScore(managing * scale);
+        attitude = roundScore(Math.max(0, 100 - work - managing));
+    }
+
+    return {
+        work,
+        managing,
+        attitude,
+        total: roundScore(work + managing + attitude),
+    };
+}
+
+function computeProbationRuleConfig() {
+    const weights = normalizeProbationWeights(
+        state.appSettings?.probation_weight_work,
+        state.appSettings?.probation_weight_managing,
+        state.appSettings?.probation_weight_attitude
+    );
+
+    const defaultAttendance = cloneDefaultAttendanceRules();
+    defaultAttendance.monthly_cap = roundScore(clamp(toNumber(defaultAttendance.monthly_cap, weights.attitude), 0, weights.attitude));
+
+    const rawAttendance = getRawProbationAttendanceRules();
+    const rawEvents = rawAttendance.events && typeof rawAttendance.events === 'object' && !Array.isArray(rawAttendance.events)
+        ? rawAttendance.events
+        : {};
+
+    const eventKeys = [...new Set([
+        ...Object.keys(defaultAttendance.events || {}),
+        ...Object.keys(rawEvents),
+    ])];
+
+    const normalizedEvents = {};
+    eventKeys.forEach(key => {
+        normalizedEvents[key] = normalizeAttendanceEventRule(
+            key,
+            rawEvents[key],
+            defaultAttendance.events?.[key] || {}
+        );
+    });
+
+    const monthlyCap = roundScore(clamp(
+        toNumber(rawAttendance.monthly_cap, defaultAttendance.monthly_cap),
+        0,
+        weights.attitude
+    ));
+
+    const passThreshold = roundScore(clamp(
+        toNumber(state.appSettings?.probation_pass_threshold, 75),
+        0,
+        weights.total
+    ));
+
+    const managingResponsibility = roundScore(weights.managing * 0.4);
+    const managingInnovation = roundScore(weights.managing * 0.4);
+    const managingCommunication = roundScore(Math.max(0, weights.managing - managingResponsibility - managingInnovation));
+
+    return {
+        work_weight: weights.work,
+        managing_weight: weights.managing,
+        attitude_weight: weights.attitude,
+        total_weight: weights.total,
+        pass_threshold: passThreshold,
+        attendance: {
+            monthly_cap: monthlyCap,
+            events: normalizedEvents,
+        },
+        managing_rubric: {
+            responsibility_max: managingResponsibility,
+            innovation_max: managingInnovation,
+            communication_max: managingCommunication,
+        },
+    };
+}
+
+export function getProbationRuleConfig() {
+    return computeProbationRuleConfig();
+}
+
+export function getDefaultProbationAttendanceRulesJson() {
+    return JSON.stringify(DEFAULT_PROBATION_ATTENDANCE_RULES, null, 2);
+}
+
+export function getProbationAttendanceEventOptions(config = getProbationRuleConfig()) {
+    const opts = {};
+    Object.entries(config.attendance?.events || {}).forEach(([key, eventRule]) => {
+        opts[key] = eventRule?.label || key;
+    });
+    return opts;
+}
+
+export function suggestProbationAttendanceDeduction(eventType, qty, config = getProbationRuleConfig()) {
+    const key = String(eventType || '').trim() || 'other';
+    const amount = Math.max(0, Math.round(toNumber(qty, 0)));
+    const events = config.attendance?.events || {};
+    const eventRule = events[key] || events.other;
+    if (!eventRule) return 0;
+
+    let points = 0;
+    if (eventRule.mode === 'tiered' && Array.isArray(eventRule.tiers)) {
+        const tier = eventRule.tiers.find(item => amount >= Number(item.min_qty || 0));
+        points = toNumber(tier?.points, 0);
+    } else {
+        const perQty = Math.max(0, toNumber(eventRule.per_qty, 0));
+        const maxPoints = Math.max(0, toNumber(eventRule.max_points, config.attendance?.monthly_cap || config.attitude_weight || 0));
+        points = Math.min(maxPoints, amount * perQty);
+    }
+
+    return roundScore(clamp(points, 0, toNumber(config.attendance?.monthly_cap, config.attitude_weight)));
+}
+
 export function calculateEmployeeWeightedKpiScore(employeeId, records = state.kpiRecords) {
     const employee = state.db[employeeId];
     if (!employee) {
@@ -1248,25 +1505,32 @@ function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function attendanceDeduction(entries = []) {
-    return roundScore(asArray(entries).reduce((sum, row) => sum + Math.max(0, toNumber(row?.deduction_points, 0)), 0));
+function attendanceDeduction(entries = [], config = getProbationRuleConfig()) {
+    const sum = roundScore(asArray(entries).reduce((total, row) => total + Math.max(0, toNumber(row?.deduction_points, 0)), 0));
+    const cap = Math.max(0, toNumber(config.attendance?.monthly_cap, config.attitude_weight));
+    return roundScore(clamp(sum, 0, cap));
 }
 
-function normalizeMonthlyScoreRow(row = {}) {
+function normalizeMonthlyScoreRow(row = {}, config = getProbationRuleConfig()) {
     const monthNoRaw = toNumber(row.month_no, 0);
     const monthNo = Number.isFinite(monthNoRaw) ? Math.max(1, Math.min(3, Math.round(monthNoRaw))) : 0;
+    const workMax = Math.max(0, toNumber(config.work_weight, DEFAULT_PROBATION_WEIGHTS.work));
+    const managingMax = Math.max(0, toNumber(config.managing_weight, DEFAULT_PROBATION_WEIGHTS.managing));
+    const attitudeMax = Math.max(0, toNumber(config.attitude_weight, DEFAULT_PROBATION_WEIGHTS.attitude));
+    const totalMax = Math.max(0, toNumber(config.total_weight, workMax + managingMax + attitudeMax));
+
     return {
         id: row.id || null,
         month_no: monthNo,
         period_start: row.period_start || '',
         period_end: row.period_end || '',
-        work_performance_score: roundScore(clamp(toNumber(row.work_performance_score, 0), 0, 50)),
-        managing_task_score: roundScore(clamp(toNumber(row.managing_task_score, 0), 0, 30)),
+        work_performance_score: roundScore(clamp(toNumber(row.work_performance_score, 0), 0, workMax)),
+        managing_task_score: roundScore(clamp(toNumber(row.managing_task_score, 0), 0, managingMax)),
         manager_qualitative_text: String(row.manager_qualitative_text || '').trim(),
         manager_note: String(row.manager_note || '').trim(),
-        attitude_score: roundScore(clamp(toNumber(row.attitude_score, 20), 0, 20)),
-        attendance_deduction: roundScore(Math.max(0, toNumber(row.attendance_deduction, 0))),
-        monthly_total: roundScore(clamp(toNumber(row.monthly_total, 0), 0, 100)),
+        attitude_score: roundScore(clamp(toNumber(row.attitude_score, attitudeMax), 0, attitudeMax)),
+        attendance_deduction: roundScore(clamp(toNumber(row.attendance_deduction, 0), 0, attitudeMax)),
+        monthly_total: roundScore(clamp(toNumber(row.monthly_total, 0), 0, totalMax)),
     };
 }
 
@@ -1364,9 +1628,10 @@ export function buildProbationDraft(employeeId, monthlyScores = [], attendanceRe
     }
 
     const windows = buildProbationWindows(employee.join_date, 3);
+    const rules = getProbationRuleConfig();
     const scoreMap = {};
     asArray(monthlyScores).forEach(raw => {
-        const row = normalizeMonthlyScoreRow(raw);
+        const row = normalizeMonthlyScoreRow(raw, rules);
         if (!row.month_no) return;
         scoreMap[row.month_no] = row;
     });
@@ -1381,13 +1646,13 @@ export function buildProbationDraft(employeeId, monthlyScores = [], attendanceRe
     const monthlyRows = windows.map(win => {
         const existing = scoreMap[win.month_no] || {};
         const workInfo = calculateProbationWorkPerformance(employeeId, win.start_date, win.end_date);
-        const workScore = roundScore(clamp(workInfo.score * 0.5, 0, 50));
+        const workScore = roundScore(clamp((workInfo.score * rules.work_weight) / 100, 0, rules.work_weight));
 
-        const managingScore = roundScore(clamp(toNumber(existing.managing_task_score, 0), 0, 30));
+        const managingScore = roundScore(clamp(toNumber(existing.managing_task_score, 0), 0, rules.managing_weight));
         const monthAttendance = attendanceByMonth[win.month_no] || [];
-        const deduction = attendanceDeduction(monthAttendance);
-        const attitudeScore = roundScore(clamp(20 - deduction, 0, 20));
-        const monthlyTotal = roundScore(clamp(workScore + managingScore + attitudeScore, 0, 100));
+        const deduction = attendanceDeduction(monthAttendance, rules);
+        const attitudeScore = roundScore(clamp(rules.attitude_weight - deduction, 0, rules.attitude_weight));
+        const monthlyTotal = roundScore(clamp(workScore + managingScore + attitudeScore, 0, rules.total_weight));
 
         return {
             id: existing.id || null,
@@ -1492,6 +1757,7 @@ export async function saveProbationReview(review, qualitativeItems = []) {
 }
 
 export async function saveProbationMonthlyScores(reviewId, rows = []) {
+    const rules = getProbationRuleConfig();
     const normalized = asArray(rows)
         .map(raw => {
             const monthNo = Math.max(1, Math.min(3, Math.round(toNumber(raw?.month_no, 0))));
@@ -1505,13 +1771,13 @@ export async function saveProbationMonthlyScores(reviewId, rows = []) {
                 month_no: monthNo,
                 period_start: raw?.period_start || null,
                 period_end: raw?.period_end || null,
-                work_performance_score: roundScore(clamp(toNumber(raw?.work_performance_score, 0), 0, 50)),
-                managing_task_score: roundScore(clamp(toNumber(raw?.managing_task_score, 0), 0, 30)),
+                work_performance_score: roundScore(clamp(toNumber(raw?.work_performance_score, 0), 0, rules.work_weight)),
+                managing_task_score: roundScore(clamp(toNumber(raw?.managing_task_score, 0), 0, rules.managing_weight)),
                 manager_qualitative_text: String(raw?.manager_qualitative_text || '').trim(),
                 manager_note: String(raw?.manager_note || '').trim(),
-                attendance_deduction: roundScore(Math.max(0, toNumber(raw?.attendance_deduction, 0))),
-                attitude_score: roundScore(clamp(toNumber(raw?.attitude_score, 20), 0, 20)),
-                monthly_total: roundScore(clamp(toNumber(raw?.monthly_total, 0), 0, 100)),
+                attendance_deduction: roundScore(clamp(toNumber(raw?.attendance_deduction, 0), 0, rules.attitude_weight)),
+                attitude_score: roundScore(clamp(toNumber(raw?.attitude_score, rules.attitude_weight), 0, rules.attitude_weight)),
+                monthly_total: roundScore(clamp(toNumber(raw?.monthly_total, 0), 0, rules.total_weight)),
             };
         })
         .filter(row => row.probation_review_id && row.month_no >= 1 && row.month_no <= 3 && row.period_start && row.period_end);
@@ -1554,6 +1820,8 @@ export async function saveProbationMonthlyScores(reviewId, rows = []) {
 }
 
 export async function saveProbationAttendanceRecord(record) {
+    const rules = getProbationRuleConfig();
+    const maxDeduction = Math.max(0, toNumber(rules.attendance?.monthly_cap, rules.attitude_weight));
     const payload = {
         id: record?.id || generateUuid(),
         probation_review_id: record?.probation_review_id,
@@ -1561,7 +1829,7 @@ export async function saveProbationAttendanceRecord(record) {
         event_date: record?.event_date || null,
         event_type: String(record?.event_type || 'attendance').trim() || 'attendance',
         qty: toNumber(record?.qty, 1),
-        deduction_points: roundScore(Math.max(0, toNumber(record?.deduction_points, 0))),
+        deduction_points: roundScore(clamp(toNumber(record?.deduction_points, 0), 0, maxDeduction)),
         note: String(record?.note || '').trim(),
         entered_by: record?.entered_by || state.currentUser?.id || null,
     };
