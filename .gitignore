@@ -28,3 +28,30 @@ dist-ssr
 .env.*
 !.env.example
 
+
+# Security / Sensitive local files
+backups/
+exports/
+reports/
+*.dump
+*.bak
+*.tmp
+*.sqlite
+*.db
+*.csv
+*.xlsx
+*.xls
+*.pdf
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.kdbx
+secrets/
+.secrets/
+*.secret
+*.token
