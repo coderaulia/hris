@@ -828,68 +828,71 @@ export async function generateProbationDrafts() {
         return;
     }
 
-    const scoped = getFilteredEmployeeIds();
-    const now = new Date();
-    let created = 0;
-    let skipped = 0;
+    try {
+        const scoped = getFilteredEmployeeIds();
+        const now = new Date();
+        let created = 0;
+        let skipped = 0;
 
-    for (const empId of scoped) {
-        const emp = state.db[empId];
-        if (!emp || emp.role !== 'employee' || !emp.join_date) {
-            skipped++;
-            continue;
+        for (const empId of scoped) {
+            const emp = state.db[empId];
+            if (!emp || emp.role !== 'employee' || !emp.join_date) {
+                skipped++;
+                continue;
+            }
+
+            const draft = buildProbationDraft(empId);
+            if (!draft.review_period_start || draft.metric_count <= 0) {
+                skipped++;
+                continue;
+            }
+
+            const reviewEnd = new Date(`${draft.review_period_end}T23:59:59`);
+            if (Number.isNaN(reviewEnd.getTime()) || now < reviewEnd) {
+                skipped++;
+                continue;
+            }
+
+            const already = (state.probationReviews || []).some(r =>
+                r.employee_id === empId && r.review_period_start === draft.review_period_start
+            );
+            if (already) {
+                skipped++;
+                continue;
+            }
+
+            const savedReview = await saveProbationReview({
+                employee_id: empId,
+                review_period_start: draft.review_period_start,
+                review_period_end: draft.review_period_end,
+                quantitative_score: draft.quantitative_score,
+                qualitative_score: draft.qualitative_score,
+                final_score: draft.final_score,
+                decision: 'pending',
+                manager_notes: 'Auto-generated probation draft from first 3-month review window.',
+            }, []);
+
+            await saveProbationMonthlyScores(savedReview.id, draft.monthly_rows.map(row => ({
+                ...row,
+                probation_review_id: savedReview.id,
+            })));
+
+            created++;
         }
 
-        const draft = buildProbationDraft(empId);
-        if (!draft.review_period_start || draft.metric_count <= 0) {
-            skipped++;
-            continue;
-        }
+        await logActivity({
+            action: 'probation.draft.generate',
+            entityType: 'probation_review',
+            entityId: 'bulk',
+            details: { created, skipped },
+        });
 
-        const reviewEnd = new Date(`${draft.review_period_end}T23:59:59`);
-        if (Number.isNaN(reviewEnd.getTime()) || now < reviewEnd) {
-            skipped++;
-            continue;
-        }
-
-        const already = (state.probationReviews || []).some(r =>
-            r.employee_id === empId && r.review_period_start === draft.review_period_start
-        );
-        if (already) {
-            skipped++;
-            continue;
-        }
-
-        const savedReview = await saveProbationReview({
-            employee_id: empId,
-            review_period_start: draft.review_period_start,
-            review_period_end: draft.review_period_end,
-            quantitative_score: draft.quantitative_score,
-            qualitative_score: draft.qualitative_score,
-            final_score: draft.final_score,
-            decision: 'pending',
-            manager_notes: 'Auto-generated probation draft from first 3-month review window.',
-        }, []);
-
-        await saveProbationMonthlyScores(savedReview.id, draft.monthly_rows.map(row => ({
-            ...row,
-            probation_review_id: savedReview.id,
-        })));
-
-        created++;
+        renderProbationPipView();
+        await notify.success(`Probation draft generation complete. Created: ${created}, Skipped: ${skipped}.`);
+    } catch (error) {
+        await notify.error(`Failed to generate probation drafts: ${getErrorMessage(error)}`);
     }
-
-    await logActivity({
-        action: 'probation.draft.generate',
-        entityType: 'probation_review',
-        entityId: 'bulk',
-        details: { created, skipped },
-    });
-
-    renderProbationPipView();
-    await notify.success(`Probation draft generation complete. Created: ${created}, Skipped: ${skipped}.`);
 }
-
 export async function reviewProbation(reviewId) {
     if (!isManager() && !isAdmin()) {
         await notify.error('Access denied.');
@@ -918,7 +921,6 @@ export async function reviewProbation(reviewId) {
             <td><input id="pr-att-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.attitude_score, 2)}" readonly></td>
             <td><input id="pr-ded-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.attendance_deduction, 2)}" readonly></td>
             <td><textarea id="pr-qual-${row.month_no}" class="form-control form-control-sm" rows="2" placeholder="Qualitative summary: achievements, behavior, and quality of execution">${escapeHTML(row.manager_qualitative_text || '')}</textarea></td>
-            <td><textarea id="pr-note-${row.month_no}" class="form-control form-control-sm" rows="2" placeholder="Evidence notes: key tasks, blockers, and follow-up actions">${escapeHTML(row.manager_note || '')}</textarea></td>
             <td><input id="pr-total-${row.month_no}" class="form-control form-control-sm text-end" value="${toFixedScore(row.monthly_total, 2)}" readonly></td>
         </tr>
     `).join('');
@@ -944,7 +946,7 @@ export async function reviewProbation(reviewId) {
                     <div class="small"><strong>Pass Rule:</strong> decision <strong>Pass</strong> requires final score >= ${toFixedScore(passThreshold, 1)}.</div>
                 </div>
                 <div class="table-responsive border rounded mb-3" style="max-height:380px; overflow:auto;">
-                    <table class="table table-sm align-middle mb-0" style="table-layout:fixed; min-width:1640px;">
+                    <table class="table table-sm align-middle mb-0" style="table-layout:fixed; min-width:1280px;">
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th style="width:190px;">Month</th>
@@ -952,8 +954,7 @@ export async function reviewProbation(reviewId) {
                                 <th style="width:115px;">Managing<br><span class="text-muted">(30)</span></th>
                                 <th style="width:115px;">Attitude<br><span class="text-muted">(20)</span></th>
                                 <th style="width:115px;">Deduction</th>
-                                <th style="width:380px;">Qualitative Text</th>
-                                <th style="width:330px;">Manager Note</th>
+                                <th style="width:520px;">Qualitative Text</th>
                                 <th style="width:115px;">Total</th>
                             </tr>
                         </thead>
@@ -981,7 +982,6 @@ export async function reviewProbation(reviewId) {
             for (const row of rows) {
                 const manage = Number(document.getElementById(`pr-manage-${row.month_no}`)?.value);
                 const qual = (document.getElementById(`pr-qual-${row.month_no}`)?.value || '').trim();
-                const note = (document.getElementById(`pr-note-${row.month_no}`)?.value || '').trim();
                 if (!Number.isFinite(manage) || manage < 0 || manage > 30) {
                     Swal.showValidationMessage(`Managing Task score for Month ${row.month_no} must be between 0 and 30.`);
                     return false;
@@ -991,7 +991,6 @@ export async function reviewProbation(reviewId) {
                     probation_review_id: review.id,
                     managing_task_score: Math.max(0, Math.min(30, manage)),
                     manager_qualitative_text: qual,
-                    manager_note: note,
                 });
             }
 
@@ -1287,8 +1286,7 @@ export async function exportProbationPdf() {
             toFixedScore(row.attitude_score, 2),
             toFixedScore(row.attendance_deduction, 2),
             toFixedScore(row.monthly_total, 2),
-            row.manager_qualitative_text || row.manager_note || review.manager_notes || '-',
-            row.manager_note || review.manager_notes || '-',
+            row.manager_qualitative_text || review.manager_notes || '-',
         ]);
 
         runAutoTable({
@@ -1302,7 +1300,6 @@ export async function exportProbationPdf() {
                 'Deduction',
                 'Total',
                 'Qualitative',
-                'Manager Note',
             ]],
             body: monthRows,
             theme: 'grid',
@@ -1310,15 +1307,14 @@ export async function exportProbationPdf() {
             bodyStyles: { fontSize: 8, valign: 'top' },
             styles: { overflow: 'linebreak', cellPadding: 1.4 },
             columnStyles: {
-                0: { cellWidth: 16, halign: 'center' },
-                1: { cellWidth: 34 },
-                2: { cellWidth: 16, halign: 'right' },
-                3: { cellWidth: 18, halign: 'right' },
-                4: { cellWidth: 16, halign: 'right' },
-                5: { cellWidth: 16, halign: 'right' },
-                6: { cellWidth: 14, halign: 'right', fontStyle: 'bold' },
-                7: { cellWidth: 30 },
-                8: { cellWidth: 30 },
+                0: { cellWidth: 14, halign: 'center' },
+                1: { cellWidth: 27 },
+                2: { cellWidth: 14, halign: 'right' },
+                3: { cellWidth: 15, halign: 'right' },
+                4: { cellWidth: 14, halign: 'right' },
+                5: { cellWidth: 13, halign: 'right' },
+                6: { cellWidth: 13, halign: 'right', fontStyle: 'bold' },
+                7: { cellWidth: 72 },
             },
             margin: { left: 14, right: 14 },
         });
@@ -1551,45 +1547,102 @@ export async function exportProbationCsv() {
         return;
     }
 
-    const draft = await ensureProbationMonthlyRows(review, { persist: false });
-    const employee = state.db[review.employee_id] || { id: review.employee_id, name: review.employee_id, position: '-' };
-    const attendanceRows = getAttendanceRows(review.id);
-    const company = state.appSettings?.company_name || 'Company';
-    const appName = state.appSettings?.app_name || 'HR Performance Suite';
+    try {
+        const draft = await ensureProbationMonthlyRows(review, { persist: false });
+        const employee = state.db[review.employee_id] || { id: review.employee_id, name: review.employee_id, position: '-' };
+        const attendanceRows = getAttendanceRows(review.id);
+        const company = state.appSettings?.company_name || 'Company';
+        const appName = state.appSettings?.app_name || 'HR Performance Suite';
 
-    const ExcelJS = await import('exceljs');
-    const wb = new ExcelJS.Workbook();
+        const ExcelJS = await import('exceljs');
+        const wb = new ExcelJS.Workbook();
 
-    (draft.monthly_rows || []).forEach(monthRow => {
-        const ws = wb.addWorksheet(`Bulan ${monthRow.month_no}`);
-        ws.columns = [
-            { width: 6 },
-            { width: 38 },
-            { width: 16 },
-            { width: 52 },
-            { width: 40 },
+        (draft.monthly_rows || []).forEach(monthRow => {
+            const ws = wb.addWorksheet(`Bulan ${monthRow.month_no}`);
+            ws.columns = [
+                { width: 6 },
+                { width: 38 },
+                { width: 16 },
+                { width: 52 },
+                { width: 40 },
+            ];
+
+            ws.addRow([company]);
+            ws.addRow([appName]);
+            ws.addRow([]);
+            ws.addRow(['Probationary Employee Assessment']);
+            ws.mergeCells('A4:E4');
+            ws.addRow([]);
+            ws.addRow(['Employee', employee.name, '', 'Position', employee.position || '-']);
+            ws.addRow(['Month Window', `${monthRow.period_start} to ${monthRow.period_end}`]);
+            ws.addRow([]);
+            ws.addRow(['No', 'Tugas & tanggung Jawab', 'Realisasi', 'Penilaian Qualitative', 'Catatan']);
+            ws.addRow([1, 'Work Performance (50 points)', Number(monthRow.work_performance_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow([2, 'Managing Task (30 points)', Number(monthRow.managing_task_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow([3, 'Attitude (20 points)', Number(monthRow.attitude_score || 0), `Attendance deduction: ${toFixedScore(monthRow.attendance_deduction || 0, 2)}`, monthAttendanceSummary(review.id, monthRow.month_no)]);
+            ws.addRow(['', 'Score Rata-rata', Number(monthRow.monthly_total || 0), '', '']);
+
+            const headRow = ws.getRow(9);
+            headRow.font = { bold: true };
+            headRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            [9, 10, 11, 12, 13].forEach(rn => {
+                const row = ws.getRow(rn);
+                row.eachCell(cell => {
+                    cell.border = {
+                        top: { style: 'thin' },
+                        left: { style: 'thin' },
+                        bottom: { style: 'thin' },
+                        right: { style: 'thin' },
+                    };
+                });
+            });
+            ws.getCell('A4').font = { bold: true, size: 14 };
+            ws.getCell('A4').alignment = { horizontal: 'center' };
+        });
+
+        const recap = wb.addWorksheet('Rekap');
+        recap.columns = [
+            { width: 10 },
+            { width: 22 },
+            { width: 20 },
+            { width: 14 },
+            { width: 14 },
+            { width: 14 },
+            { width: 14 },
+            { width: 42 },
         ];
 
-        ws.addRow([company]);
-        ws.addRow([appName]);
-        ws.addRow([]);
-        ws.addRow(['Probationary Employee Assessment']);
-        ws.mergeCells('A4:E4');
-        ws.addRow([]);
-        ws.addRow(['Employee', employee.name, '', 'Position', employee.position || '-']);
-        ws.addRow(['Month Window', `${monthRow.period_start} to ${monthRow.period_end}`]);
-        ws.addRow([]);
-        ws.addRow(['No', 'Tugas & tanggung Jawab', 'Realisasi', 'Penilaian Qualitative', 'Catatan']);
-        ws.addRow([1, 'Work Performance (50 points)', Number(monthRow.work_performance_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
-        ws.addRow([2, 'Managing Task (30 points)', Number(monthRow.managing_task_score || 0), monthRow.manager_qualitative_text || '', monthRow.manager_note || '']);
-        ws.addRow([3, 'Attitude (20 points)', Number(monthRow.attitude_score || 0), `Attendance deduction: ${toFixedScore(monthRow.attendance_deduction || 0, 2)}`, monthAttendanceSummary(review.id, monthRow.month_no)]);
-        ws.addRow(['', 'Score Rata-rata', Number(monthRow.monthly_total || 0), '', '']);
+        recap.addRow([company]);
+        recap.addRow([appName]);
+        recap.addRow([]);
+        recap.addRow(['Probationary Employee Assessment - Recap']);
+        recap.mergeCells('A4:H4');
+        recap.addRow([]);
+        recap.addRow(['Nama', employee.name, '', 'Jabatan', employee.position || '-']);
+        recap.addRow(['Mulai Probation', review.review_period_start || draft.review_period_start || '-', '', 'Akhir Probation', review.review_period_end || draft.review_period_end || '-']);
+        recap.addRow([]);
+        recap.addRow(['No', 'Task', 'Period', 'Work (50)', 'Managing (30)', 'Attitude (20)', 'Total', 'Qualitative']);
 
-        const headRow = ws.getRow(9);
-        headRow.font = { bold: true };
-        headRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-        [9, 10, 11, 12, 13].forEach(rn => {
-            const row = ws.getRow(rn);
+        (draft.monthly_rows || []).forEach(row => {
+            recap.addRow([
+                row.month_no,
+                `Hasil Progres Bulan ${row.month_no}`,
+                `${row.period_start} to ${row.period_end}`,
+                Number(row.work_performance_score || 0),
+                Number(row.managing_task_score || 0),
+                Number(row.attitude_score || 0),
+                Number(row.monthly_total || 0),
+                row.manager_qualitative_text || review.manager_notes || '-',
+            ]);
+        });
+
+        recap.addRow(['', 'Score Rata-rata', '', Number(draft.quantitative_score || 0), Number(draft.qualitative_score || 0), '', Number(review.final_score || draft.final_score || 0), '']);
+        recap.addRow([]);
+        recap.addRow(['Decision', review.decision || 'pending']);
+        recap.addRow(['Summary', review.manager_notes || '-']);
+
+        [9, 10, 11, 12].forEach(rn => {
+            const row = recap.getRow(rn);
             row.eachCell(cell => {
                 cell.border = {
                     top: { style: 'thin' },
@@ -1599,78 +1652,26 @@ export async function exportProbationCsv() {
                 };
             });
         });
-        ws.getCell('A4').font = { bold: true, size: 14 };
-        ws.getCell('A4').alignment = { horizontal: 'center' };
-    });
+        recap.getCell('A4').font = { bold: true, size: 14 };
+        recap.getCell('A4').alignment = { horizontal: 'center' };
 
-    const recap = wb.addWorksheet('Rekap');
-    recap.columns = [
-        { width: 10 },
-        { width: 22 },
-        { width: 20 },
-        { width: 14 },
-        { width: 14 },
-        { width: 14 },
-        { width: 14 },
-        { width: 42 },
-    ];
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const safeName = String(employee.name || review.employee_id || 'employee').replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.href = url;
+        a.download = `probation_${safeName}_${getCurrentPeriodKey()}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
 
-    recap.addRow([company]);
-    recap.addRow([appName]);
-    recap.addRow([]);
-    recap.addRow(['Probationary Employee Assessment - Recap']);
-    recap.mergeCells('A4:H4');
-    recap.addRow([]);
-    recap.addRow(['Nama', employee.name, '', 'Jabatan', employee.position || '-']);
-    recap.addRow(['Mulai Probation', review.review_period_start || draft.review_period_start || '-', '', 'Akhir Probation', review.review_period_end || draft.review_period_end || '-']);
-    recap.addRow([]);
-    recap.addRow(['No', 'Task', 'Period', 'Work (50)', 'Managing (30)', 'Attitude (20)', 'Total', 'Qualitative']);
-
-    (draft.monthly_rows || []).forEach(row => {
-        recap.addRow([
-            row.month_no,
-            `Hasil Progres Bulan ${row.month_no}`,
-            `${row.period_start} to ${row.period_end}`,
-            Number(row.work_performance_score || 0),
-            Number(row.managing_task_score || 0),
-            Number(row.attitude_score || 0),
-            Number(row.monthly_total || 0),
-            row.manager_qualitative_text || row.manager_note || review.manager_notes || '-',
-        ]);
-    });
-
-    recap.addRow(['', 'Score Rata-rata', '', Number(draft.quantitative_score || 0), Number(draft.qualitative_score || 0), '', Number(review.final_score || draft.final_score || 0), '']);
-    recap.addRow([]);
-    recap.addRow(['Decision', review.decision || 'pending']);
-    recap.addRow(['Summary', review.manager_notes || '-']);
-
-    [9, 10, 11, 12].forEach(rn => {
-        const row = recap.getRow(rn);
-        row.eachCell(cell => {
-            cell.border = {
-                top: { style: 'thin' },
-                left: { style: 'thin' },
-                bottom: { style: 'thin' },
-                right: { style: 'thin' },
-            };
-        });
-    });
-    recap.getCell('A4').font = { bold: true, size: 14 };
-    recap.getCell('A4').alignment = { horizontal: 'center' };
-
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const safeName = String(employee.name || review.employee_id || 'employee').replace(/[^a-zA-Z0-9_-]/g, '_');
-    a.href = url;
-    a.download = `probation_${safeName}_${getCurrentPeriodKey()}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+        await notify.success('Probation Excel exported.');
+    } catch (error) {
+        await notify.error(`Failed to export probation Excel: ${getErrorMessage(error)}`);
+    }
 }
-
 export async function generatePipPlans() {
     if (!isManager() && !isAdmin()) {
         await notify.error('Access denied.');
@@ -1820,6 +1821,4 @@ export async function updatePipPlanStatus(planId) {
     renderProbationPipView();
     await notify.success('PIP plan updated.');
 }
-
-
 
