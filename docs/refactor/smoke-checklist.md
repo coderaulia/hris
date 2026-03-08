@@ -10,7 +10,7 @@ Use this checklist after module-splitting changes to verify no behavior regressi
 ## Core App Flow
 
 1. Login as superadmin.
-2. Open Dashboard, Employees, KPI, Records, Settings.
+2. Open Dashboard, Employees, Assessment & KPI, Records, Settings.
 3. Confirm header/company branding still loads from settings.
 
 ## Data Flow Checks
@@ -20,15 +20,20 @@ Use this checklist after module-splitting changes to verify no behavior regressi
 - Confirm assessment/training history persists.
 
 2. KPI:
-- Create/edit KPI definition.
+- Create KPI definition with effective month.
+- Edit existing KPI definition and confirm new version appears in KPI Version History.
+- Toggle KPI governance approval setting (HR/Superadmin).
+- As manager, submit KPI definition or target change and verify pending approval state when enabled.
+- As HR/Superadmin, approve and reject pending KPI changes.
 - Insert KPI record and confirm weighted score updates.
+- Change KPI target/definition after record exists, then confirm old KPI record still uses snapshot values.
 - Delete KPI record and confirm score re-calculates.
 
 3. Probation:
 - Generate probation draft.
 - Save monthly qualitative text.
 - Save attendance entry and verify attitude deduction updates.
-- Export probation report.
+- Export probation report (PDF/Excel).
 
 4. PIP:
 - Create a PIP plan.
@@ -37,16 +42,25 @@ Use this checklist after module-splitting changes to verify no behavior regressi
 ## Role Checks
 
 1. Manager account:
-- Edit KPI/competency targets for direct reports only.
+- Edit KPI/competency definitions only for scoped positions.
+- Edit KPI monthly targets only for scoped employees.
 - Access records limited to team scope.
 
-2. Employee account:
+2. HR account:
+- Can review probation and attendance entries.
+- Can approve/reject pending KPI governance changes.
+
+3. Employee account:
 - No manager/superadmin admin panels visible.
 
 ## SQL Dependencies
 
 - `public.probation_monthly_scores` exists.
 - `public.probation_attendance_records` exists.
+- `public.kpi_definition_versions` exists.
+- `public.employee_kpi_target_versions` exists.
+- `public.kpi_records` has snapshot columns (`target_snapshot`, `kpi_name_snapshot`, `kpi_unit_snapshot`, `kpi_category_snapshot`).
+- App setting key `kpi_hr_approval_required` exists.
 - RLS policies still allow expected reads/writes per role.
 
 ## Module Wiring Checks

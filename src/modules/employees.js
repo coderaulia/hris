@@ -61,7 +61,7 @@ export function renderEmployeeManager() {
 
     sortedIds.forEach(id => {
         const rec = db[id];
-        if (rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead'))) {
+        if ((rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead') || rec.seniority.includes('Director'))) || rec.role === 'director') {
             mgrSelect.innerHTML += `<option value="${escapeHTML(rec.id)}">${escapeHTML(rec.name)} (${escapeHTML(rec.position)})</option>`;
         }
     });
@@ -88,6 +88,7 @@ export function renderEmployeeManager() {
         let roleBadge = '';
         if (rec.role === 'superadmin') roleBadge = '<span class="badge bg-danger ms-1">Admin</span>';
         else if (rec.role === 'manager') roleBadge = '<span class="badge bg-warning text-dark ms-1">Mgr</span>';
+        else if (rec.role === 'director') roleBadge = '<span class="badge bg-info text-dark ms-1">Dir</span>';
 
         const isMgr = rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead'));
         const mgrIcon = isMgr ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '';
@@ -284,7 +285,7 @@ export async function importEmployeeCSV(input) {
             const text = String(e.target.result || '');
             const lines = text.split(/\r\n|\n/);
             const startRow = lines[0]?.toLowerCase().includes('id') ? 1 : 0;
-            const validRoles = new Set(['employee', 'manager', 'superadmin']);
+            const validRoles = new Set(['employee', 'manager', 'director', 'superadmin']);
             const ops = [];
             const errors = [];
             const warnings = [];

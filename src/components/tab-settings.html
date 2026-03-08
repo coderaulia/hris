@@ -75,6 +75,8 @@
                                 <span class="badge bg-warning text-dark ms-2">Manager</span> Assess
                                 subordinates,
                                 view reports
+                                <span class="badge bg-info text-dark ms-2">Director</span> Company dashboard visibility,
+                                assess and input KPI for direct-report positions
                                 <span class="badge bg-secondary ms-2">Employee</span> Self-assess, view own
                                 records
                             </div>
@@ -219,6 +221,21 @@
                                         </button>
                                     </div>
                                 </div>
+                                <div class="card border mb-3">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <h6 class="m-0 fw-bold small"><i class="bi bi-shield-check me-1"></i>KPI Governance</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-check form-switch mb-2">
+                                            <input class="form-check-input" type="checkbox" id="kpi-approval-required-toggle">
+                                            <label class="form-check-label small fw-semibold" for="kpi-approval-required-toggle">Require HR approval for manager KPI changes</label>
+                                        </div>
+                                        <div class="text-muted" style="font-size: 11px;">When enabled, manager KPI definition/target updates become pending until approved by HR or Super Admin.</div>
+                                        <button class="btn btn-outline-primary btn-sm mt-2" onclick="window.__app.saveKpiGovernanceConfig()">
+                                            <i class="bi bi-save me-1"></i>Save Governance Rule
+                                        </button>
+                                    </div>
+                                </div>
                                 <!-- KPI Definition -->
                                 <div class="card border">
                                     <div class="card-header bg-light">
@@ -239,11 +256,16 @@
                                                     <option value="">-- Apply to Position --</option>
                                                 </select>
                                             </div>
-                                            <div class="col-3"><input type="number" id="kpi-def-target"
-                                                    class="form-control form-control-sm" placeholder="Target">
-                                            </div>
+                                            <div class="col-3"><input type="month" id="kpi-def-effective-period"
+                                                    class="form-control form-control-sm" title="Effective month"></div>
                                             <div class="col-3"><input type="text" id="kpi-def-unit"
                                                     class="form-control form-control-sm" placeholder="Unit">
+                                            </div>
+                                            <div class="col-4"><input type="number" id="kpi-def-target"
+                                                    class="form-control form-control-sm" placeholder="Target">
+                                            </div>
+                                            <div class="col-8"><input type="text" id="kpi-def-request-note"
+                                                    class="form-control form-control-sm" placeholder="Change note (optional)">
                                             </div>
                                             <div class="col-12 d-flex gap-2">
                                                 <button class="btn btn-primary btn-sm flex-fill"
@@ -277,6 +299,22 @@
                                     <div class="card-body" id="kpi-definitions-list"
                                         style="max-height: 600px; overflow-y: auto;"></div>
                                 </div>
+                                <div class="card border mt-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="m-0 fw-bold small"><i class="bi bi-hourglass-split me-1"></i>Pending KPI Approvals</h6>
+                                    </div>
+                                    <div class="card-body" id="kpi-pending-approvals" style="max-height: 220px; overflow-y: auto;">
+                                        <div class="text-muted small fst-italic">No pending approvals.</div>
+                                    </div>
+                                </div>
+                                <div class="card border mt-3">
+                                    <div class="card-header bg-light">
+                                        <h6 class="m-0 fw-bold small"><i class="bi bi-clock-history me-1"></i>KPI Version History</h6>
+                                    </div>
+                                    <div class="card-body" id="kpi-version-history" style="max-height: 260px; overflow-y: auto;">
+                                        <div class="text-muted small fst-italic">No version history yet.</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -286,8 +324,17 @@
             <!-- Organization Map Config -->
             <div id="set-org" class="hidden">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white border-bottom">
+                    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
                         <h6 class="m-0 fw-bold"><i class="bi bi-diagram-3 me-1"></i> Organization Setup</h6>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-warning btn-sm" onclick="window.__app.exportOrgConfigJSON()"><i
+                                    class="bi bi-download me-1"></i> Export JSON</button>
+                            <button class="btn btn-outline-secondary btn-sm"
+                                onclick="window.__app.triggerOrgConfigImport()"><i class="bi bi-upload me-1"></i>
+                                Import JSON</button>
+                            <input type="file" id="org-import-input" class="hidden" accept=".json"
+                                onchange="window.__app.importOrgConfigJSON(this)">
+                        </div>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-secondary py-2 small mb-4">

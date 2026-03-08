@@ -5,6 +5,8 @@ import { fetchEmployees } from './employees.js';
 import { fetchConfig } from './config.js';
 import {
     fetchKpiDefinitions,
+    fetchKpiDefinitionVersions,
+    fetchEmployeeKpiTargetVersions,
     fetchKpiRecords,
     fetchKpiWeightProfiles,
     fetchKpiWeightItems,
@@ -24,6 +26,8 @@ async function syncAll() {
         fetchEmployees(),
         fetchConfig(),
         fetchKpiDefinitions(),
+        fetchKpiDefinitionVersions(),
+        fetchEmployeeKpiTargetVersions(),
         fetchKpiRecords(),
         fetchKpiWeightProfiles(),
         fetchKpiWeightItems(),
@@ -45,3 +49,4 @@ async function syncAll() {
 }
 
 export { syncAll };
+

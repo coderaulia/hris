@@ -32,8 +32,21 @@ import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog,
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
 import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
-import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory } from './modules/kpi.js';
-import { renderSettings, saveAppSettings, applyBranding, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition } from './modules/settings.js';
+import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory, saveKpiGovernanceConfig, approveKpiDefinitionVersion, rejectKpiDefinitionVersion, approveKpiTargetVersion, rejectKpiTargetVersion } from './modules/kpi.js';
+import {
+    renderSettings,
+    saveAppSettings,
+    applyBranding,
+    editUserRole,
+    setupUserLogin,
+    saveOrgConfig,
+    addOrgDepartment,
+    addOrgPosition,
+    exportOrgConfigJSON,
+    triggerOrgConfigImport,
+    importOrgConfigJSON,
+} from './modules/settings.js';
+
 import { debugError, escapeHTML } from './lib/utils.js';
 import { getRoleScopedEmployeeIds } from './lib/reportFilters.js';
 import * as notify from './lib/notify.js';
@@ -78,10 +91,12 @@ window.__app = {
 
     // KPI
     renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord,
-    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory,
+    removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory, saveKpiGovernanceConfig, approveKpiDefinitionVersion, rejectKpiDefinitionVersion, approveKpiTargetVersion, rejectKpiTargetVersion,
 
     // Settings
-    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition, toggleSettingsView, toggleRecordsView,
+    renderSettings, saveAppSettings, editUserRole, setupUserLogin, saveOrgConfig, addOrgDepartment, addOrgPosition,
+    exportOrgConfigJSON, triggerOrgConfigImport, importOrgConfigJSON,
+    toggleSettingsView, toggleRecordsView,
 };
 
 function doLogout() {
@@ -213,7 +228,7 @@ function renderReportFilterOptions() {
         if (rec?.manager_id) managerIds.add(rec.manager_id);
     });
     Object.keys(db).forEach(id => {
-        if (db[id]?.role === 'manager' || db[id]?.role === 'superadmin') managerIds.add(id);
+        if (db[id]?.role === 'manager' || db[id]?.role === 'superadmin' || db[id]?.role === 'director') managerIds.add(id);
     });
     const managers = [...managerIds]
         .map(id => ({ id, name: db[id]?.name || id }))
@@ -407,6 +422,7 @@ async function showApp() {
     const navConfig = {
         superadmin: ['nav-dashboard', 'nav-employees', 'nav-assessment', 'nav-records', 'nav-settings'],
         manager: ['nav-dashboard', 'nav-assessment', 'nav-records', 'nav-settings'],
+        director: ['nav-dashboard', 'nav-assessment', 'nav-records'],
         employee: ['nav-records'],
     };
 
@@ -425,9 +441,15 @@ async function showApp() {
 
     const roleEl = document.getElementById('user-role-badge');
     if (roleEl) {
-        const roleLabels = { superadmin: 'Super Admin', manager: 'Manager', employee: 'Employee' };
+        const roleLabels = { superadmin: 'Super Admin', manager: 'Manager', director: 'Director', employee: 'Employee' };
         roleEl.innerText = roleLabels[role] || role;
-        roleEl.className = 'badge ms-2 ' + (role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : 'bg-secondary');
+        roleEl.className = 'badge ms-2 ' + (role === 'superadmin'
+            ? 'bg-danger'
+            : role === 'manager'
+                ? 'bg-warning text-dark'
+                : role === 'director'
+                    ? 'bg-info text-dark'
+                    : 'bg-secondary');
     }
 
     renderReportFilterOptions();
@@ -439,7 +461,7 @@ async function showApp() {
     if (!passOk) return;
 
     // Default tab
-    if (role === 'superadmin' || role === 'manager') {
+    if (role === 'superadmin' || role === 'manager' || role === 'director') {
         switchTab('tab-dashboard');
     } else {
         switchTab('tab-records');
@@ -478,5 +500,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         debugError('Session restore failed:', err);
     }
 });
+
 
 

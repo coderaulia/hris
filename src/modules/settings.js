@@ -178,8 +178,8 @@ export function applyBranding() {
         const dept = appSettings.department_label || 'Human Resources Department';
         const userName = state.currentUser?.name || '';
         const role = state.currentUser?.role || 'employee';
-        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : 'Employee';
-        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : 'bg-secondary';
+        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : role === 'director' ? 'Director' : 'Employee';
+        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : role === 'director' ? 'bg-info text-dark' : 'bg-secondary';
         headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span id="user-display-name" class="fw-bold">${escapeHTML(userName)}</span> <span id="user-role-badge" class="badge ms-2 ${roleClass}">${roleLabel}</span>`;
     }
 
@@ -358,6 +358,7 @@ function renderUserManagement() {
         let roleBadge = '<span class="badge bg-secondary">Employee</span>';
         if (rec.role === 'superadmin') roleBadge = '<span class="badge bg-danger">Super Admin</span>';
         else if (rec.role === 'manager') roleBadge = '<span class="badge bg-warning text-dark">Manager</span>';
+        else if (rec.role === 'director') roleBadge = '<span class="badge bg-info text-dark">Director</span>';
 
         const authStatus = rec.auth_email
             ? `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${escapeHTML(rec.auth_email)}</span>`
@@ -396,6 +397,7 @@ export async function editUserRole(empId) {
         inputValue: rec.role,
         inputOptions: {
             superadmin: 'superadmin',
+            director: 'director',
             manager: 'manager',
             employee: 'employee',
         },
@@ -544,3 +546,151 @@ async function renderActivityLog() {
     });
 }
 
+
+export function exportOrgConfigJSON() {
+    if (!isAdmin()) return;
+
+    const levels = document.getElementById('settings-levels')?.value?.trim() || state.appSettings?.levels || '';
+    const deptMap = collectDeptPositions();
+    const payload = {
+        schema_version: 1,
+        exported_at: new Date().toISOString(),
+        levels,
+        dept_positions: deptMap,
+        departments: Object.keys(deptMap),
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute('href', dataStr);
+    a.setAttribute('download', 'organization_setup.json');
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
+export function triggerOrgConfigImport() {
+    document.getElementById('org-import-input')?.click();
+}
+
+function normalizeOrgImportPayload(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        throw new Error('Expected a JSON object.');
+    }
+
+    const levelsRaw = raw.levels ?? raw.organization?.levels ?? '';
+    const deptRaw = raw.dept_positions ?? raw.organization?.dept_positions ?? raw.departments_map ?? {};
+
+    let levels = '';
+    if (Array.isArray(levelsRaw)) {
+        levels = levelsRaw.map(v => String(v || '').trim()).filter(Boolean).join(', ');
+    } else {
+        levels = String(levelsRaw || '').trim();
+    }
+
+    let sourceMap = deptRaw;
+    if (typeof sourceMap === 'string') {
+        try {
+            sourceMap = JSON.parse(sourceMap);
+        } catch {
+            throw new Error('dept_positions must be an object or valid JSON string.');
+        }
+    }
+
+    if (!sourceMap || typeof sourceMap !== 'object' || Array.isArray(sourceMap)) {
+        throw new Error('dept_positions must be an object map of department to position list.');
+    }
+
+    const cleanedMap = {};
+    Object.entries(sourceMap).forEach(([deptNameRaw, positionsRaw]) => {
+        const deptName = String(deptNameRaw || '').trim();
+        if (!deptName) return;
+
+        const arr = Array.isArray(positionsRaw) ? positionsRaw : [];
+        const cleanedPositions = arr
+            .map(v => String(v || '').trim())
+            .filter(Boolean);
+
+        cleanedMap[deptName] = [...new Set(cleanedPositions)];
+    });
+
+    if (Object.keys(cleanedMap).length === 0) {
+        throw new Error('No valid departments found in import file.');
+    }
+
+    return {
+        levels,
+        deptMap: cleanedMap,
+    };
+}
+
+export async function importOrgConfigJSON(input) {
+    if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    if (!(await requireRecentAuth('importing organization setup'))) return;
+
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const parsed = JSON.parse(String(e.target?.result || '{}'));
+            const normalized = normalizeOrgImportPayload(parsed);
+            const deptRows = Object.entries(normalized.deptMap);
+            const previewRows = deptRows.slice(0, 8).map(([dept, positions]) => `
+                <tr>
+                    <td>${escapeHTML(dept)}</td>
+                    <td>${positions.length}</td>
+                </tr>
+            `).join('');
+
+            const proceed = await notify.confirm('', {
+                title: 'Confirm Organization Import',
+                confirmButtonText: 'Import Now',
+                html: `
+                    <div class="text-start small">
+                        <div class="mb-2"><strong>Seniority levels:</strong> ${escapeHTML(normalized.levels || '(keep current)')}</div>
+                        <div class="mb-2"><strong>Total departments:</strong> ${deptRows.length}</div>
+                        <div class="table-responsive" style="max-height:220px;">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead><tr><th>Department</th><th>Positions</th></tr></thead>
+                                <tbody>${previewRows || '<tr><td colspan="2" class="text-center text-muted">No rows</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `,
+            });
+            if (!proceed) return;
+
+            const levelsToSave = normalized.levels || state.appSettings?.levels || '';
+            const departments = Object.keys(normalized.deptMap).join(', ');
+
+            await notify.withLoading(async () => {
+                await saveSetting('levels', levelsToSave);
+                await saveSetting('dept_positions', JSON.stringify(normalized.deptMap));
+                await saveSetting('departments', departments);
+            }, 'Importing Organization', 'Applying organization setup...');
+
+            await logActivity({
+                action: 'organization.config.import',
+                entityType: 'organization',
+                entityId: 'dept_positions',
+                details: {
+                    levels: levelsToSave,
+                    departments: Object.keys(normalized.deptMap),
+                    total_departments: Object.keys(normalized.deptMap).length,
+                },
+            });
+
+            renderOrgSettings();
+            await renderActivityLog();
+            await notify.success(`Organization setup imported (${Object.keys(normalized.deptMap).length} departments).`);
+        } catch (err) {
+            await notify.error('Invalid organization JSON: ' + err.message);
+        } finally {
+            input.value = '';
+        }
+    };
+
+    reader.readAsText(file);
+}

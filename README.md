@@ -17,6 +17,8 @@ This system replaces older, disconnected spreadsheets by centralizing authentica
 - **Monthly/Quarterly KPI Tracking:** Employees can report data on targets ranging from Sales performance to Customer Satisfaction.
 - **Department Drill-Downs:** Managers can view individual and aggregate departmental achievement scores, complete with 6-month trends.
 - **KPI Library:** Admins can create overarching KPI definitions and apply global or personalized targets for every employee.
+- **KPI Governance:** KPI definitions and monthly target overrides support effective-month changes, optional approval workflow, and version history.
+- **Non-Retroactive Scoring:** KPI records store target/name/unit snapshots at submission time so old scores remain stable after KPI updates.
 
 ### **3. Robust Analytics Dashboard**
 - **Actionable Insights:** Tracks overall organizational skill averages, highest/lowest-scoring groups, and KPI top performers continuously.
@@ -70,6 +72,19 @@ TNA/
    - Generates all Database Tables.
    - Triggers the necessary Row-Level Security (RLS) policies.
    - Inserts baseline employee/competency sample data and app defaults.
+
+### Phase 1B: Required Incremental Migrations (Existing Projects)
+
+If your project was already running before sprint updates, run these migration files in order from `/migrations`:
+
+1. `20260307_safe_next_steps.sql`
+2. `20260308_probation_monthly_attendance.sql`
+3. `20260308_probation_hr_access_policy.sql`
+4. `20260308_manager_kpi_competency_policy.sql`
+5. `20260308_director_role_scope.sql`
+6. `20260308_kpi_governance.sql`
+
+This enables probation monthly scoring, HR probation access, director scope, and KPI governance (effective month + approvals + version history + snapshot scoring).
 
 ### Phase 2: Connecting the Frontend
 
@@ -174,13 +189,21 @@ Required secret:
 - **Capabilities:** Have unrestricted access. Only Admins can tweak the global Competency matrices, establish organization-wide KPI scales, map exact organizational hierarchies (Departments/Roles/Branches), and import/export raw infrastructure configuration JSONs.
 
 ### 2. Managers
-- **Capabilities:** Have visibility strictly linked to their explicit Department.
-- **Workflow:** 
-   1. The Manager opens the app and switches to the "Assessments" tab to view what their reporting employees have submitted.
-   2. They leave managerial scores, which ultimately create the locked final KPI report.
-   3. They monitor their specific Department's monthly KPI dashboards to track performance visually.
+- **Capabilities:** Have visibility linked to scoped department/team and can manage KPI for direct reports.
+- **Workflow:**
+   1. Open Assessment tab to review team submissions.
+   2. Finalize managerial assessments.
+   3. Manage KPI definitions/targets for scoped positions and employees.
+   4. Monitor department KPI dashboards and monthly progress.
 
-### 3. Employees
+### 3. HR
+- **Capabilities:** Operational reviewer for probation and KPI governance.
+- **Workflow:**
+   1. Manage probation reviews and attendance-based deductions.
+   2. Approve/reject pending KPI definition or monthly target changes (when approval is enabled).
+   3. Maintain probation scoring policy and pass threshold settings.
+
+### 4. Employees
 - **Capabilities:** Limited view, focusing only on their direct requirements.
 - **Workflow:**
    1. Logs into their account.
@@ -194,4 +217,8 @@ Required secret:
 - **SQL Injection/XSS Prevention:** The system utilizes robust frontend sanitization via custom `escapeHTML` formatters natively across all list/render functions preventing DOM injections.
 - **Row Level Security:** Ensure that your Supabase instance doesn't have RLS disabled. The queries are formatted exclusively expecting the native secure SDK flow.
 - **Default Credentials:** No default production admin credential should be documented or shipped. Use unique credentials and force password rotation for temporary accounts.
+
+
+
+
 

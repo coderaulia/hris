@@ -4,20 +4,66 @@
 
 import { state, emit } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, formatPeriod, formatNumber, debugError, formatDateTime } from '../lib/utils.js';
-import { saveKpiDefinition, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, logActivity, getEmployeeKpiTarget, normalizeKpiTargetStore, buildKpiTargetStore } from './data.js';
+import { saveKpiDefinition, submitKpiDefinitionVersion, decideKpiDefinitionVersion, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, submitEmployeeKpiTargetVersions, decideEmployeeKpiTargetVersion, logActivity, saveSetting, getEmployeeKpiTarget, getKpiRecordTarget, getKpiDefinitionForPeriod, } from './data.js';
 import * as notify from '../lib/notify.js';
-import { getFilteredEmployeeIds } from '../lib/reportFilters.js';
+import { getFilteredEmployeeIds, getDirectorOperationalScopeIds } from '../lib/reportFilters.js';
 import { requireRecentAuth } from './auth.js';
 
 // ---- RENDER KPI SETTINGS TAB ----
 export function renderKpiManager() {
     renderKpiDefinitions();
     renderKpiTargetConfig();
+    renderKpiGovernanceControls();
+    renderKpiPendingApprovals();
+    renderKpiVersionHistory();
+}
+
+function isHrApproverRole() {
+    return state.currentUser?.role === 'superadmin' || state.currentUser?.role === 'hr';
 }
 
 function canEditKpiSettings() {
-    return state.currentUser?.role === 'superadmin' || state.currentUser?.role === 'manager';
+    return state.currentUser?.role === 'superadmin'
+        || state.currentUser?.role === 'manager'
+        || state.currentUser?.role === 'hr';
 }
+
+function isKpiApprovalRequired() {
+    const val = String(state.appSettings?.kpi_hr_approval_required || '').toLowerCase();
+    return ['1', 'true', 'yes', 'on'].includes(val);
+}
+
+function formatKpiStatusBadge(status) {
+    const key = String(status || 'approved').toLowerCase();
+    if (key === 'pending') return '<span class="badge bg-warning text-dark ms-2">Pending Approval</span>';
+    if (key === 'rejected') return '<span class="badge bg-danger ms-2">Rejected</span>';
+    return '<span class="badge bg-success-subtle text-success border ms-2">Approved</span>';
+}
+
+function isDefinitionActive(kpi, period = '') {
+    const status = String(kpi?.approval_status || 'approved').toLowerCase();
+    if (status !== 'approved') return false;
+    if (kpi?.is_active === false) return false;
+    const effective = String(kpi?.effective_period || '').trim();
+    if (!period || !effective) return true;
+    return effective <= period;
+}
+function getLatestTargetVersionForPeriod(employeeId, kpiId, period, options = {}) {
+    const includePending = Boolean(options.includePending);
+    return (state.employeeKpiTargetVersions || [])
+        .filter(row => String(row.employee_id || '') === String(employeeId || ''))
+        .filter(row => String(row.kpi_id || '') === String(kpiId || ''))
+        .filter(row => String(row.effective_period || '') === String(period || ''))
+        .filter(row => includePending || String(row.status || '').toLowerCase() === 'approved')
+        .sort((a, b) => Number(b.version_no || 0) - Number(a.version_no || 0))[0] || null;
+}
+
+function getDefinitionMetaForPeriod(kpiId, period) {
+    const resolved = getKpiDefinitionForPeriod(kpiId, period);
+    if (resolved) return resolved;
+    return state.kpiConfig.find(k => String(k.id || '') === String(kpiId || '')) || null;
+}
+
 
 function getManagerScopePositionSet() {
     if (state.currentUser?.role !== 'manager') return null;
@@ -64,10 +110,41 @@ function getManagerScopeEmployeeIds() {
 }
 
 function canManageEmployeeTarget(empId) {
-    if (state.currentUser?.role === 'superadmin') return true;
+    if (state.currentUser?.role === 'superadmin' || state.currentUser?.role === 'hr') return true;
     if (state.currentUser?.role !== 'manager') return false;
     const scopedIds = getManagerScopeEmployeeIds();
     return scopedIds?.has(empId) || false;
+}
+
+
+function getKpiRecordScopeEmployeeIds() {
+    const { currentUser, db } = state;
+    if (!currentUser) return new Set();
+
+    if (currentUser.role === 'superadmin' || currentUser.role === 'hr') {
+        return new Set(Object.keys(db || {}));
+    }
+
+    if (currentUser.role === 'manager') {
+        return new Set(getManagerScopeEmployeeIds() || []);
+    }
+
+    if (currentUser.role === 'director') {
+        return new Set(getDirectorOperationalScopeIds(db, currentUser.id));
+    }
+
+    if (currentUser.role === 'employee') {
+        return new Set([String(currentUser.id)]);
+    }
+
+    return new Set();
+}
+
+function canManageKpiRecordForEmployee(empId) {
+    const target = String(empId || '');
+    if (!target) return false;
+    const scopedIds = getKpiRecordScopeEmployeeIds();
+    return scopedIds.has(target);
 }
 
 function getSelectedTargetPeriod() {
@@ -82,6 +159,207 @@ function getCurrentPeriodKey() {
 
 export function onKpiTargetPeriodChange() {
     onKpiEmployeeChange();
+}
+
+function renderKpiGovernanceControls() {
+    const toggle = document.getElementById('kpi-approval-required-toggle');
+    if (!toggle) return;
+    toggle.checked = isKpiApprovalRequired();
+    toggle.disabled = !isHrApproverRole();
+    if (!isHrApproverRole()) {
+        toggle.title = 'Only HR/Super Admin can update governance approval rule.';
+    } else {
+        toggle.title = '';
+    }
+}
+
+export async function saveKpiGovernanceConfig() {
+    if (!isHrApproverRole()) {
+        await notify.error('Only HR or Super Admin can update KPI governance rules.');
+        return;
+    }
+
+    const toggle = document.getElementById('kpi-approval-required-toggle');
+    const enabled = Boolean(toggle?.checked);
+
+    try {
+        await notify.withLoading(async () => {
+            await saveSetting('kpi_hr_approval_required', enabled ? 'true' : 'false');
+        }, 'Saving Governance Rule', 'Updating KPI approval policy...');
+
+        await logActivity({
+            action: 'kpi.governance.approval_rule',
+            entityType: 'app_setting',
+            entityId: 'kpi_hr_approval_required',
+            details: {
+                enabled,
+            },
+        });
+
+        await notify.success('KPI governance rule saved.');
+    } catch (error) {
+        await notify.error('Failed to save governance rule: ' + error.message);
+    }
+}
+
+function renderKpiPendingApprovals() {
+    const container = document.getElementById('kpi-pending-approvals');
+    if (!container) return;
+
+    const canApprove = isHrApproverRole();
+    const me = String(state.currentUser?.id || '');
+
+    let definitionRows = (state.kpiDefinitionVersions || [])
+        .filter(row => String(row.status || '').toLowerCase() === 'pending');
+    let targetRows = (state.employeeKpiTargetVersions || [])
+        .filter(row => String(row.status || '').toLowerCase() === 'pending');
+
+    if (!canApprove) {
+        definitionRows = definitionRows.filter(row => String(row.requested_by || '') === me);
+        targetRows = targetRows.filter(row => String(row.requested_by || '') === me);
+    }
+
+    definitionRows = definitionRows.slice(0, 10);
+    targetRows = targetRows.slice(0, 10);
+
+    if (definitionRows.length === 0 && targetRows.length === 0) {
+        container.innerHTML = '<div class="text-muted small fst-italic">No pending approvals.</div>';
+        return;
+    }
+
+    const definitionHtml = definitionRows.map(row => {
+        const targetText = `${formatNumber(row.target || 0)} ${escapeHTML(row.unit || '')}`.trim();
+        const actions = canApprove
+            ? `<div class="btn-group btn-group-sm ms-2"><button class="btn btn-outline-success" onclick="window.__app.approveKpiDefinitionVersion('${escapeInlineArg(row.id)}')"><i class="bi bi-check-lg"></i></button><button class="btn btn-outline-danger" onclick="window.__app.rejectKpiDefinitionVersion('${escapeInlineArg(row.id)}')"><i class="bi bi-x-lg"></i></button></div>`
+            : '<span class="badge bg-light text-muted border ms-2">Awaiting HR</span>';
+
+        return `<div class="border rounded p-2 mb-2 bg-white">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="fw-semibold small">Definition: ${escapeHTML(row.name || '-')}</div>
+                    <div class="text-muted" style="font-size:11px;">${escapeHTML(row.category || 'General')} | Effective ${escapeHTML(row.effective_period || '-')} | ${escapeHTML(targetText || '-')}</div>
+                    <div class="text-muted" style="font-size:10px;">Requested by: ${escapeHTML(state.db[row.requested_by]?.name || row.requested_by || '-')}</div>
+                </div>
+                ${actions}
+            </div>
+        </div>`;
+    }).join('');
+
+    const targetHtml = targetRows.map(row => {
+        const emp = state.db[row.employee_id];
+        const def = state.kpiConfig.find(k => k.id === row.kpi_id);
+        const targetText = row.target_value === null || row.target_value === undefined
+            ? 'Clear override'
+            : `${formatNumber(row.target_value)} ${escapeHTML(row.unit || def?.unit || '')}`.trim();
+        const actions = canApprove
+            ? `<div class="btn-group btn-group-sm ms-2"><button class="btn btn-outline-success" onclick="window.__app.approveKpiTargetVersion('${escapeInlineArg(row.id)}')"><i class="bi bi-check-lg"></i></button><button class="btn btn-outline-danger" onclick="window.__app.rejectKpiTargetVersion('${escapeInlineArg(row.id)}')"><i class="bi bi-x-lg"></i></button></div>`
+            : '<span class="badge bg-light text-muted border ms-2">Awaiting HR</span>';
+
+        return `<div class="border rounded p-2 mb-2 bg-white">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+                <div>
+                    <div class="fw-semibold small">Target: ${escapeHTML(emp?.name || row.employee_id)} - ${escapeHTML(def?.name || row.kpi_id)}</div>
+                    <div class="text-muted" style="font-size:11px;">Effective ${escapeHTML(row.effective_period || '-')} | ${targetText}</div>
+                    <div class="text-muted" style="font-size:10px;">Requested by: ${escapeHTML(state.db[row.requested_by]?.name || row.requested_by || '-')}</div>
+                </div>
+                ${actions}
+            </div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `<div class="small fw-semibold text-primary mb-2">Definition Changes</div>${definitionHtml || '<div class="text-muted small fst-italic mb-2">No pending definition changes.</div>'}<div class="small fw-semibold text-primary mb-2 mt-2">Target Changes</div>${targetHtml || '<div class="text-muted small fst-italic">No pending target changes.</div>'}`;
+}
+
+function renderKpiVersionHistory() {
+    const container = document.getElementById('kpi-version-history');
+    if (!container) return;
+
+    const definitionRows = (state.kpiDefinitionVersions || []).slice(0, 10);
+    const targetRows = (state.employeeKpiTargetVersions || []).slice(0, 10);
+
+    if (definitionRows.length === 0 && targetRows.length === 0) {
+        container.innerHTML = '<div class="text-muted small fst-italic">No version history yet.</div>';
+        return;
+    }
+
+    const defs = definitionRows.map(row => {
+        const targetText = `${formatNumber(row.target || 0)} ${escapeHTML(row.unit || '')}`.trim();
+        return `<tr>
+            <td class="small">Definition</td>
+            <td class="small">${escapeHTML(row.name || '-')}</td>
+            <td class="small">${escapeHTML(row.effective_period || '-')}</td>
+            <td class="small text-end">v${escapeHTML(String(row.version_no || 0))}</td>
+            <td class="small">${formatKpiStatusBadge(row.status)}</td>
+            <td class="small">${escapeHTML(targetText || '-')}</td>
+        </tr>`;
+    }).join('');
+
+    const targets = targetRows.map(row => {
+        const emp = state.db[row.employee_id];
+        const def = state.kpiConfig.find(k => k.id === row.kpi_id);
+        const targetText = row.target_value === null || row.target_value === undefined
+            ? 'Clear override'
+            : `${formatNumber(row.target_value)} ${escapeHTML(row.unit || def?.unit || '')}`.trim();
+
+        return `<tr>
+            <td class="small">Target</td>
+            <td class="small">${escapeHTML(emp?.name || row.employee_id)} / ${escapeHTML(def?.name || row.kpi_id)}</td>
+            <td class="small">${escapeHTML(row.effective_period || '-')}</td>
+            <td class="small text-end">v${escapeHTML(String(row.version_no || 0))}</td>
+            <td class="small">${formatKpiStatusBadge(row.status)}</td>
+            <td class="small">${escapeHTML(targetText)}</td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `<div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead class="table-light sticky-top"><tr><th>Type</th><th>Scope</th><th>Effective</th><th class="text-end">Version</th><th>Status</th><th>Value</th></tr></thead><tbody>${defs}${targets}</tbody></table></div>`;
+}
+
+export async function approveKpiDefinitionVersion(versionId) {
+    if (!isHrApproverRole()) {
+        await notify.error('Only HR or Super Admin can approve KPI changes.');
+        return;
+    }
+    await decideKpiDefinitionVersion(versionId, 'approved');
+    await logActivity({ action: 'kpi.definition.approve', entityType: 'kpi_definition_version', entityId: versionId, details: {} });
+    renderKpiManager();
+    await notify.success('KPI definition version approved.');
+}
+
+export async function rejectKpiDefinitionVersion(versionId) {
+    if (!isHrApproverRole()) {
+        await notify.error('Only HR or Super Admin can reject KPI changes.');
+        return;
+    }
+    const reason = await notify.input({ title: 'Rejection Reason', input: 'textarea', inputValue: '', confirmButtonText: 'Reject' });
+    if (reason === null) return;
+    await decideKpiDefinitionVersion(versionId, 'rejected', reason);
+    await logActivity({ action: 'kpi.definition.reject', entityType: 'kpi_definition_version', entityId: versionId, details: { reason } });
+    renderKpiManager();
+    await notify.success('KPI definition version rejected.');
+}
+
+export async function approveKpiTargetVersion(versionId) {
+    if (!isHrApproverRole()) {
+        await notify.error('Only HR or Super Admin can approve KPI changes.');
+        return;
+    }
+    await decideEmployeeKpiTargetVersion(versionId, 'approved');
+    await logActivity({ action: 'kpi.target.approve', entityType: 'employee_kpi_target_version', entityId: versionId, details: {} });
+    renderKpiManager();
+    await notify.success('KPI target version approved.');
+}
+
+export async function rejectKpiTargetVersion(versionId) {
+    if (!isHrApproverRole()) {
+        await notify.error('Only HR or Super Admin can reject KPI changes.');
+        return;
+    }
+    const reason = await notify.input({ title: 'Rejection Reason', input: 'textarea', inputValue: '', confirmButtonText: 'Reject' });
+    if (reason === null) return;
+    await decideEmployeeKpiTargetVersion(versionId, 'rejected', reason);
+    await logActivity({ action: 'kpi.target.reject', entityType: 'employee_kpi_target_version', entityId: versionId, details: { reason } });
+    renderKpiManager();
+    await notify.success('KPI target version rejected.');
 }
 
 // ---- KPI DEFINITIONS (Admin only) ----
@@ -124,6 +402,8 @@ function renderKpiDefinitions() {
             <span class="fw-bold">${escapeHTML(kpi.name)}</span>
             <span class="text-muted small ms-2">${escapeHTML(kpi.description || '')}</span>
             <span class="badge bg-light text-dark border ms-2">Target: ${kpi.target ? formatNumber(kpi.target) : '-'} ${escapeHTML(kpi.unit || '')}</span>
+            <span class="badge bg-info-subtle text-info border ms-2">Effective: ${escapeHTML(kpi.effective_period || '-')}</span>
+            ${formatKpiStatusBadge(kpi.approval_status)}
           </div>
           ${isEditor ? `<div class="btn-group btn-group-sm">
             <button class="btn btn-outline-info" onclick="window.__app.copyKpiDef('${escapeInlineArg(kpi.id)}')" title="Copy KPI"><i class="bi bi-files"></i></button>
@@ -146,7 +426,8 @@ function renderKpiTargetConfig() {
     empSelect.innerHTML = '<option value="">-- Select Employee --</option>';
     const { currentUser, db } = state;
 
-    let keys = Object.keys(db).filter(id => db[id]?.role === 'employee');
+    const assignableRoles = new Set(['employee', 'manager', 'superadmin', 'director', 'hr']);
+    let keys = Object.keys(db).filter(id => assignableRoles.has(String(db[id]?.role || '').toLowerCase()));
     if (currentUser.role === 'manager') {
         const scopedIds = getManagerScopeEmployeeIds();
         keys = keys.filter(id => scopedIds?.has(id));
@@ -159,6 +440,10 @@ function renderKpiTargetConfig() {
     const periodInput = document.getElementById('kpi-target-period');
     if (periodInput && !periodInput.value) {
         periodInput.value = getCurrentPeriodKey();
+    }
+    const defPeriodInput = document.getElementById('kpi-def-effective-period');
+    if (defPeriodInput && !defPeriodInput.value) {
+        defPeriodInput.value = getCurrentPeriodKey();
     }
 
     const defSelect = document.getElementById('kpi-def-category');
@@ -214,35 +499,42 @@ export function onKpiEmployeeChange() {
     if (!emp || !kpiConfig) return;
 
     const empPos = emp.position || '';
+    const period = getSelectedTargetPeriod() || getCurrentPeriodKey();
     const applicableKpis = kpiConfig.filter(kpi => {
+        if (!isDefinitionActive(kpi, period)) return false;
         const pos = kpi.category || 'General';
         return pos === 'General' || pos === empPos;
     });
 
     if (applicableKpis.length === 0) {
-        listDiv.innerHTML = '<div class="alert alert-warning py-2 small m-0">No KPIs found for this position. Please define them first.</div>';
+        listDiv.innerHTML = '<div class="alert alert-warning py-2 small m-0">No active approved KPIs found for this position and month.</div>';
         saveBtn.classList.add('hidden');
         return;
     }
-    const period = getSelectedTargetPeriod();
-    const { defaultTargets, monthlyTargets } = normalizeKpiTargetStore(emp.kpi_targets || {});
-    const periodTargets = period && monthlyTargets[period] ? monthlyTargets[period] : {};
+
     let html = '';
 
     applicableKpis.forEach(kpi => {
-        const monthlyValue = periodTargets[kpi.id];
-        const defaultValue = defaultTargets[kpi.id];
-        const val = monthlyValue !== undefined ? monthlyValue : '';
-        const fallbackLabel = monthlyValue === undefined && defaultValue !== undefined
-            ? `<div class="text-info" style="font-size: 10px;">Default override: ${formatNumber(defaultValue)} ${escapeHTML(kpi.unit || '')}</div>`
+        const effectiveTarget = getEmployeeKpiTarget(emp, kpi.id, period);
+        const approvedVersion = getLatestTargetVersionForPeriod(emp.id, kpi.id, period);
+        const pendingVersion = getLatestTargetVersionForPeriod(emp.id, kpi.id, period, { includePending: true });
+        const hasPending = pendingVersion && String(pendingVersion.status || '').toLowerCase() === 'pending';
+
+        const val = approvedVersion && approvedVersion.target_value !== null && approvedVersion.target_value !== undefined
+            ? approvedVersion.target_value
+            : '';
+
+        const pendingLabel = hasPending
+            ? '<div class="text-warning" style="font-size: 10px;">Pending change waiting for HR approval.</div>'
             : '';
 
         html += `
         <div class="d-flex justify-content-between align-items-center bg-white border rounded px-2 py-1">
             <div class="flex-grow-1">
                 <div class="small fw-bold text-truncate" style="max-width: 250px;" title="${escapeHTML(kpi.name)}">${escapeHTML(kpi.name)}</div>
+                <div class="text-muted" style="font-size: 10px;">Effective target: ${formatNumber(effectiveTarget)} ${escapeHTML(kpi.unit || '')}</div>
                 <div class="text-muted" style="font-size: 10px;">Global Default: ${formatNumber(kpi.target)} ${escapeHTML(kpi.unit || '')}</div>
-                ${fallbackLabel}
+                ${pendingLabel}
             </div>
             <div class="ms-2 d-flex gap-1 align-items-center" style="width: 140px;">
                 <input type="number" class="form-control form-control-sm text-end target-custom-input"
@@ -262,51 +554,79 @@ export async function saveKpiTargets() {
     if (!canEditKpiSettings()) { await notify.error('Access Denied'); return; }
     if (!canManageEmployeeTarget(empId)) { await notify.error('Manager can only update targets for team members.'); return; }
 
-    const period = getSelectedTargetPeriod();
+    const period = getSelectedTargetPeriod() || getCurrentPeriodKey();
+    if (!period) {
+        await notify.warn('Please select an effective month first.');
+        return;
+    }
+
     const inputs = document.querySelectorAll('.target-custom-input');
-    const targets = {};
+    const items = [];
 
-    inputs.forEach(inp => {
+    for (const inp of inputs) {
+        const kpiId = String(inp.dataset.kpi || '').trim();
+        if (!kpiId) continue;
+
         const val = inp.value.trim();
-        if (val !== '') {
-            targets[inp.dataset.kpi] = parseFloat(val);
-        }
-    });
-
-    const emp = state.db[empId];
-    if (emp) {
-        const normalized = normalizeKpiTargetStore(emp.kpi_targets || {});
-        if (period) {
-            if (Object.keys(targets).length > 0) {
-                normalized.monthlyTargets[period] = targets;
-            } else {
-                delete normalized.monthlyTargets[period];
-            }
-        } else {
-            normalized.defaultTargets = targets;
+        const parsed = val === '' ? null : Number(val);
+        if (val !== '' && Number.isNaN(parsed)) {
+            await notify.warn('All target values must be numeric.');
+            return;
         }
 
-        emp.kpi_targets = buildKpiTargetStore(normalized.defaultTargets, normalized.monthlyTargets);
+        const existing = getLatestTargetVersionForPeriod(empId, kpiId, period, { includePending: true });
+        const previous = existing?.target_value ?? null;
+        const normalizedPrev = previous === null || previous === undefined ? null : Number(previous);
+        const normalizedNext = parsed === null ? null : Number(parsed);
 
-        try {
-            const { saveEmployee } = await import('./data.js');
-            await notify.withLoading(async () => {
-                await saveEmployee(emp);
-            }, 'Saving KPI Targets', `Updating personalized targets for ${emp.name || emp.id}...`);
-            await logActivity({
-                action: 'kpi.targets.update',
-                entityType: 'employee',
-                entityId: emp.id,
-                details: {
-                    employee_name: emp.name,
-                    period: period || 'default',
-                    targets: Object.keys(targets).length,
-                },
+        if (normalizedPrev === normalizedNext) continue;
+
+        const def = getDefinitionMetaForPeriod(kpiId, period);
+        items.push({
+            kpi_id: kpiId,
+            target_value: normalizedNext,
+            unit: String(def?.unit || ''),
+        });
+    }
+
+    if (items.length === 0) {
+        await notify.info('No target changes detected for this month.');
+        return;
+    }
+
+    const employee = state.db[empId];
+    try {
+        const result = await notify.withLoading(async () => {
+            return await submitEmployeeKpiTargetVersions({
+                employee_id: empId,
+                effective_period: period,
+                items,
             });
-            await notify.success('Employee monthly KPI targets saved successfully!');
-        } catch (e) {
-            await notify.error('Error saving custom targets: ' + e.message);
+        }, 'Saving KPI Targets', `Updating monthly targets for ${employee?.name || empId}...`);
+
+        await logActivity({
+            action: result?.status === 'pending' ? 'kpi.targets.submit_for_approval' : 'kpi.targets.update',
+            entityType: 'employee_kpi_target_version',
+            entityId: empId,
+            details: {
+                employee_name: employee?.name || empId,
+                period,
+                total_changes: items.length,
+                status: result?.status || 'approved',
+            },
+        });
+
+        if (result?.status === 'pending') {
+            await notify.success('Target changes submitted. Waiting for HR approval.');
+        } else {
+            await notify.success('Monthly KPI targets saved successfully.');
         }
+
+        onKpiEmployeeChange();
+        renderKpiPendingApprovals();
+        renderKpiVersionHistory();
+    } catch (e) {
+        await notify.error('Error saving KPI targets: ' + e.message);
     }
 }
 // ---- START KPI INPUT (from Assessment Tab) ----
@@ -316,6 +636,16 @@ export function startKpiInput() {
 
     const rec = state.db[targetId];
     if (!rec) { notify.error('Employee Record not found in database.'); return; }
+
+    const role = state.currentUser?.role || 'employee';
+    if (role === 'employee' && targetId !== state.currentUser?.id) {
+        notify.error('Access denied: employee can only submit KPI for own account.');
+        return;
+    }
+    if (role !== 'employee' && !canManageKpiRecordForEmployee(targetId)) {
+        notify.error('Access denied: selected employee is outside your KPI input scope.');
+        return;
+    }
 
     document.getElementById('step-login').classList.add('hidden');
     document.getElementById('step-kpi-input').classList.remove('hidden');
@@ -343,10 +673,13 @@ export function startKpiInput() {
         const { kpiConfig } = state;
         const empPos = rec.position || '';
 
-        const applicableKpis = (kpiConfig || []).filter(kpi => {
-            const pos = kpi.category || 'General';
-            return pos === 'General' || pos === empPos;
-        });
+        const applicableKpis = (kpiConfig || [])
+            .filter(kpi => {
+                if (!isDefinitionActive(kpi, activePeriod)) return false;
+                const pos = kpi.category || 'General';
+                return pos === 'General' || pos === empPos;
+            })
+            .map(kpi => getDefinitionMetaForPeriod(kpi.id, activePeriod) || kpi);
 
         applicableKpis.forEach(kpi => {
             const effectiveTarget = getEmployeeKpiTarget(rec, kpi.id, activePeriod);
@@ -362,13 +695,14 @@ export function startKpiInput() {
             histBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted fst-italic py-2 small">No recent KPI achievements logged.</td></tr>';
         } else {
             empRecords.forEach(r => {
-                const kpiDef = (state.kpiConfig || []).find(k => k.id === r.kpi_id);
-                const t = getEmployeeKpiTarget(rec, r.kpi_id, r.period);
+                const kpiMeta = getDefinitionMetaForPeriod(r.kpi_id, r.period);
+                const kpiName = r.kpi_name_snapshot || kpiMeta?.name || '-';
+                const t = getKpiRecordTarget(r, rec);
                 const ach = t > 0 ? Math.round((r.value / t) * 100) : 0;
                 let bg = ach >= 100 ? 'bg-success' : ach >= 75 ? 'bg-primary' : ach >= 50 ? 'bg-warning text-dark' : 'bg-danger';
                 histBody.innerHTML += `<tr>
                     <td class="small">${formatPeriod(r.period)}</td>
-                    <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(kpiDef?.name || '')}">${escapeHTML(kpiDef?.name || '-')}</td>
+                    <td class="small text-truncate" style="max-width: 150px;" title="${escapeHTML(kpiName || '')}">${escapeHTML(kpiName || '-')}</td>
                     <td class="text-center small fw-bold">${formatNumber(r.value)}</td>
                     <td class="text-center small">${formatNumber(t)}</td>
                     <td class="text-center"><span class="badge ${bg} px-1" style="font-size: 9px;">${ach}%</span></td>
@@ -428,8 +762,9 @@ export async function renderKpiHistory() {
 
     records.forEach(record => {
         const emp = db[record.employee_id];
-        const kpiDef = kpiConfig.find(k => k.id === record.kpi_id);
-        const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
+        const kpiDef = getDefinitionMetaForPeriod(record.kpi_id, record.period);
+        const unit = record.kpi_unit_snapshot || kpiDef?.unit || '';
+        const target = getKpiRecordTarget(record, emp);
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
 
         let achBadge = 'bg-secondary';
@@ -438,20 +773,22 @@ export async function renderKpiHistory() {
         else if (achievement >= 50) achBadge = 'bg-warning text-dark';
         else achBadge = 'bg-danger';
 
+        const canEditRecord = currentUser.role !== 'employee' && canManageKpiRecordForEmployee(record.employee_id);
+
         tbody.innerHTML += `
             <tr>
         <td class="fw-bold">${escapeHTML(emp?.name || record.employee_id)}</td>
-        <td>${escapeHTML(kpiDef?.name || 'Unknown KPI')}</td>
+        <td>${escapeHTML(record.kpi_name_snapshot || kpiDef?.name || 'Unknown KPI')}</td>
         <td class="text-center">${formatPeriod(record.period)}</td>
-        <td class="text-center fw-bold">${formatNumber(record.value)} ${escapeHTML(kpiDef?.unit || '')}</td>
-        <td class="text-center">${formatNumber(target)} ${escapeHTML(kpiDef?.unit || '')}</td>
+        <td class="text-center fw-bold">${formatNumber(record.value)} ${escapeHTML(unit)}</td>
+        <td class="text-center">${formatNumber(target)} ${escapeHTML(unit)}</td>
         <td class="text-center"><span class="badge ${achBadge}">${achievement}%</span></td>
         <td class="small text-muted">
           <div>${escapeHTML(state.db[record.updated_by || record.submitted_by]?.name || record.updated_by || record.submitted_by || '-')}</div>
           <div>${escapeHTML(formatDateTime(record.updated_at || record.submitted_at))}</div>
         </td>
         <td class="text-end">
-          ${currentUser.role !== 'employee' ? `
+          ${canEditRecord ? `
             <div class="btn-group btn-group-sm" role="group">
                 <button class="btn btn-outline-primary" onclick="window.__app.editKpiRecord('${escapeInlineArg(record.id)}')" title="Edit KPI Record"><i class="bi bi-pencil"></i></button>
                 <button class="btn btn-outline-danger" onclick="window.__app.removeKpiRecord('${escapeInlineArg(record.id)}')" title="Delete KPI Record"><i class="bi bi-trash"></i></button>
@@ -472,6 +809,16 @@ export async function submitKpiRecord() {
 
     if (!empId || !kpiId || !period || isNaN(value)) {
         await notify.warn('Please fill in all required fields.');
+        return;
+    }
+
+    const role = state.currentUser?.role || 'employee';
+    if (role === 'employee' && empId !== state.currentUser?.id) {
+        await notify.error('Access denied: employee can only submit KPI for own account.');
+        return;
+    }
+    if (role !== 'employee' && !canManageKpiRecordForEmployee(empId)) {
+        await notify.error('Access denied: selected employee is outside your KPI input scope.');
         return;
     }
 
@@ -520,9 +867,12 @@ export async function submitKpiRecord() {
 export async function saveKpiDef() {
     if (!canEditKpiSettings()) { await notify.error('Access Denied'); return; }
     if (!(await requireRecentAuth('saving KPI definition'))) return;
+
     const name = document.getElementById('kpi-def-name')?.value?.trim();
     const description = document.getElementById('kpi-def-desc')?.value?.trim();
     const category = document.getElementById('kpi-def-category')?.value?.trim();
+    const effective_period = document.getElementById('kpi-def-effective-period')?.value?.trim() || getCurrentPeriodKey();
+    const request_note = document.getElementById('kpi-def-request-note')?.value?.trim() || '';
     const target = parseFloat(document.getElementById('kpi-def-target')?.value) || 0;
     const unit = document.getElementById('kpi-def-unit')?.value?.trim() || '';
 
@@ -539,29 +889,43 @@ export async function saveKpiDef() {
         }
     }
 
-    const kpi = {
-        name, description, category: category || 'General', target, unit,
-    };
-    if (editingId) kpi.id = editingId;
-
     try {
-        const saved = await notify.withLoading(async () => {
-            return await saveKpiDefinition(kpi);
+        const result = await notify.withLoading(async () => {
+            return await submitKpiDefinitionVersion({
+                id: editingId || undefined,
+                name,
+                description,
+                category: category || 'General',
+                target,
+                unit,
+                effective_period,
+                request_note,
+            });
         }, 'Saving KPI Definition', 'Updating KPI definition...');
+
         await logActivity({
-            action: editingId ? 'kpi.definition.update' : 'kpi.definition.create',
+            action: result?.status === 'pending' ? 'kpi.definition.submit_for_approval' : (editingId ? 'kpi.definition.update' : 'kpi.definition.create'),
             entityType: 'kpi_definition',
-            entityId: saved?.id || editingId || name,
+            entityId: result?.definition_id || editingId || name,
             details: {
                 name,
                 category: category || 'General',
                 target,
                 unit,
+                effective_period,
+                version_no: result?.version_no || null,
+                status: result?.status || 'approved',
             },
         });
-        await notify.success('KPI Definition saved!');
+
         clearKpiDefForm();
         renderKpiManager();
+
+        if (result?.status === 'pending') {
+            await notify.success('KPI definition submitted for HR approval.');
+        } else {
+            await notify.success('KPI definition saved.');
+        }
     } catch (err) {
         await notify.error('Error saving KPI: ' + err.message);
     }
@@ -577,6 +941,8 @@ export function editKpiDef(id) {
     document.getElementById('kpi-def-category').value = kpi.category || 'General';
     document.getElementById('kpi-def-target').value = kpi.target || '';
     document.getElementById('kpi-def-unit').value = kpi.unit || '';
+    document.getElementById('kpi-def-effective-period').value = kpi.effective_period || getCurrentPeriodKey();
+    document.getElementById('kpi-def-request-note').value = '';
     document.getElementById('kpi-def-edit-id').value = kpi.id;
 
     document.getElementById('kpi-def-title').innerText = 'Edit KPI Definition';
@@ -592,6 +958,8 @@ export function copyKpiDef(id) {
     document.getElementById('kpi-def-category').value = kpi.category || 'General';
     document.getElementById('kpi-def-target').value = kpi.target || '';
     document.getElementById('kpi-def-unit').value = kpi.unit || '';
+    document.getElementById('kpi-def-effective-period').value = kpi.effective_period || getCurrentPeriodKey();
+    document.getElementById('kpi-def-request-note').value = '';
 
     // Explicitly reset the ID so it saves as a NEW definition
     document.getElementById('kpi-def-edit-id').value = '';
@@ -635,6 +1003,9 @@ export async function removeKpiDef(id) {
 }
 
 export async function removeKpiRecord(id) {
+    const record = state.kpiRecords.find(r => r.id === id);
+    if (!record) { await notify.error('Record not found.'); return; }
+    if (!canManageKpiRecordForEmployee(record.employee_id)) { await notify.error('Access Denied'); return; }
     if (!(await notify.confirm('Delete this KPI record?', { confirmButtonText: 'Delete' }))) return;
     try {
         await notify.withLoading(async () => {
@@ -657,14 +1028,16 @@ export async function editKpiRecord(id) {
 
     const record = state.kpiRecords.find(r => r.id === id);
     if (!record) { await notify.error('Record not found.'); return; }
+    if (!canManageKpiRecordForEmployee(record.employee_id)) { await notify.error('Access Denied'); return; }
 
     const emp = state.db[record.employee_id];
-    const kpiDef = state.kpiConfig.find(k => k.id === record.kpi_id);
-    const unit = kpiDef?.unit ? ` ${kpiDef.unit}` : '';
+    const kpiDef = getDefinitionMetaForPeriod(record.kpi_id, record.period);
+    const kpiName = record.kpi_name_snapshot || kpiDef?.name || 'Unknown KPI';
+    const unit = (record.kpi_unit_snapshot || kpiDef?.unit) ? ` ${record.kpi_unit_snapshot || kpiDef?.unit}` : '';
 
     const newValueRaw = await notify.input({
         title: 'Edit KPI Value',
-        text: `Employee: ${emp?.name || record.employee_id}\nKPI: ${kpiDef?.name || 'Unknown KPI'}`,
+        text: `Employee: ${emp?.name || record.employee_id}\nKPI: ${kpiName}`,
         input: 'number',
         inputLabel: `Enter new value${unit}:`,
         inputValue: String(record.value ?? ''),
@@ -741,6 +1114,8 @@ export function clearKpiDefForm() {
     document.getElementById('kpi-def-category').value = '';
     document.getElementById('kpi-def-target').value = '';
     document.getElementById('kpi-def-unit').value = '';
+    document.getElementById('kpi-def-effective-period').value = getCurrentPeriodKey();
+    document.getElementById('kpi-def-request-note').value = '';
     document.getElementById('kpi-def-edit-id').value = '';
     document.getElementById('kpi-def-title').innerText = 'Add New KPI Definition';
 }
@@ -897,3 +1272,17 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

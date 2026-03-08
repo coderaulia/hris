@@ -30,6 +30,18 @@
   - score/status labels and class maps
   - score band helper functions
 
+## KPI Governance Data
+
+- `src/modules/data/kpi.js`
+  - KPI definition versioning (`kpi_definition_versions`)
+  - Employee KPI monthly target versioning (`employee_kpi_target_versions`)
+  - HR approval/rejection flow for pending KPI changes
+  - KPI record snapshot save (`target_snapshot`, KPI name/unit/category snapshot)
+- `src/modules/data/targets.js`
+  - Effective-month KPI definition resolution
+  - Effective-month employee target resolution
+  - Snapshot-aware KPI target resolver for reports/charts
+
 ## Next Internal Refactor Step
 
 - Move feature logic out of `records/core.js` into the corresponding `records/*` files incrementally.

@@ -7,7 +7,7 @@ import { state } from '../../lib/store.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../../lib/utils.js';
 import * as notify from '../../lib/notify.js';
 import { getFilteredEmployeeIds } from '../../lib/reportFilters.js';
-import { calculateEmployeeWeightedKpiScore, getEmployeeKpiTarget } from '../data.js';
+import { calculateEmployeeWeightedKpiScore, getKpiRecordTarget, getKpiDefinitionForPeriod } from '../data.js';
 import { DOM_IDS, getScoreBandClass, getKpiStatus } from '../../lib/uiContracts.js';
 
 let chartDistInstance = null;
@@ -23,6 +23,16 @@ let _currentDeptEmpIds = [];
 let _currentDeptRecords = [];
 let _currentDeptMonth = '';
 let _deptKpiTrendChart = null;
+
+function getKpiRecordMeta(record) {
+    const def = getKpiDefinitionForPeriod(record?.kpi_id, record?.period) || state.kpiConfig.find(k => k.id === record?.kpi_id);
+    return {
+        name: record?.kpi_name_snapshot || def?.name || record?.kpi_id || '-',
+        unit: record?.kpi_unit_snapshot || def?.unit || '',
+        category: record?.kpi_category_snapshot || def?.category || 'General',
+        target: getKpiRecordTarget(record, state.db[record?.employee_id]),
+    };
+}
 
 export function renderDashboard() {
     renderAssessmentSummary();
@@ -198,9 +208,9 @@ function renderKpiSummary() {
     let achievedCount = 0;
 
     monthlyRecords.forEach(record => {
-        const def = kpiConfig.find(k => k.id === record.kpi_id);
-        if (def && def.target > 0) {
-            const ach = (record.value / def.target) * 100;
+        const target = getKpiRecordMeta(record).target;
+        if (target > 0) {
+            const ach = (record.value / target) * 100;
             totalAchievement += ach;
             achievedCount++;
         }
@@ -211,8 +221,8 @@ function renderKpiSummary() {
     // Count how many meet target
     let metTarget = 0;
     monthlyRecords.forEach(record => {
-        const def = kpiConfig.find(k => k.id === record.kpi_id);
-        if (def && def.target > 0 && record.value >= def.target) metTarget++;
+        const target = getKpiRecordMeta(record).target;
+        if (target > 0 && record.value >= target) metTarget++;
     });
 
     const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
@@ -232,12 +242,11 @@ function renderKpiSummary() {
 
         const catMap = {};
         monthlyRecords.forEach(record => {
-            const def = kpiConfig.find(k => k.id === record.kpi_id);
-            if (!def) return;
-            const cat = def.category || 'General';
+            const meta = getKpiRecordMeta(record);
+            const cat = meta.category || 'General';
             if (!catMap[cat]) catMap[cat] = { sum: 0, count: 0 };
-            if (def.target > 0) {
-                catMap[cat].sum += (record.value / def.target) * 100;
+            if (meta.target > 0) {
+                catMap[cat].sum += (record.value / meta.target) * 100;
                 catMap[cat].count++;
             }
         });
@@ -310,9 +319,7 @@ function renderKpiSummary() {
                 let sum = 0;
                 let count = 0;
                 empRecords.forEach(record => {
-                    const emp = db[id];
-                    const def = kpiConfig.find(k => k.id === record.kpi_id);
-                    const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
+                    const target = getKpiRecordMeta(record).target;
                     if (target > 0) {
                         sum += (record.value / target) * 100;
                         count++;
@@ -383,9 +390,7 @@ function renderDeptKpiCards(records) {
         let totalAch = 0, achCount = 0, metCount = 0;
 
         deptRecords.forEach(record => {
-            const def = kpiConfig.find(k => k.id === record.kpi_id);
-            const emp = db[record.employee_id];
-            const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
+            const target = getKpiRecordMeta(record).target;
             if (target > 0) {
                 const ach = (record.value / target) * 100;
                 totalAch += ach;
@@ -520,8 +525,8 @@ export function renderDeptKpiTable(month, tabBtn) {
 
     monthRecords.forEach(record => {
         const emp = db[record.employee_id];
-        const def = kpiConfig.find(k => k.id === record.kpi_id);
-        const target = getEmployeeKpiTarget(emp, record.kpi_id, record.period);
+        const meta = getKpiRecordMeta(record);
+        const target = meta.target;
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
 
         if (target > 0) {
@@ -533,8 +538,8 @@ export function renderDeptKpiTable(month, tabBtn) {
         rows.push({
             name: emp?.name || record.employee_id,
             position: emp?.position || '-',
-            kpi: def?.name || 'Unknown',
-            unit: def?.unit || '',
+            kpi: meta.name || 'Unknown',
+            unit: meta.unit || '',
             period: formatPeriod(record.period),
             periodRaw: record.period,
             value: record.value,
@@ -614,8 +619,7 @@ export function renderDeptKpiTable(month, tabBtn) {
             if (past6Months.includes(r.period)) {
                 if (!monthCounts[r.period]) { monthCounts[r.period] = 0; monthAchs[r.period] = 0; }
 
-                const def = kpiConfig.find(k => k.id === r.kpi_id);
-                const t = getEmployeeKpiTarget(db[r.employee_id], r.kpi_id, r.period);
+                const t = getKpiRecordMeta(r).target;
                 if (t > 0) {
                     monthAchs[r.period] += (r.value / t) * 100;
                     monthCounts[r.period]++;
@@ -1228,6 +1232,15 @@ export async function exportEmployeeKpiPDF(employeeId) {
 
 
 export { renderAssessmentSummary, renderKpiSummary, renderDeptKpiCards };
+
+
+
+
+
+
+
+
+
 
 
 

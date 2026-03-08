@@ -6,7 +6,7 @@ import { Chart } from 'chart.js/auto';
 import Swal from 'sweetalert2';
 import { state, emit, isAdmin, isEmployee, isManager } from '../../lib/store.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../../lib/utils.js';
-import { saveEmployee, logActivity, buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getEmployeeKpiTarget, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction } from '../data.js';
+import { saveEmployee, logActivity, buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getKpiRecordTarget, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction } from '../data.js';
 import { requireRecentAuth } from '../auth.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from '../assessment.js';
 import * as notify from '../../lib/notify.js';
@@ -1453,8 +1453,9 @@ export async function exportProbationPdf() {
 
                 periodRecords.forEach(record => {
                     const kpiDef = (state.kpiConfig || []).find(k => k.id === record.kpi_id);
-                    const unit = kpiDef?.unit || '';
-                    const target = getEmployeeKpiTarget(employee, record.kpi_id, record.period);
+                    const kpiName = record.kpi_name_snapshot || kpiDef?.name || record.kpi_id || '-';
+                    const unit = record.kpi_unit_snapshot || kpiDef?.unit || '';
+                    const target = getKpiRecordTarget(record, employee);
                     const actual = Number(record.value || 0);
                     const achievement = target > 0 ? (actual / target) * 100 : 0;
 
@@ -1462,7 +1463,7 @@ export async function exportProbationPdf() {
                         `Month ${monthRow.month_no}`,
                         `${monthRow.period_start} to ${monthRow.period_end}`,
                         period || '-',
-                        kpiDef?.name || record.kpi_id || '-',
+                        kpiName,
                         `${formatNumber(target)} ${unit}`.trim(),
                         `${formatNumber(actual)} ${unit}`.trim(),
                         target > 0 ? `${toFixedScore(achievement, 2)}%` : '-',
@@ -1824,6 +1825,10 @@ export async function updatePipPlanStatus(planId) {
     renderProbationPipView();
     await notify.success('PIP plan updated.');
 }
+
+
+
+
 
 
 

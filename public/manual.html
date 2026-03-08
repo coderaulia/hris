@@ -97,18 +97,23 @@
                     <ol>
                         <li>Open <strong>Assessment & KPI</strong>, select employee, click <strong>Input KPI Achievement</strong>.</li>
                         <li>Set <strong>Period (YYYY-MM)</strong>, select KPI metric, and input value.</li>
+                        <li>KPI metric list follows active definition by <strong>effective month</strong> and your role scope.</li>
                         <li>If KPI unit is <strong>%</strong>, fill Attained and Total to auto-calculate final value.</li>
                         <li>Click <strong>Submit Achievement</strong>.</li>
+                        <li>System stores KPI snapshots (target/name/unit/category) at record time, so future KPI edits do not change old records.</li>
                         <li>Open <strong>Records &gt; KPI Records</strong> to validate saved data.</li>
                         <li>Use row actions in KPI Records to <strong>Edit</strong> or <strong>Delete</strong> wrong entry (according to role scope).</li>
                     </ol>
                 </section>
 
                 <section class="manual-section mb-4">
-                    <h2 class="fw-bold">6. KPI Definition, Monthly Target Config & Probation Rules</h2>
+                    <h2 class="fw-bold">6. KPI Definition, Governance, Monthly Target Config & Probation Rules</h2>
                     <ol>
                         <li>Open <strong>Settings &gt; KPI Management</strong>.</li>
-                        <li>To add/edit KPI definition, fill KPI name, category/position, target, and unit, then save.</li>
+                        <li>To add/edit KPI definition, fill KPI name, category/position, target, unit, <strong>effective month</strong>, and optional change note.</li>
+                        <li>Use <strong>KPI Governance</strong> toggle to require HR approval for manager KPI changes.</li>
+                        <li>If governance is enabled, changes appear in <strong>Pending KPI Approvals</strong> until approved by HR/Super Admin.</li>
+                        <li>All submitted changes are recorded in <strong>KPI Version History</strong> (definition and target versions).</li>
                         <li>Manager can add/edit KPI definition for team positions only; Super Admin can manage all.</li>
                         <li>In <strong>Employee Targets Config</strong>, select target month and employee.</li>
                         <li>Input monthly target override per KPI, then click <strong>Save Employee Targets</strong>.</li>
@@ -164,6 +169,7 @@
                     <h2 class="fw-bold">11. Troubleshooting</h2>
                     <ul class="mb-0">
                         <li>Data not visible: confirm your role and selected filters.</li>
+                        <li>KPI change not applied yet: check <strong>Pending KPI Approvals</strong> and approval status.</li>
                         <li>Cannot save/update: check required fields and network connection.</li>
                         <li>Error <strong>email rate limit exceeded</strong>: too many auth emails in short time, wait and retry.</li>
                         <li>Access issue persists: contact your system administrator.</li>
@@ -175,3 +181,5 @@
 </body>
 
 </html>
+
+

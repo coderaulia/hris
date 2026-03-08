@@ -6,6 +6,8 @@ export const state = {
     db: {},           // Employee database { id: { ...record } }
     appConfig: {},    // Competency config { positionName: { competencies: [...] } }
     kpiConfig: [],    // KPI definitions
+    kpiDefinitionVersions: [],
+    employeeKpiTargetVersions: [],
     kpiRecords: [],   // KPI records
     kpiWeightProfiles: [],
     kpiWeightItems: [],
@@ -58,6 +60,11 @@ export function isManager() {
     return state.currentUser?.role === 'manager' || state.currentUser?.role === 'superadmin';
 }
 
+export function isDirector() {
+    return state.currentUser?.role === 'director';
+}
+
 export function isEmployee() {
     return state.currentUser?.role === 'employee';
 }
+

@@ -2,10 +2,11 @@
 // ASSESSMENT MODULE
 // ==================================================
 
-import { state, emit, isEmployee, isManager } from '../lib/store.js';
+import { state, emit, isEmployee } from '../lib/store.js';
 import { escapeHTML, getDepartment } from '../lib/utils.js';
 import { saveEmployee, logActivity } from './data.js';
 import * as notify from '../lib/notify.js';
+import { getDirectorOperationalScopeIds } from '../lib/reportFilters.js';
 
 // ---- SELF ASSESSMENT (Employee fast-track) ----
 export function initiateSelfAssessment(clickedId) {
@@ -59,6 +60,29 @@ export function initiateSelfAssessment(clickedId) {
     }, 100);
 }
 
+
+function getAssessorScopeIds() {
+    const { currentUser, db } = state;
+    if (!currentUser) return [];
+
+    if (currentUser.role === 'superadmin') {
+        return Object.keys(db);
+    }
+
+    if (currentUser.role === 'manager') {
+        const mgrRec = db[currentUser.id];
+        if (mgrRec && mgrRec.department) {
+            return Object.keys(db).filter(id => db[id].department === mgrRec.department && id !== currentUser.id);
+        }
+        return Object.keys(db).filter(id => db[id].manager_id === currentUser.id);
+    }
+
+    if (currentUser.role === 'director') {
+        return getDirectorOperationalScopeIds(db, currentUser.id);
+    }
+
+    return [];
+}
 // ---- RENDER PENDING LIST ----
 export function renderPendingList() {
     const { currentUser, db, appSettings } = state;
@@ -129,17 +153,13 @@ export function renderPendingList() {
 
     sel.innerHTML = '<option value="">-- Select Employee to Assess --</option>';
 
-    let keys = Object.keys(db);
-    if (currentUser.role === 'manager') {
-        const mgrRec = db[currentUser.id];
-        if (mgrRec && mgrRec.department) {
-            keys = keys.filter(id => db[id].department === mgrRec.department && id !== currentUser.id);
-        } else {
-            keys = keys.filter(id => db[id].manager_id === currentUser.id);
-        }
-    }
-    // Superadmin can assess anyone
+    let keys = getAssessorScopeIds().filter(id => id !== currentUser.id);
     keys.sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''));
+
+    if (keys.length === 0) {
+        sel.innerHTML = '<option value="">-- No employees in your scope --</option>';
+        return;
+    }
 
     keys.forEach(id => {
         const rec = db[id];
@@ -186,13 +206,21 @@ export async function startAssessment() {
     const rec = db[targetId];
     if (!rec) { await notify.error('Employee Record not found in database.'); return; }
 
+    if (!isEmployee()) {
+        const scopeSet = new Set(getAssessorScopeIds());
+        if (!scopeSet.has(targetId)) {
+            await notify.error('Access denied: selected employee is outside your assessment scope.');
+            return;
+        }
+    }
+
     if (isEmployee() && ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0))) {
         await notify.info('You have already submitted your self-assessment. Re-submission is disabled.');
         return;
     }
 
     if (!state.currentSession.isEditing) {
-        if (isManager() && !isEmployee() && rec.percentage > 0) {
+        if (!isEmployee() && rec.percentage > 0) {
             if (!(await notify.confirm(`Warning: ${rec.name} has already been assessed. Overwrite?`, { confirmButtonText: 'Overwrite' }))) return;
         }
 
