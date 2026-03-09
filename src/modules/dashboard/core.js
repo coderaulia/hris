@@ -34,6 +34,10 @@ function getKpiRecordMeta(record) {
     };
 }
 
+function normalizeEmployeeId(value) {
+    return String(value ?? '').trim();
+}
+
 export function renderDashboard() {
     renderAssessmentSummary();
     renderKpiSummary();
@@ -180,7 +184,7 @@ function renderAssessmentSummary() {
 // ==================================================
 function renderKpiSummary() {
     const { kpiRecords, kpiConfig, db } = state;
-    const visibleIds = new Set(getFilteredEmployeeIds());
+    const visibleIds = new Set(getFilteredEmployeeIds().map(normalizeEmployeeId));
 
     const today = new Date();
     const currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
@@ -195,11 +199,11 @@ function renderKpiSummary() {
         selYear + '-' + String(currentQ * 3 + 3).padStart(2, '0')
     ];
 
-    const scopedRecords = kpiRecords.filter(r => visibleIds.has(r.employee_id));
+    const scopedRecords = kpiRecords.filter(r => visibleIds.has(normalizeEmployeeId(r.employee_id)));
     const monthlyRecords = scopedRecords.filter(r => r.period === selectedMonth);
     const quarterlyRecords = scopedRecords.filter(r => qPeriods.includes(r.period));
     const totalScopedEmployees = visibleIds.size;
-    const employeesWithMonthlyKpi = new Set(monthlyRecords.map(r => r.employee_id)).size;
+    const employeesWithMonthlyKpi = new Set(monthlyRecords.map(r => normalizeEmployeeId(r.employee_id))).size;
 
     // KPI Overview Cards (Current Month)
     const totalKpis = kpiConfig.length;
@@ -437,8 +441,9 @@ function buildEmployeePerformanceLookup() {
 function buildScopedRecordLookup(scopedIds) {
     const lookup = new Map();
     (state.kpiRecords || []).forEach(record => {
-        if (scopedIds && !scopedIds.has(record.employee_id)) return;
-        const key = `${record.employee_id}__${record.period}`;
+        const employeeId = normalizeEmployeeId(record.employee_id);
+        if (scopedIds && !scopedIds.has(employeeId)) return;
+        const key = `${employeeId}__${record.period}`;
         if (!lookup.has(key)) lookup.set(key, []);
         lookup.get(key).push(record);
     });
@@ -470,7 +475,7 @@ function getEmployeePeriodKpiScore(employeeId, period, scoreLookup, recordLookup
 
 function buildLeadershipAnalyticsSnapshot(selectedMonth) {
     const scopedEmployeeIds = getFilteredEmployeeIds().filter(id => isTrackedEmployee(state.db[id]));
-    const scopedEmployeeSet = new Set(scopedEmployeeIds);
+    const scopedEmployeeSet = new Set(scopedEmployeeIds.map(normalizeEmployeeId));
     const selectedPeriod = shiftPeriodKey(selectedMonth, 0) || selectedMonth;
     const trendPeriods = buildRollingPeriods(selectedPeriod, 6);
     const riskPeriods = buildRollingPeriods(selectedPeriod, 3);
@@ -490,14 +495,14 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
     const atRiskEmployees = selectedPeriodScores.filter(row => row.score < pipThreshold);
     const atRiskEmployeeSet = new Set(atRiskEmployees.map(row => row.employee_id));
 
-    const scopedProbationReviews = (state.probationReviews || []).filter(review => scopedEmployeeSet.has(review.employee_id));
+    const scopedProbationReviews = (state.probationReviews || []).filter(review => scopedEmployeeSet.has(normalizeEmployeeId(review.employee_id)));
     const closedProbationReviews = scopedProbationReviews.filter(review => ['pass', 'extend', 'fail'].includes(String(review.decision || '').toLowerCase()));
     const passedProbationReviews = closedProbationReviews.filter(review => String(review.decision || '').toLowerCase() === 'pass');
     const probationPassRate = closedProbationReviews.length > 0
         ? (passedProbationReviews.length / closedProbationReviews.length) * 100
         : 0;
 
-    const scopedPipPlans = (state.pipPlans || []).filter(plan => scopedEmployeeSet.has(plan.employee_id));
+    const scopedPipPlans = (state.pipPlans || []).filter(plan => scopedEmployeeSet.has(normalizeEmployeeId(plan.employee_id)));
     const activePlanStatuses = new Set(['active', 'extended']);
     const resolvedPlanStatuses = new Set(['completed', 'cancelled', 'escalated']);
     const successPlanStatuses = new Set(['completed']);
@@ -505,17 +510,17 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
     const activePipEmployeeSet = new Set(
         scopedPipPlans
             .filter(plan => activePlanStatuses.has(String(plan.status || 'active').toLowerCase()))
-            .map(plan => plan.employee_id)
+            .map(plan => normalizeEmployeeId(plan.employee_id))
     );
 
     const convertedEmployeeSet = new Set(
         scopedPipPlans
             .filter(plan => {
                 const status = String(plan.status || 'active').toLowerCase();
-                return atRiskEmployeeSet.has(plan.employee_id)
+                return atRiskEmployeeSet.has(normalizeEmployeeId(plan.employee_id))
                     && (activePlanStatuses.has(status) || String(plan.trigger_period || '') === selectedPeriod);
             })
-            .map(plan => plan.employee_id)
+            .map(plan => normalizeEmployeeId(plan.employee_id))
     );
 
     const resolvedPipPlans = scopedPipPlans.filter(plan => resolvedPlanStatuses.has(String(plan.status || '').toLowerCase()));
@@ -543,10 +548,11 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
 
     const latestReviewByEmployee = new Map();
     scopedProbationReviews.forEach(review => {
-        const current = latestReviewByEmployee.get(review.employee_id);
+        const employeeId = normalizeEmployeeId(review.employee_id);
+        const current = latestReviewByEmployee.get(employeeId);
         const reviewTs = new Date(review.reviewed_at || review.created_at || 0).getTime();
         if (!current || reviewTs > current._sortTs) {
-            latestReviewByEmployee.set(review.employee_id, {
+            latestReviewByEmployee.set(employeeId, {
                 ...review,
                 _sortTs: reviewTs,
             });
@@ -643,7 +649,7 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
             const assessmentScores = teamEmployeeIds
                 .map(employeeId => Number(state.db[employeeId]?.percentage || 0))
                 .filter(score => score > 0);
-            const teamClosedReviews = closedProbationReviews.filter(review => teamSet.has(review.employee_id));
+            const teamClosedReviews = closedProbationReviews.filter(review => teamSet.has(normalizeEmployeeId(review.employee_id)));
             const teamPassedReviews = teamClosedReviews.filter(review => String(review.decision || '').toLowerCase() === 'pass');
             const activePipCount = teamEmployeeIds.filter(employeeId => activePipEmployeeSet.has(employeeId)).length;
             const riskCount = teamEmployeeIds.filter(employeeId => riskEmployeeSet.has(employeeId)).length;
@@ -889,7 +895,7 @@ function renderDeptKpiCards(records) {
     const deptStats = {};
     Object.keys(deptMap).forEach(dept => {
         const empIds = deptMap[dept];
-        const deptRecords = records.filter(r => empIds.includes(r.employee_id));
+        const deptRecords = records.filter(r => empIds.includes(normalizeEmployeeId(r.employee_id)));
         let totalAch = 0, achCount = 0, metCount = 0;
 
         deptRecords.forEach(record => {
@@ -970,7 +976,7 @@ export function openDeptKpiModal(dept) {
 
     // Get employees in this department
     _currentDeptEmpIds = Object.keys(db).filter(id => db[id].department === dept && filteredIds.has(id));
-    _currentDeptRecords = kpiRecords.filter(r => _currentDeptEmpIds.includes(r.employee_id));
+    _currentDeptRecords = kpiRecords.filter(r => _currentDeptEmpIds.includes(normalizeEmployeeId(r.employee_id)));
 
     // Get unique months in the department records + current month
     const today = new Date();
@@ -1016,7 +1022,7 @@ export function renderDeptKpiTable(month, tabBtn) {
     // Filter by month
     _currentDeptMonth = month;
     const monthRecords = _currentDeptRecords.filter(r => r.period === month);
-    const monthRecordEmpIds = new Set(monthRecords.map(r => r.employee_id));
+    const monthRecordEmpIds = new Set(monthRecords.map(r => normalizeEmployeeId(r.employee_id)));
     const noKpiEmpIds = _currentDeptEmpIds.filter(id => !monthRecordEmpIds.has(id));
     const noKpiEmpNames = noKpiEmpIds.map(id => db[id]?.name || id).sort((a, b) => a.localeCompare(b));
     const allEmpNames = _currentDeptEmpIds.map(id => db[id]?.name || id).sort((a, b) => a.localeCompare(b));
@@ -1027,7 +1033,8 @@ export function renderDeptKpiTable(month, tabBtn) {
     let totalAch = 0, achCount = 0, metCount = 0;
 
     monthRecords.forEach(record => {
-        const emp = db[record.employee_id];
+        const recordEmployeeId = normalizeEmployeeId(record.employee_id);
+        const emp = db[recordEmployeeId] || db[record.employee_id];
         const meta = getKpiRecordMeta(record);
         const target = meta.target;
         const achievement = target > 0 ? Math.round((record.value / target) * 100) : 0;
@@ -1039,7 +1046,7 @@ export function renderDeptKpiTable(month, tabBtn) {
         }
 
         rows.push({
-            name: emp?.name || record.employee_id,
+            name: emp?.name || recordEmployeeId,
             position: emp?.position || '-',
             kpi: meta.name || 'Unknown',
             unit: meta.unit || '',
@@ -1048,7 +1055,7 @@ export function renderDeptKpiTable(month, tabBtn) {
             value: record.value,
             target: target,
             achievement: achievement,
-            employee_id: record.employee_id
+            employee_id: recordEmployeeId
         });
     });
 

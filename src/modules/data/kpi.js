@@ -541,7 +541,7 @@ function calculateEmployeeWeightedKpiScore(employeeId, records = state.kpiRecord
         };
     }
 
-    const employeeRecords = asArray(records).filter(r => r.employee_id === employeeId);
+    const employeeRecords = asArray(records).filter(r => String(r.employee_id || '') === String(employeeId || ''));
     const metrics = employeeRecords
         .map(record => {
             const target = getKpiRecordTarget(record, employee);
@@ -630,7 +630,7 @@ function calculateEmployeeWeightedKpiScore(employeeId, records = state.kpiRecord
 async function upsertEmployeePerformanceScore(employeeId, period) {
     if (!employeeId || !period) return null;
 
-    const periodRecords = state.kpiRecords.filter(r => r.employee_id === employeeId && r.period === period);
+    const periodRecords = state.kpiRecords.filter(r => String(r.employee_id || '') === String(employeeId || '') && String(r.period || '') === String(period || ''));
     const summary = calculateEmployeeWeightedKpiScore(employeeId, periodRecords);
 
     const payload = {
@@ -661,7 +661,7 @@ async function upsertEmployeePerformanceScore(employeeId, period) {
         );
 
         const idx = state.employeePerformanceScores.findIndex(
-            r => r.employee_id === data.employee_id && r.period === data.period && r.score_type === data.score_type
+            r => String(r.employee_id || '') === String(data.employee_id || '') && String(r.period || '') === String(data.period || '') && String(r.score_type || '') === String(data.score_type || '')
         );
         if (idx >= 0) state.employeePerformanceScores[idx] = data;
         else state.employeePerformanceScores.push(data);
@@ -875,3 +875,4 @@ export {
     deleteKpiRecord,
     resolveEmployeeKpiTarget,
 };
+

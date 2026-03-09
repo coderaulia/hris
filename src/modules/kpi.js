@@ -49,6 +49,19 @@ function isDefinitionActive(kpi, period = '') {
     return effective <= period;
 }
 
+function normalizeEmployeeId(value) {
+    return String(value ?? '').trim();
+}
+
+function setKpiRecordsCount(visibleCount, scopedCount = visibleCount) {
+    const badge = document.getElementById('kpi-records-count');
+    if (!badge) return;
+    badge.innerText = String(visibleCount);
+    badge.title = visibleCount === scopedCount
+        ? `${visibleCount} KPI record${visibleCount === 1 ? '' : 's'} shown`
+        : `Showing ${visibleCount} of ${scopedCount} KPI records`;
+}
+
 const KPI_UNIT_OPTIONS = [
     '',
     '%',
@@ -722,7 +735,7 @@ export function startKpiInput() {
 
     const histBody = document.getElementById('kpi-quick-history');
     if (histBody) {
-        const empRecords = (state.kpiRecords || []).filter(r => r.employee_id === rec.id).slice(0, 5);
+        const empRecords = (state.kpiRecords || []).filter(r => normalizeEmployeeId(r.employee_id) === normalizeEmployeeId(rec.id)).slice(0, 5);
         histBody.innerHTML = '';
         if (empRecords.length === 0) {
             histBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted fst-italic py-2 small">No recent KPI achievements logged.</td></tr>';
@@ -766,13 +779,14 @@ export async function renderKpiHistory() {
         }
     }
 
-    const scopedIds = new Set(getFilteredEmployeeIds());
-    let records = (kpiRecords || []).filter(r => scopedIds.has(r.employee_id));
+    const scopedIds = new Set(getFilteredEmployeeIds().map(normalizeEmployeeId));
+    const scopedRecords = (kpiRecords || []).filter(r => scopedIds.has(normalizeEmployeeId(r.employee_id)));
+    let records = [...scopedRecords];
 
     // Apply employee filter
     const filterEmp = document.getElementById('kpi-records-filter-emp')?.value;
     if (filterEmp) {
-        records = records.filter(r => r.employee_id === filterEmp);
+        records = records.filter(r => normalizeEmployeeId(r.employee_id) === normalizeEmployeeId(filterEmp));
     }
 
     // Apply period filter
@@ -788,13 +802,16 @@ export async function renderKpiHistory() {
     // Sort by most recent first
     records.sort((a, b) => (b.submitted_at || '').localeCompare(a.submitted_at || ''));
 
+    setKpiRecordsCount(records.length, scopedRecords.length);
+
     if (records.length === 0) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No KPI records found.</td></tr>';
         return;
     }
 
     records.forEach(record => {
-        const emp = db[record.employee_id];
+        const recordEmployeeId = normalizeEmployeeId(record.employee_id);
+        const emp = db[recordEmployeeId] || db[record.employee_id];
         const kpiDef = getDefinitionMetaForPeriod(record.kpi_id, record.period);
         const unit = record.kpi_unit_snapshot || kpiDef?.unit || '';
         const target = getKpiRecordTarget(record, emp);
@@ -806,11 +823,11 @@ export async function renderKpiHistory() {
         else if (achievement >= 50) achBadge = 'bg-warning text-dark';
         else achBadge = 'bg-danger';
 
-        const canEditRecord = currentUser.role !== 'employee' && canManageKpiRecordForEmployee(record.employee_id);
+        const canEditRecord = currentUser.role !== 'employee' && canManageKpiRecordForEmployee(recordEmployeeId);
 
         tbody.innerHTML += `
             <tr>
-        <td class="fw-bold">${escapeHTML(emp?.name || record.employee_id)}</td>
+        <td class="fw-bold">${escapeHTML(emp?.name || recordEmployeeId)}</td>
         <td>${escapeHTML(record.kpi_name_snapshot || kpiDef?.name || 'Unknown KPI')}</td>
         <td class="text-center">${formatPeriod(record.period)}</td>
         <td class="text-center fw-bold">${formatNumber(record.value)} ${escapeHTML(unit)}</td>
@@ -1310,17 +1327,4 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 

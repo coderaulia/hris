@@ -18,6 +18,15 @@ let historyChart = null;
 let editingTrainingIndex = -1;
 let currentTrainingId = null;
 
+function setAssessmentRecordsCount(visibleCount, scopedCount = visibleCount) {
+    const badge = document.getElementById('assessment-records-count');
+    if (!badge) return;
+    badge.innerText = String(visibleCount);
+    badge.title = visibleCount === scopedCount
+        ? `${visibleCount} assessment record${visibleCount === 1 ? '' : 's'} shown`
+        : `Showing ${visibleCount} of ${scopedCount} assessment records`;
+}
+
 // ---- RENDER RECORDS TABLE ----
 export function renderRecordsTable(filterKeys = null) {
     const tbody = document.getElementById(DOM_IDS.records.tableBody);
@@ -28,7 +37,8 @@ export function renderRecordsTable(filterKeys = null) {
     if (!currentUser) return;
 
     const scopedSet = new Set(getFilteredEmployeeIds());
-    let keys = Object.keys(db).filter(id => scopedSet.has(id));
+    const scopedKeys = Object.keys(db).filter(id => scopedSet.has(id));
+    let keys = [...scopedKeys];
     if (filterKeys) {
         const filterSet = new Set(filterKeys);
         keys = keys.filter(id => filterSet.has(id));
@@ -42,6 +52,8 @@ export function renderRecordsTable(filterKeys = null) {
             return period === periodFilter;
         });
     }
+
+    setAssessmentRecordsCount(keys.length, scopedKeys.length);
 
     if (keys.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No records found.</td></tr>';
@@ -1825,11 +1837,4 @@ export async function updatePipPlanStatus(planId) {
     renderProbationPipView();
     await notify.success('PIP plan updated.');
 }
-
-
-
-
-
-
-
 
