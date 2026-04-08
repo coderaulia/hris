@@ -6,110 +6,71 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_SESSION_TIMEOUT_MINUTES: ${{ secrets.VITE_SESSION_TIMEOUT_MINUTES }}
+      VITE_MONITOR_WEBHOOK_URL: ${{ secrets.VITE_MONITOR_WEBHOOK_URL }}
+      VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      VITE_AUTH_REDIRECT_URL: ${{ secrets.VITE_AUTH_REDIRECT_URL }}
+      SITE_BASE_URL: ${{ secrets.SITE_BASE_URL }}
+      SITE_HEALTHCHECK_URL: ${{ secrets.SITE_HEALTHCHECK_URL }}
+      DEPLOY_NOTIFY_WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFY_WEBHOOK_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: npm ci
 
-      - name: Validate required env vars
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: |
-          if [ -z "$VITE_SUPABASE_URL" ]; then
-            echo "Missing secret: VITE_SUPABASE_URL"
-            exit 1
-          fi
-          if [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "Missing secret: VITE_SUPABASE_ANON_KEY"
-            exit 1
-          fi
-
       - name: Build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_SESSION_TIMEOUT_MINUTES: ${{ secrets.VITE_SESSION_TIMEOUT_MINUTES }}
-          VITE_MONITOR_WEBHOOK_URL: ${{ secrets.VITE_MONITOR_WEBHOOK_URL }}
-          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: npm run build
 
-      - name: Deploy dist/ to Hostinger via FTP
+      - name: Upload Dist To Hostinger
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.HOSTINGER_FTP_HOST }}
           username: ${{ secrets.HOSTINGER_FTP_USER }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
           protocol: ftps
-          port: 21
-          local-dir: ./dist/
+          local-dir: dist/
+          server-dir: ${{ secrets.HOSTINGER_FTP_REMOTE_DIR }}
           dangerous-clean-slate: false
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
 
-      - name: Post-deploy health check
-        env:
-          SITE_BASE_URL: ${{ secrets.SITE_BASE_URL }}
-          SITE_HEALTHCHECK_URL: ${{ secrets.SITE_HEALTHCHECK_URL }}
+      - name: Health Check
+        shell: bash
         run: |
-          set -euo pipefail
-          if [ -z "${SITE_BASE_URL:-}" ] && [ -z "${SITE_HEALTHCHECK_URL:-}" ]; then
-            echo "No SITE_BASE_URL/SITE_HEALTHCHECK_URL configured, skipping health check."
-            exit 0
-          fi
-          if [ -n "$SITE_BASE_URL" ]; then
-            BASE="${SITE_BASE_URL%/}"
-            curl -fSL --retry 5 --retry-delay 5 "$BASE/"
-            HEALTH_URL="$BASE/healthz.json"
-          else
-            HEALTH_URL="$SITE_HEALTHCHECK_URL"
-          fi
-          if [ -n "$SITE_HEALTHCHECK_URL" ]; then
-            HEALTH_URL="$SITE_HEALTHCHECK_URL"
-          fi
-          curl -fSL --retry 5 --retry-delay 5 "$HEALTH_URL"
+          URL="${SITE_HEALTHCHECK_URL:-${SITE_BASE_URL%/}/healthz.json}"
+          echo "Checking ${URL}"
+          curl --fail --silent --show-error --location "$URL" > /tmp/healthz.json
+          cat /tmp/healthz.json
 
-      - name: Notify deploy success
-        if: ${{ success() }}
-        env:
-          DEPLOY_NOTIFY_WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFY_WEBHOOK_URL }}
+      - name: Notify Deploy Webhook
+        if: ${{ success() && env.DEPLOY_NOTIFY_WEBHOOK_URL != '' }}
+        shell: bash
         run: |
-          if [ -z "${DEPLOY_NOTIFY_WEBHOOK_URL:-}" ]; then
-            echo "No DEPLOY_NOTIFY_WEBHOOK_URL configured, skipping success notification."
-            exit 0
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -sS -X POST "$DEPLOY_NOTIFY_WEBHOOK_URL" \
+          curl --fail --silent --show-error \
+            -X POST \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"success\",\"repository\":\"${{ github.repository }}\",\"sha\":\"${{ github.sha }}\",\"run_url\":\"$RUN_URL\"}"
+            -d "{\"status\":\"success\",\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${GITHUB_REF_NAME}\",\"commit\":\"${GITHUB_SHA}\",\"url\":\"${SITE_BASE_URL}\"}" \
+            "$DEPLOY_NOTIFY_WEBHOOK_URL"
 
-      - name: Notify deploy failure
-        if: ${{ failure() }}
-        env:
-          DEPLOY_NOTIFY_WEBHOOK_URL: ${{ secrets.DEPLOY_NOTIFY_WEBHOOK_URL }}
+      - name: Notify Failure Webhook
+        if: ${{ failure() && env.DEPLOY_NOTIFY_WEBHOOK_URL != '' }}
+        shell: bash
         run: |
-          if [ -z "${DEPLOY_NOTIFY_WEBHOOK_URL:-}" ]; then
-            echo "No DEPLOY_NOTIFY_WEBHOOK_URL configured, skipping failure notification."
-            exit 0
-          fi
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -sS -X POST "$DEPLOY_NOTIFY_WEBHOOK_URL" \
+          curl --silent --show-error \
+            -X POST \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"failure\",\"repository\":\"${{ github.repository }}\",\"sha\":\"${{ github.sha }}\",\"run_url\":\"$RUN_URL\"}"
+            -d "{\"status\":\"failure\",\"repo\":\"${GITHUB_REPOSITORY}\",\"branch\":\"${GITHUB_REF_NAME}\",\"commit\":\"${GITHUB_SHA}\",\"url\":\"${SITE_BASE_URL}\"}" \
+            "$DEPLOY_NOTIFY_WEBHOOK_URL"

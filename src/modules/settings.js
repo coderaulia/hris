@@ -11,7 +11,7 @@ import * as notify from '../lib/notify.js';
 
 // ---- RENDER SETTINGS PAGE ----
 function canAccessSettings() {
-    return isAdmin() || state.currentUser?.role === 'manager';
+    return isAdmin() || state.currentUser?.role === 'manager' || state.currentUser?.role === 'hr';
 }
 
 function applySettingsRoleVisibility() {
@@ -178,8 +178,8 @@ export function applyBranding() {
         const dept = appSettings.department_label || 'Human Resources Department';
         const userName = state.currentUser?.name || '';
         const role = state.currentUser?.role || 'employee';
-        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : role === 'director' ? 'Director' : 'Employee';
-        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : role === 'director' ? 'bg-info text-dark' : 'bg-secondary';
+        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : role === 'hr' ? 'HR' : role === 'director' ? 'Director' : 'Employee';
+        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : role === 'hr' ? 'bg-success' : role === 'director' ? 'bg-info text-dark' : 'bg-secondary';
         headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span id="user-display-name" class="fw-bold">${escapeHTML(userName)}</span> <span id="user-role-badge" class="badge ms-2 ${roleClass}">${roleLabel}</span>`;
     }
 
@@ -359,6 +359,7 @@ function renderUserManagement() {
         if (rec.role === 'superadmin') roleBadge = '<span class="badge bg-danger">Super Admin</span>';
         else if (rec.role === 'manager') roleBadge = '<span class="badge bg-warning text-dark">Manager</span>';
         else if (rec.role === 'director') roleBadge = '<span class="badge bg-info text-dark">Director</span>';
+        else if (rec.role === 'hr') roleBadge = '<span class="badge bg-success">HR</span>';
 
         const authStatus = rec.auth_email
             ? `<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>${escapeHTML(rec.auth_email)}</span>`
@@ -397,6 +398,7 @@ export async function editUserRole(empId) {
         inputValue: rec.role,
         inputOptions: {
             superadmin: 'superadmin',
+            hr: 'hr',
             director: 'director',
             manager: 'manager',
             employee: 'employee',

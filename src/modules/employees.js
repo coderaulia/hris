@@ -89,6 +89,7 @@ export function renderEmployeeManager() {
         if (rec.role === 'superadmin') roleBadge = '<span class="badge bg-danger ms-1">Admin</span>';
         else if (rec.role === 'manager') roleBadge = '<span class="badge bg-warning text-dark ms-1">Mgr</span>';
         else if (rec.role === 'director') roleBadge = '<span class="badge bg-info text-dark ms-1">Dir</span>';
+        else if (rec.role === 'hr') roleBadge = '<span class="badge bg-success ms-1">HR</span>';
 
         const isMgr = rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead'));
         const mgrIcon = isMgr ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '';
@@ -285,7 +286,7 @@ export async function importEmployeeCSV(input) {
             const text = String(e.target.result || '');
             const lines = text.split(/\r\n|\n/);
             const startRow = lines[0]?.toLowerCase().includes('id') ? 1 : 0;
-            const validRoles = new Set(['employee', 'manager', 'director', 'superadmin']);
+            const validRoles = new Set(['employee', 'manager', 'director', 'superadmin', 'hr']);
             const ops = [];
             const errors = [];
             const warnings = [];

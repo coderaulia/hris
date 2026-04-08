@@ -422,6 +422,7 @@ async function showApp() {
     const navConfig = {
         superadmin: ['nav-dashboard', 'nav-employees', 'nav-assessment', 'nav-records', 'nav-settings'],
         manager: ['nav-dashboard', 'nav-assessment', 'nav-records', 'nav-settings'],
+        hr: ['nav-dashboard', 'nav-records', 'nav-settings'],
         director: ['nav-dashboard', 'nav-assessment', 'nav-records'],
         employee: ['nav-records'],
     };
@@ -441,10 +442,12 @@ async function showApp() {
 
     const roleEl = document.getElementById('user-role-badge');
     if (roleEl) {
-        const roleLabels = { superadmin: 'Super Admin', manager: 'Manager', director: 'Director', employee: 'Employee' };
+        const roleLabels = { superadmin: 'Super Admin', manager: 'Manager', hr: 'HR', director: 'Director', employee: 'Employee' };
         roleEl.innerText = roleLabels[role] || role;
         roleEl.className = 'badge ms-2 ' + (role === 'superadmin'
             ? 'bg-danger'
+            : role === 'hr'
+                ? 'bg-success'
             : role === 'manager'
                 ? 'bg-warning text-dark'
                 : role === 'director'
@@ -461,7 +464,7 @@ async function showApp() {
     if (!passOk) return;
 
     // Default tab
-    if (role === 'superadmin' || role === 'manager' || role === 'director') {
+    if (role === 'superadmin' || role === 'manager' || role === 'hr' || role === 'director') {
         switchTab('tab-dashboard');
     } else {
         switchTab('tab-records');

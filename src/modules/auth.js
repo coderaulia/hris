@@ -6,10 +6,6 @@ import { supabase } from '../lib/supabase.js';
 import { state, emit } from '../lib/store.js';
 import * as notify from '../lib/notify.js';
 
-function isVerifiedUser(user) {
-    return Boolean(user?.email_confirmed_at || user?.confirmed_at);
-}
-
 function getHashParams() {
     const hash = String(window.location.hash || '').replace(/^#/, '');
     return new URLSearchParams(hash);
@@ -36,11 +32,14 @@ async function findProfileByAuthUser(user) {
 
     if (byAuthId) {
         profile = byAuthId;
-    } else if (isVerifiedUser(user)) {
+    } else {
+        const normalizedEmail = String(user?.email || '').trim();
+        if (!normalizedEmail) return null;
+
         const { data: byEmail } = await supabase
             .from('employees')
             .select('*')
-            .eq('auth_email', user.email)
+            .ilike('auth_email', normalizedEmail)
             .maybeSingle();
 
         if (byEmail) {
