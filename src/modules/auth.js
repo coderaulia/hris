@@ -77,6 +77,46 @@ function setCurrentUser(profile, authUser) {
     return state.currentUser;
 }
 
+function findEmployeeProfileForCurrentUser() {
+    const currentUser = state.currentUser;
+    if (!currentUser) return null;
+
+    const authId = String(currentUser.auth_id || '').trim();
+    const email = String(currentUser.email || '').trim().toLowerCase();
+
+    const match = Object.values(state.db || {}).find(rec => {
+        const recAuthId = String(rec?.auth_id || '').trim();
+        const recEmail = String(rec?.auth_email || '').trim().toLowerCase();
+        return (authId && recAuthId === authId) || (email && recEmail === email);
+    });
+
+    return match || null;
+}
+
+export function reconcileCurrentUserProfile() {
+    const currentUser = state.currentUser;
+    if (!currentUser) return currentUser;
+
+    const profile = findEmployeeProfileForCurrentUser();
+    if (!profile) return currentUser;
+
+    const nextUser = {
+        ...currentUser,
+        id: profile.id,
+        name: profile.name || currentUser.name,
+        role: profile.role || currentUser.role || 'employee',
+        position: profile.position || '',
+        department: profile.department || '',
+        seniority: profile.seniority || '',
+        must_change_password: Boolean(profile.must_change_password),
+    };
+
+    state.currentUser = nextUser;
+    sessionStorage.setItem('hr_user', JSON.stringify(nextUser));
+    emit('auth:login', nextUser);
+    return nextUser;
+}
+
 export async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;

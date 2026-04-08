@@ -12,6 +12,7 @@ import {
     mapLegacyEmployeeRow,
     execSupabase,
 } from './runtime.js';
+import { reconcileCurrentUserProfile } from '../auth.js';
 
 async function fetchEmployees() {
     try {
@@ -135,6 +136,7 @@ async function fetchEmployees() {
         });
 
         state.db = db;
+        reconcileCurrentUserProfile();
         emit('data:employees', db);
         return db;
     } catch (error) {
