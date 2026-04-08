@@ -6,6 +6,9 @@ import { supabase } from '../lib/supabase.js';
 import { state, emit } from '../lib/store.js';
 import * as notify from '../lib/notify.js';
 
+const PROFILE_RESOLUTION_RETRY_MS = 250;
+const PROFILE_RESOLUTION_MAX_ATTEMPTS = 3;
+
 function getHashParams() {
     const hash = String(window.location.hash || '').replace(/^#/, '');
     return new URLSearchParams(hash);
@@ -58,9 +61,9 @@ async function findProfileByAuthUser(user) {
     return profile;
 }
 
-function setCurrentUser(profile, authUser) {
+function buildCurrentUser(profile, authUser) {
     const role = profile?.role || 'employee';
-    state.currentUser = {
+    return {
         id: profile?.employee_id || authUser.id,
         name: profile?.name || authUser.email.split('@')[0],
         email: authUser.email,
@@ -72,8 +75,35 @@ function setCurrentUser(profile, authUser) {
         must_change_password: Boolean(profile?.must_change_password),
         reauthenticated_at: Date.now(),
     };
-    sessionStorage.setItem('hr_user', JSON.stringify(state.currentUser));
+}
+
+function setCurrentUser(profile, authUser, options = {}) {
+    state.currentUser = buildCurrentUser(profile, authUser);
+    if (options.persist !== false) {
+        sessionStorage.setItem('hr_user', JSON.stringify(state.currentUser));
+    }
     emit('auth:login', state.currentUser);
+    return state.currentUser;
+}
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function resolveProfileWithRetry(authUser) {
+    for (let attempt = 0; attempt < PROFILE_RESOLUTION_MAX_ATTEMPTS; attempt += 1) {
+        const profile = await findProfileByAuthUser(authUser);
+        if (profile) return profile;
+        if (attempt < PROFILE_RESOLUTION_MAX_ATTEMPTS - 1) {
+            await delay(PROFILE_RESOLUTION_RETRY_MS);
+        }
+    }
+    return null;
+}
+
+function persistCurrentUser() {
+    if (!state.currentUser) return;
+    sessionStorage.setItem('hr_user', JSON.stringify(state.currentUser));
     return state.currentUser;
 }
 
@@ -112,7 +142,7 @@ export function reconcileCurrentUserProfile() {
     };
 
     state.currentUser = nextUser;
-    sessionStorage.setItem('hr_user', JSON.stringify(nextUser));
+    persistCurrentUser();
     emit('auth:login', nextUser);
     return nextUser;
 }
@@ -121,8 +151,12 @@ export async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
 
-    const profile = await findProfileByAuthUser(data.user);
-    return setCurrentUser(profile, data.user);
+    const profile = await resolveProfileWithRetry(data.user);
+    const user = setCurrentUser(profile, data.user, { persist: Boolean(profile) });
+    if (!profile) {
+        sessionStorage.removeItem('hr_user');
+    }
+    return user;
 }
 
 export async function signOut() {
@@ -137,8 +171,12 @@ export async function restoreSession() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
-    const profile = await findProfileByAuthUser(session.user);
-    return setCurrentUser(profile, session.user);
+    const profile = await resolveProfileWithRetry(session.user);
+    const user = setCurrentUser(profile, session.user, { persist: Boolean(profile) });
+    if (!profile) {
+        sessionStorage.removeItem('hr_user');
+    }
+    return user;
 }
 
 const DEFAULT_AUTH_REDIRECT_URL = 'https://example.com';
@@ -192,7 +230,7 @@ export async function updatePassword(newPassword, options = {}) {
                 await saveEmployee(rec);
             }
         }
-        sessionStorage.setItem('hr_user', JSON.stringify(state.currentUser));
+        persistCurrentUser();
     }
 }
 
@@ -296,6 +334,6 @@ export async function requireRecentAuth(actionLabel = 'this action', maxAgeMs = 
     }
 
     user.reauthenticated_at = Date.now();
-    sessionStorage.setItem('hr_user', JSON.stringify(user));
+    persistCurrentUser();
     return true;
 }
