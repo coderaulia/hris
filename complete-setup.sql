@@ -737,6 +737,33 @@ CREATE INDEX IF NOT EXISTS idx_pip_actions_plan_status ON pip_actions(pip_plan_i
 CREATE INDEX IF NOT EXISTS idx_kpi_weight_items_profile ON kpi_weight_items(profile_id);
 CREATE INDEX IF NOT EXISTS idx_kpi_weight_items_kpi ON kpi_weight_items(kpi_id);
 
+-- ---------- DATA API GRANTS ----------
+-- RLS controls row access, but the Supabase Data API also needs table grants
+-- for anon/authenticated roles. Without these grants the dashboard shows
+-- "API disabled" even when policies exist.
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+
+GRANT SELECT ON public.app_settings TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.app_settings TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employees TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.competency_config TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.kpi_definitions TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.kpi_records TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.admin_activity_log TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_assessments TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_assessment_scores TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_assessment_history TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_training_records TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.employee_performance_scores TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.kpi_weight_profiles TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.kpi_weight_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.probation_reviews TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.probation_qualitative_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pip_plans TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.pip_actions TO authenticated;
+
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
+
 -- ---------- TRIGGERS ----------
 DROP TRIGGER IF EXISTS update_employee_assessments_modtime ON employee_assessments;
 CREATE TRIGGER update_employee_assessments_modtime BEFORE UPDATE ON employee_assessments FOR EACH ROW EXECUTE FUNCTION update_modified_column();
