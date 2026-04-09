@@ -61,6 +61,7 @@ let _sidebarCollapsed = false;
 const FEATURE_LOADERS = {
 	dashboard: () => import("./modules/dashboard.js"),
 	records: () => import("./modules/records.js"),
+	recordsProbation: () => import("./modules/records-probation.js"),
 	assessment: () => import("./modules/assessment.js"),
 	admin: () => import("./modules/admin.js"),
 	employees: () => import("./modules/employees.js"),
@@ -135,14 +136,6 @@ const {
 	fillTrainingRec,
 	toggleOngoing,
 	initiateSelfAssessment: recordSelfAssess,
-	renderProbationPipView,
-	generateProbationDrafts,
-	reviewProbation,
-	addProbationAttendanceEntry,
-	exportProbationPdf,
-	exportProbationCsv,
-	generatePipPlans,
-	updatePipPlanStatus,
 } = createFeatureActions("records", [
 	"renderRecordsTable",
 	"openReportByVal",
@@ -160,6 +153,18 @@ const {
 	"fillTrainingRec",
 	"toggleOngoing",
 	"initiateSelfAssessment",
+]);
+
+const {
+	renderProbationPipView,
+	generateProbationDrafts,
+	reviewProbation,
+	addProbationAttendanceEntry,
+	exportProbationPdf,
+	exportProbationCsv,
+	generatePipPlans,
+	updatePipPlanStatus,
+} = createFeatureActions("recordsProbation", [
 	"renderProbationPipView",
 	"generateProbationDrafts",
 	"reviewProbation",
@@ -331,10 +336,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Dashboard",
 				contentDescription:
 					"Track company performance, workforce activity, and HR operations in one place.",
-				activate: () => {
-					switchTab("tab-dashboard");
-					toggleDashboardView("dashboard-kpi");
-				},
+				activate: () => switchTab("tab-dashboard", { dashboardView: "dashboard-kpi" }),
 			},
 			{
 				id: "nav-dashboard-assessment",
@@ -352,10 +354,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Assessment & TNA Summary",
 				contentDescription:
 					"Review competency coverage, training needs, score distribution, and assessment performance by department.",
-				activate: () => {
-					switchTab("tab-dashboard");
-					toggleDashboardView("dashboard-assessment");
-				},
+				activate: () => switchTab("tab-dashboard", { dashboardView: "dashboard-assessment" }),
 			},
 		],
 	},
@@ -376,10 +375,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Manpower Planning",
 				contentDescription:
 					"Reserved for headcount planning, staffing forecasts, and hiring capacity workflows.",
-				activate: () => {
-					switchTab("tab-employees");
-					toggleEmployeesView("employees-planning");
-				},
+				activate: () => switchTab("tab-employees", { employeesView: "employees-planning" }),
 			},
 			{
 				id: "nav-employees-directory",
@@ -390,10 +386,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Staff Directory",
 				contentDescription:
 					"Review the active employee roster, export lists, and manage imported records.",
-				activate: () => {
-					switchTab("tab-employees");
-					toggleEmployeesView("employees-directory");
-				},
+				activate: () => switchTab("tab-employees", { employeesView: "employees-directory" }),
 			},
 			{
 				id: "nav-employees-add",
@@ -404,10 +397,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Add New Employee",
 				contentDescription:
 					"Create or update employee records with role, department, manager, and access data.",
-				activate: () => {
-					switchTab("tab-employees");
-					toggleEmployeesView("employees-add");
-				},
+				activate: () => switchTab("tab-employees", { employeesView: "employees-add" }),
 			},
 		],
 	},
@@ -451,10 +441,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "KPI Management",
 				contentDescription:
 					"Maintain KPI definitions, employee targets, weighting, and approval workflows.",
-				activate: () => {
-					switchTab("tab-settings");
-					toggleSettingsView("set-kpi");
-				},
+				activate: () => switchTab("tab-settings", { settingsView: "set-kpi" }),
 			},
 		],
 	},
@@ -482,13 +469,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Assessment Records",
 				contentDescription:
 					"Search employee assessment outcomes, reports, training notes, and review history.",
-				activate: () => {
-					switchTab("tab-records");
-					const btn = document.querySelector(
-						'#recordsPills [data-target="records-assessment"]',
-					);
-					toggleRecordsView("records-assessment", btn);
-				},
+				activate: () => switchTab("tab-records", { recordsView: "records-assessment" }),
 			},
 			{
 				id: "nav-records-kpi",
@@ -499,13 +480,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "KPI Records",
 				contentDescription:
 					"Inspect KPI history, target attainment, and employee performance trends over time.",
-				activate: () => {
-					switchTab("tab-records");
-					const btn = document.querySelector(
-						'#recordsPills [data-target="records-kpi"]',
-					);
-					toggleRecordsView("records-kpi", btn);
-				},
+				activate: () => switchTab("tab-records", { recordsView: "records-kpi" }),
 			},
 			{
 				id: "nav-records-probation",
@@ -516,13 +491,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Probation & PIP",
 				contentDescription:
 					"Manage probation reviews, attendance entries, and performance improvement plans.",
-				activate: () => {
-					switchTab("tab-records");
-					const btn = document.querySelector(
-						'#recordsPills [data-target="records-probation"]',
-					);
-					toggleRecordsView("records-probation", btn);
-				},
+				activate: () => switchTab("tab-records", { recordsView: "records-probation" }),
 			},
 		],
 	},
@@ -544,10 +513,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Application Settings",
 				contentDescription:
 					"Configure branding, organization structure, user permissions, and system setup.",
-				activate: () => {
-					switchTab("tab-settings");
-					toggleSettingsView("set-general");
-				},
+				activate: () => switchTab("tab-settings", { settingsView: "set-general" }),
 			},
 			{
 				id: "nav-settings-users",
@@ -559,10 +525,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Users & Roles",
 				contentDescription:
 					"Manage login access, role assignments, and recent admin activity.",
-				activate: () => {
-					switchTab("tab-settings");
-					toggleSettingsView("set-users");
-				},
+				activate: () => switchTab("tab-settings", { settingsView: "set-users" }),
 			},
 			{
 				id: "nav-settings-competencies",
@@ -574,10 +537,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Competency Setup",
 				contentDescription:
 					"Maintain competencies, organizational role maps, and benchmark requirements.",
-				activate: () => {
-					switchTab("tab-settings");
-					toggleSettingsView("set-competencies");
-				},
+				activate: () => switchTab("tab-settings", { settingsView: "set-competencies" }),
 			},
 			{
 				id: "nav-settings-org",
@@ -589,10 +549,7 @@ const NAVIGATION_GROUPS = [
 				contentTitle: "Organization Map",
 				contentDescription:
 					"Organize departments, positions, and reporting relationships across the company.",
-				activate: () => {
-					switchTab("tab-settings");
-					toggleSettingsView("set-org");
-				},
+				activate: () => switchTab("tab-settings", { settingsView: "set-org" }),
 			},
 		],
 	},
@@ -728,8 +685,40 @@ function doLogout() {
 	signOut();
 }
 
+function getActiveRecordsViewId() {
+	return (
+		["records-assessment", "records-kpi", "records-probation"].find((id) => {
+			const el = document.getElementById(id);
+			return el && !el.classList.contains("hidden");
+		}) || "records-assessment"
+	);
+}
+
+function getActiveEmployeesViewId() {
+	return (
+		document.querySelector(".employee-subview:not(.hidden)")?.id ||
+		"employees-planning"
+	);
+}
+
+function getActiveSettingsViewId() {
+	const panels = [
+		"set-general",
+		"set-users",
+		"set-competencies",
+		"set-kpi",
+		"set-org",
+	];
+	return (
+		panels.find((id) => {
+			const el = document.getElementById(id);
+			return el && !el.classList.contains("hidden");
+		}) || (state.currentUser?.role === "manager" ? "set-kpi" : "set-general")
+	);
+}
+
 // ---- Tab Navigation ----
-async function switchTab(tabId) {
+async function switchTab(tabId, options = {}) {
 	document
 		.querySelectorAll(".content-section")
 		.forEach((el) => el.classList.remove("active"));
@@ -757,28 +746,26 @@ async function switchTab(tabId) {
 	syncSidebarActiveState(tabId);
 
 	// Trigger renders
-	if (tabId === "tab-dashboard") await renderDashboard();
+	if (tabId === "tab-dashboard") {
+		await renderDashboard();
+		toggleDashboardView(options.dashboardView || "dashboard-kpi");
+	}
 	if (tabId === "tab-records") {
-		await Promise.all([
-			renderRecordsTable(),
-			renderKpiHistory(),
-			renderProbationPipView(),
-		]);
+		const recordsView = options.recordsView || getActiveRecordsViewId();
+		const btn =
+			options.recordsButton ||
+			document.querySelector(`#recordsPills [data-target="${recordsView}"]`);
+		await toggleRecordsView(recordsView, btn);
 	}
 	if (tabId === "tab-assessment") await renderPendingList();
 	if (tabId === "tab-employees") {
 		await renderEmployeeManager();
-		const activeEmployeeView =
-			document.querySelector(".employee-subview:not(.hidden)")?.id ||
-			"employees-planning";
-		toggleEmployeesView(activeEmployeeView);
+		toggleEmployeesView(options.employeesView || getActiveEmployeesViewId());
 	}
 	if (tabId === "tab-settings") {
-		await Promise.all([
-			renderSettings(),
-			renderAdminList(),
-			renderKpiManager(),
-		]);
+		const settingsView = options.settingsView || getActiveSettingsViewId();
+		await renderSettings();
+		await toggleSettingsView(settingsView);
 	}
 }
 
@@ -968,11 +955,7 @@ async function refreshActiveReports() {
 		}
 
 		// Fallback when view state is not initialized yet.
-		await Promise.all([
-			renderRecordsTable(),
-			renderKpiHistory(),
-			renderProbationPipView(),
-		]);
+		await renderRecordsTable();
 	}
 }
 
@@ -1138,6 +1121,7 @@ async function toggleRecordsView(viewId, btn) {
 	const target = document.getElementById(viewId);
 	if (target) target.classList.remove("hidden");
 	if (btn) btn.classList.add("active");
+	if (viewId === "records-assessment") await renderRecordsTable();
 	if (viewId === "records-kpi") await renderKpiHistory();
 	if (viewId === "records-probation") await renderProbationPipView();
 }

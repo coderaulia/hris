@@ -2,4 +2,4 @@ export {
     generateProbationDrafts,
     reviewProbation,
     addProbationAttendanceEntry,
-} from './core.js';
+} from './probationCore.js';

@@ -1,4 +1,4 @@
 export {
     generatePipPlans,
     updatePipPlanStatus,
-} from './core.js';
+} from './probationCore.js';

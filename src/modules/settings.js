@@ -42,16 +42,6 @@ export async function renderSettings() {
         renderOrgSettings();
         await renderActivityLog();
     }
-
-    setTimeout(() => {
-        const panels = ['set-general', 'set-users', 'set-competencies', 'set-kpi', 'set-org'];
-        const currentVisible = panels.find(id => {
-            const el = document.getElementById(id);
-            return el && !el.classList.contains('hidden');
-        });
-        const fallback = isAdmin() ? 'set-general' : 'set-kpi';
-        window.__app.toggleSettingsView(currentVisible || fallback);
-    }, 50);
 }
 // ---- APP SETTINGS ----
 function renderAppSettings() {

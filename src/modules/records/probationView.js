@@ -1,1 +1,1 @@
-export { renderProbationPipView } from './core.js';
+export { renderProbationPipView } from './probationCore.js';
