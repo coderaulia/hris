@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import tailwindcss from '@tailwindcss/vite';
+import viteCompression from 'vite-plugin-compression';
 
 export default defineConfig({
-    plugins: [tailwindcss()],
+    plugins: [
+        tailwindcss(),
+        viteCompression({
+            algorithm: 'gzip',
+            ext: '.gz',
+            threshold: 1024,
+            deleteOriginFile: false,
+        }),
+    ],
     root: '.',
     publicDir: 'public',
     build: {

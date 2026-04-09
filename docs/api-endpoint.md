@@ -1,6 +1,23 @@
-# API Endpoint Tracking
+# API Endpoint Notes
 
-Last updated: 2026-04-08  
-Baseline commit: `main`
+Last updated: 2026-04-09
 
-There is still no custom backend on `main`. The application is a Vite static SPA that talks directly to Supabase from the browser through `@supabase/supabase-js`, plus one static health check at `/healthz.json`. Auth flows are browser-side: sign-in, session restore, sign-out, password reset, password update, and superadmin user creation. The live data surface is Supabase tables for settings, employees, competency config, assessments, training, KPI governance, probation/PIP, and activity logs. As of 2026-04-08, Data API grants for `anon` and `authenticated` are now treated as a required baseline alongside RLS policies; missing grants can break role resolution even when policies look correct. Future backend work is still optional and should stay focused on auth redirect handling, heavy exports, approvals, and private backup automation.
+## Runtime Model
+
+- No custom backend API
+- Frontend talks directly to Supabase with `@supabase/supabase-js`
+- Static health check only: `/healthz.json`
+
+## Supabase Data Surface
+
+- Settings: `app_settings`
+- Employees: `employees`, `employee_assessments`, `employee_assessment_scores`, `employee_assessment_history`, `employee_training_records`
+- KPI: `kpi_definitions`, `kpi_definition_versions`, `employee_kpi_target_versions`, `kpi_records`, `employee_performance_scores`, `kpi_weight_profiles`, `kpi_weight_items`
+- Probation/PIP: `probation_reviews`, `probation_qualitative_items`, `probation_monthly_scores`, `probation_attendance_records`, `pip_plans`, `pip_actions`
+- Admin: `admin_activity_log`, `competency_config`
+
+## Guardrails
+
+- RLS is required, but not sufficient on its own
+- Data API grants for `anon` and `authenticated` are now validated in CI
+- Fresh environments must be bootstrapped with `complete-setup.sql` and then all numbered migrations

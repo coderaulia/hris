@@ -1,6 +1,22 @@
 # Project Status
 
-Last updated: 2026-04-08  
-Baseline commit: `main`
+Last updated: 2026-04-09
 
-HR Performance Suite remains a Vite static SPA backed by Supabase Auth, Postgres, RLS, and browser-side exports. Core product scope is in place: employee management, competency assessments, training logs, KPI governance, probation/PIP workflows, dashboard reporting, and Hostinger deployment. The most recent operational lesson is now explicit: RLS alone is not enough for fresh environments. Supabase Data API grants for `anon` and `authenticated` must exist alongside policies, or branding fetches, profile resolution, and role-aware login can fail in production. Fresh setup SQL and a retrofit migration now standardize that baseline. Current priorities are steadying production auth redirect handling, keeping migrations consistent across environments, and expanding automated regression coverage for assessment, KPI approval, and probation flows while the internal refactor continues incrementally.
+## Current State
+
+- Frontend: Vite SPA with vanilla JS, Tailwind-enhanced custom UI, and Bootstrap utilities
+- Backend: Supabase Auth + Postgres + RLS
+- Navigation: sidebar-driven app shell with role-aware menu groups
+- Core modules: dashboard, employees, assessment, records, settings, KPI governance, probation/PIP
+
+## Security Baseline
+
+- `complete-setup.sql` is the fresh-environment bootstrap snapshot
+- Every schema/security change must also ship in `migrations/YYYYMMDD_description.sql`
+- CI now blocks deploys when schema discipline, migration safety, RLS expectations, or Data API grants drift
+
+## Current Gaps
+
+- Manpower planning is still a placeholder
+- README schema/setup section still needs a cleanup pass
+- Bundle size is still large and only warned, not yet optimized
