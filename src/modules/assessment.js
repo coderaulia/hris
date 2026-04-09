@@ -3,6 +3,7 @@
 // ==================================================
 
 import { state, emit, isEmployee } from '../lib/store.js';
+import { getAssessmentHistory, getManagerAssessment, getSelfAssessment, hydrateEmployeeRecord, setAssessmentHistory, setManagerAssessment, setSelfAssessment } from '../lib/employee-records.js';
 import { escapeHTML, getDepartment } from '../lib/utils.js';
 import { saveEmployee, logActivity } from './data.js';
 import * as notify from '../lib/notify.js';
@@ -20,15 +21,17 @@ export function initiateSelfAssessment(clickedId) {
 
     const rec = state.db[targetId];
     if (!rec) { notify.error('Error: Employee Record not found.'); return; }
+    const managerAssessment = getManagerAssessment(rec);
+    const selfAssessment = getSelfAssessment(rec);
 
     // Employee must have been assessed by manager first
-    if ((!rec.scores || rec.scores.length === 0) && rec.percentage === 0) {
+    if ((!managerAssessment.scores || managerAssessment.scores.length === 0) && managerAssessment.percentage === 0) {
         notify.warn('Your manager has not completed your assessment yet. Please wait for manager assessment before self-assessing.');
         return;
     }
 
     // One-time self assessment: do not allow re-submission/edit once submitted.
-    if ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0)) {
+    if ((selfAssessment.scores && selfAssessment.scores.length > 0) || (selfAssessment.percentage && selfAssessment.percentage > 0)) {
         notify.info('You have already submitted your self-assessment. Re-submission is disabled.');
         return;
     }
@@ -125,7 +128,8 @@ export function renderPendingList() {
 
         const startBtn = document.querySelector('#step-login .btn-primary');
         if (startBtn) {
-            const alreadySubmitted = rec && ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0));
+            const selfAssessment = rec ? getSelfAssessment(rec) : { scores: [], percentage: 0 };
+            const alreadySubmitted = rec && ((selfAssessment.scores && selfAssessment.scores.length > 0) || (selfAssessment.percentage && selfAssessment.percentage > 0));
             if (alreadySubmitted) {
                 startBtn.innerHTML = '<i class="bi bi-check-circle"></i> Self-Assessment Submitted';
                 startBtn.disabled = true;
@@ -163,8 +167,10 @@ export function renderPendingList() {
 
     keys.forEach(id => {
         const rec = db[id];
-        const hasMgrScore = rec.percentage > 0 ? '✅ Assessed' : '⏳ Pending';
-        const hasSelfScore = rec.self_percentage > 0 ? ' | Self: ✅' : ' | Self: ⏳';
+        const managerAssessment = getManagerAssessment(rec);
+        const selfAssessment = getSelfAssessment(rec);
+        const hasMgrScore = managerAssessment.percentage > 0 ? '✅ Assessed' : '⏳ Pending';
+        const hasSelfScore = selfAssessment.percentage > 0 ? ' | Self: ✅' : ' | Self: ⏳';
         sel.innerHTML += `<option value="${escapeHTML(rec.id)}">${escapeHTML(rec.name)} (${escapeHTML(rec.position)}) - ${hasMgrScore}${hasSelfScore}</option>`;
     });
 }
@@ -214,13 +220,16 @@ export async function startAssessment() {
         }
     }
 
-    if (isEmployee() && ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0))) {
-        await notify.info('You have already submitted your self-assessment. Re-submission is disabled.');
-        return;
+    if (isEmployee()) {
+        const selfAssessment = getSelfAssessment(rec);
+        if ((selfAssessment.scores && selfAssessment.scores.length > 0) || (selfAssessment.percentage && selfAssessment.percentage > 0)) {
+            await notify.info('You have already submitted your self-assessment. Re-submission is disabled.');
+            return;
+        }
     }
 
     if (!state.currentSession.isEditing) {
-        if (!isEmployee() && rec.percentage > 0) {
+        if (!isEmployee() && getManagerAssessment(rec).percentage > 0) {
             if (!(await notify.confirm(`Warning: ${rec.name} has already been assessed. Overwrite?`, { confirmButtonText: 'Overwrite' }))) return;
         }
 
@@ -374,35 +383,39 @@ export async function finalSubmit() {
     currentSession.scores.forEach(x => total += x.s);
     let pct = Math.round((total / maxPoints) * 100);
 
-    const rec = db[currentSession.id];
-    rec.training_history = rec.training_history || [];
+    let rec = hydrateEmployeeRecord(db[currentSession.id]);
     if (!rec.department) rec.department = getDepartment(rec.position);
     const nowIso = new Date().toISOString();
 
     if (isEmployee()) {
-        rec.self_scores = currentSession.scores;
-        rec.self_percentage = pct;
-        rec.self_date = new Date().toLocaleDateString();
-        rec.self_assessment_updated_by = currentUser?.id || '';
-        rec.self_assessment_updated_at = nowIso;
+        rec = setSelfAssessment(rec, {
+            scores: currentSession.scores,
+            percentage: pct,
+            sourceDate: new Date().toLocaleDateString(),
+            updatedBy: currentUser?.id || '',
+            updatedAt: nowIso,
+        });
         await notify.success('Self-Assessment Submitted Successfully!');
     } else {
         // Manager/Superadmin Assessment
-        let history = rec.history || [];
-        if (rec.percentage > 0) {
+        let history = [...getAssessmentHistory(rec)];
+        const previousAssessment = getManagerAssessment(rec);
+        if (previousAssessment.percentage > 0) {
             const archiveEntry = {
-                date: rec.date_updated === '-' ? rec.date_created : rec.date_updated,
-                score: rec.percentage, seniority: rec.seniority || '-',
+                date: previousAssessment.sourceDate === '-' ? rec.date_created : previousAssessment.sourceDate,
+                score: previousAssessment.percentage, seniority: rec.seniority || '-',
             };
             const isDuplicate = history.some(h => h.date === archiveEntry.date && h.score === archiveEntry.score);
             if (!isDuplicate) history.push(archiveEntry);
         }
-        rec.history = history;
-        rec.percentage = pct;
-        rec.scores = currentSession.scores;
-        rec.date_updated = new Date().toLocaleDateString();
-        rec.assessment_updated_by = currentUser?.id || '';
-        rec.assessment_updated_at = nowIso;
+        rec = setAssessmentHistory(rec, history);
+        rec = setManagerAssessment(rec, {
+            percentage: pct,
+            scores: currentSession.scores,
+            sourceDate: new Date().toLocaleDateString(),
+            updatedBy: currentUser?.id || '',
+            updatedAt: nowIso,
+        });
         if (!rec.date_created || rec.date_created === '-') rec.date_created = rec.date_updated;
         await notify.success('Assessment Submitted!');
     }

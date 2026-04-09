@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabase.js';
 import { state, emit } from '../../lib/store.js';
+import { hydrateEmployeeRecord } from '../../lib/employee-records.js';
 import { getDepartment, debugError } from '../../lib/utils.js';
 import * as notify from '../../lib/notify.js';
 
@@ -149,7 +150,7 @@ function normalizeScoreRows(items = []) {
 }
 
 function mapLegacyEmployeeRow(row) {
-    return {
+    return hydrateEmployeeRecord({
         id: row.employee_id,
         name: row.name,
         position: row.position,
@@ -177,7 +178,7 @@ function mapLegacyEmployeeRow(row) {
         assessment_updated_at: row.assessment_updated_at || '',
         self_assessment_updated_by: row.self_assessment_updated_by || '',
         self_assessment_updated_at: row.self_assessment_updated_at || '',
-    };
+    });
 }
 
 function isPeriodKey(value) {

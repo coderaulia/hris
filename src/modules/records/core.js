@@ -5,6 +5,7 @@
 import { Chart } from 'chart.js/auto';
 import Swal from 'sweetalert2';
 import { state, emit, isAdmin, isEmployee, isManager } from '../../lib/store.js';
+import { getAssessmentHistory, getManagerAssessment, getSelfAssessment, getTrainingRecords, setAssessmentHistory, setManagerAssessment, setSelfAssessment, setTrainingRecords } from '../../lib/employee-records.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../../lib/utils.js';
 import { saveEmployee, logActivity } from '../data.js';
 import { requireRecentAuth } from '../auth.js';
@@ -48,7 +49,8 @@ export function renderRecordsTable(filterKeys = null) {
     if (periodFilter) {
         keys = keys.filter(id => {
             const rec = db[id];
-            const period = toPeriodKey(rec.assessment_updated_at || rec.date_updated || rec.date_created);
+            const managerAssessment = getManagerAssessment(rec);
+            const period = toPeriodKey(managerAssessment.updatedAt || managerAssessment.sourceDate || rec.date_created);
             return period === periodFilter;
         });
     }
@@ -70,6 +72,8 @@ export function renderRecordsTable(filterKeys = null) {
     keys.forEach(key => {
         const rec = db[key];
         if (!rec) return;
+        const managerAssessment = getManagerAssessment(rec);
+        const selfAssessment = getSelfAssessment(rec);
 
         const seniorTxt = rec.seniority || '-';
         let levelClass = 'bg-secondary text-white';
@@ -79,7 +83,7 @@ export function renderRecordsTable(filterKeys = null) {
         else if (seniorTxt === 'Senior') levelClass = 'bg-warning text-dark';
         else if (seniorTxt === 'Lead') levelClass = 'bg-success text-white';
 
-        const pct = rec.percentage || 0;
+        const pct = managerAssessment.percentage || 0;
         let badgeColor = 'bg-secondary';
         if (pct >= 80) badgeColor = 'bg-success';
         else if (pct >= 60) badgeColor = 'bg-primary';
@@ -88,8 +92,8 @@ export function renderRecordsTable(filterKeys = null) {
 
         // Self assessment status
         let selfStatus = '';
-        if (rec.self_percentage > 0) {
-            selfStatus = `<div class="small"><span class="badge bg-info bg-opacity-25 text-info border">Self: ${rec.self_percentage}%</span></div>`;
+        if (selfAssessment.percentage > 0) {
+            selfStatus = `<div class="small"><span class="badge bg-info bg-opacity-25 text-info border">Self: ${selfAssessment.percentage}%</span></div>`;
         } else if (pct > 0) {
             selfStatus = `<div class="small"><span class="badge bg-light text-muted border">Self: Pending</span></div>`;
         }
@@ -98,7 +102,7 @@ export function renderRecordsTable(filterKeys = null) {
         if (isEmployee()) {
             // Employee: can self-assess if manager has assessed them
             if (pct > 0) {
-                if ((rec.self_scores && rec.self_scores.length > 0) || (rec.self_percentage && rec.self_percentage > 0)) {
+                if ((selfAssessment.scores && selfAssessment.scores.length > 0) || (selfAssessment.percentage && selfAssessment.percentage > 0)) {
                     actions = '<span class="badge bg-success-subtle text-success border">Self Assessment Submitted</span>';
                 } else {
                     actions = `
@@ -127,8 +131,8 @@ export function renderRecordsTable(filterKeys = null) {
           <span class="badge ${levelClass}">${escapeHTML(seniorTxt)}</span>
         </td>
         <td>
-          <div class="small">${escapeHTML(getDisplayDate(rec.assessment_updated_at || rec.date_updated || rec.date_created || rec.date || '-'))}</div>
-          <div class="text-muted" style="font-size:11px;">by ${escapeHTML(state.db[rec.assessment_updated_by]?.name || rec.assessment_updated_by || '-')}</div>
+          <div class="small">${escapeHTML(getDisplayDate(managerAssessment.updatedAt || managerAssessment.sourceDate || rec.date_created || rec.date || '-'))}</div>
+          <div class="text-muted" style="font-size:11px;">by ${escapeHTML(state.db[managerAssessment.updatedBy]?.name || managerAssessment.updatedBy || '-')}</div>
         </td>
         <td>
           <span class="badge ${badgeColor}">${pct > 0 ? pct + '%' : 'N/A'}</span>
@@ -149,6 +153,10 @@ export function renderRecordsTable(filterKeys = null) {
 export function openReportByVal(id) {
     const rec = state.db[id];
     if (!rec) return;
+    const managerAssessment = getManagerAssessment(rec);
+    const selfAssessment = getSelfAssessment(rec);
+    const history = getAssessmentHistory(rec);
+    const trainingHistory = getTrainingRecords(rec);
 
     const setTxt = (domId, val) => {
         const el = document.getElementById(domId);
@@ -160,9 +168,9 @@ export function openReportByVal(id) {
     setTxt('r-pos', rec.position);
     setTxt('r-seniority', rec.seniority);
     setTxt('r-join-date', getDisplayDate(rec.join_date));
-    setTxt('r-date-updated', getDisplayDate(rec.date_updated || rec.date_created));
+    setTxt('r-date-updated', getDisplayDate(managerAssessment.sourceDate || rec.date_created));
     setTxt('r-date-next', getDisplayDate(rec.date_next));
-    setTxt('r-total', rec.percentage || 0);
+    setTxt('r-total', managerAssessment.percentage || 0);
     setTxt('r-date-generated', new Date().toLocaleDateString());
 
     const details = document.getElementById('r-details');
@@ -176,10 +184,10 @@ export function openReportByVal(id) {
     const threshold = parseInt(state.appSettings?.assessment_threshold || '7');
 
     const selfMap = {};
-    if (rec.self_scores) rec.self_scores.forEach(s => selfMap[s.q] = s.s);
+    if (selfAssessment.scores) selfAssessment.scores.forEach(s => selfMap[s.q] = s.s);
 
-    if (rec.scores && rec.scores.length > 0) {
-        rec.scores.forEach(s => {
+    if (managerAssessment.scores && managerAssessment.scores.length > 0) {
+        managerAssessment.scores.forEach(s => {
             chartLabels.push(s.q);
             mgrData.push(s.s);
             const selfScore = selfMap[s.q] || 0;
@@ -222,8 +230,8 @@ export function openReportByVal(id) {
     if (document.getElementById('competencyChart')) renderComparisonChart(chartLabels, mgrData, selfData);
 
     const historyBox = document.getElementById('r-history-box');
-    let histData = rec.history ? [...rec.history] : [];
-    if (rec.percentage > 0) histData.push({ date: rec.date_updated || 'Today', score: rec.percentage });
+    let histData = history ? [...history] : [];
+    if (managerAssessment.percentage > 0) histData.push({ date: managerAssessment.sourceDate || 'Today', score: managerAssessment.percentage });
 
     if (historyBox) {
         if (histData.length > 0) {
@@ -234,7 +242,7 @@ export function openReportByVal(id) {
         }
     }
 
-    renderReportTrainingTables(rec.training_history || []);
+    renderReportTrainingTables(trainingHistory || []);
 
     const overlay = document.getElementById('report-overlay');
     if (overlay) overlay.classList.remove('hidden');
@@ -342,7 +350,7 @@ function renderTrainingHistory() {
     const tbody = document.getElementById('t-history-body');
     tbody.innerHTML = '';
     const rec = state.db[currentTrainingId];
-    const history = rec.training_history || [];
+    const history = getTrainingRecords(rec);
 
     if (history.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted small py-3">No history found.</td></tr>';
@@ -385,7 +393,7 @@ function renderTrainingHistory() {
 }
 
 export async function saveTrainingLog() {
-    const rec = state.db[currentTrainingId];
+    let rec = state.db[currentTrainingId];
     if (!rec) return;
 
     const course = document.getElementById('t-course-name').value.trim();
@@ -395,17 +403,18 @@ export async function saveTrainingLog() {
 
     if (!course) { await notify.warn('Please enter a course name.'); return; }
     if (isOngoing) end = '';
-    if (!rec.training_history) rec.training_history = [];
+    const trainingHistory = [...getTrainingRecords(rec)];
 
     let status = isEmployee() ? 'pending' : 'approved';
     const newItem = { course, start, end, provider: 'External', status };
 
     if (editingTrainingIndex === -1) {
-        rec.training_history.push(newItem);
+        trainingHistory.push(newItem);
     } else {
-        newItem.status = rec.training_history[editingTrainingIndex].status;
-        rec.training_history[editingTrainingIndex] = newItem;
+        newItem.status = trainingHistory[editingTrainingIndex].status;
+        trainingHistory[editingTrainingIndex] = newItem;
     }
+    rec = setTrainingRecords(rec, trainingHistory);
 
     await notify.withLoading(async () => {
         await saveEmployee(rec);
@@ -419,8 +428,10 @@ export async function saveTrainingLog() {
 }
 
 export async function approveTraining(index) {
-    const rec = state.db[currentTrainingId];
-    rec.training_history[index].status = 'approved';
+    let rec = state.db[currentTrainingId];
+    const trainingHistory = [...getTrainingRecords(rec)];
+    trainingHistory[index].status = 'approved';
+    rec = setTrainingRecords(rec, trainingHistory);
     await notify.withLoading(async () => {
         await saveEmployee(rec);
     }, 'Approving Training', 'Updating training status...');
@@ -429,7 +440,7 @@ export async function approveTraining(index) {
 
 export function editTrainingItem(index) {
     const rec = state.db[currentTrainingId];
-    const item = rec.training_history[index];
+    const item = getTrainingRecords(rec)[index];
     editingTrainingIndex = index;
 
     document.getElementById('t-course-name').value = item.course;
@@ -445,8 +456,10 @@ export function editTrainingItem(index) {
 
 export async function deleteTrainingItem(index) {
     if (!(await notify.confirm('Remove this item?', { confirmButtonText: 'Remove' }))) return;
-    const rec = state.db[currentTrainingId];
-    rec.training_history.splice(index, 1);
+    let rec = state.db[currentTrainingId];
+    const trainingHistory = [...getTrainingRecords(rec)];
+    trainingHistory.splice(index, 1);
+    rec = setTrainingRecords(rec, trainingHistory);
     await notify.withLoading(async () => {
         await saveEmployee(rec);
     }, 'Removing Training Item', 'Updating training history...');
@@ -508,21 +521,20 @@ export async function deleteRecordSafe(id) {
     const rec = state.db[id];
     if (!rec) return;
     if (await notify.confirm(`Delete assessment results for ${rec.name}?`, { confirmButtonText: 'Delete' })) {
-        rec.percentage = 0; rec.scores = []; rec.history = [];
-        rec.self_scores = []; rec.self_percentage = 0; rec.self_date = '';
-        rec.date_created = '-'; rec.date_updated = '-'; rec.date_next = '-';
-        rec.assessment_updated_at = new Date().toISOString();
-        rec.assessment_updated_by = state.currentUser?.id || '';
-        state.db[id] = rec;
+        let nextRec = setManagerAssessment(rec, { percentage: 0, scores: [], sourceDate: '-', updatedAt: new Date().toISOString(), updatedBy: state.currentUser?.id || '' });
+        nextRec = setAssessmentHistory(nextRec, []);
+        nextRec = setSelfAssessment(nextRec, { percentage: 0, scores: [], sourceDate: '', updatedAt: '', updatedBy: '' });
+        nextRec.date_created = '-'; nextRec.date_updated = '-'; nextRec.date_next = '-';
+        state.db[id] = nextRec;
         await notify.withLoading(async () => {
-            await saveEmployee(rec);
+            await saveEmployee(nextRec);
         }, 'Deleting Assessment', 'Removing assessment record...');
         await logActivity({
             action: 'assessment.delete',
             entityType: 'assessment',
             entityId: id,
             details: {
-                employee_name: rec.name,
+                employee_name: nextRec.name,
             },
         });
         renderRecordsTable();

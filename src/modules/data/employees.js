@@ -12,6 +12,17 @@ import {
     mapLegacyEmployeeRow,
     execSupabase,
 } from './runtime.js';
+import {
+    getAssessmentHistory,
+    getManagerAssessment,
+    getSelfAssessment,
+    getTrainingRecords,
+    hydrateEmployeeRecord,
+    setAssessmentHistory,
+    setManagerAssessment,
+    setSelfAssessment,
+    setTrainingRecords,
+} from '../../lib/employee-records.js';
 import { reconcileCurrentUserProfile } from '../auth.js';
 
 async function fetchEmployees() {
@@ -72,7 +83,7 @@ async function fetchEmployees() {
 
         const db = {};
         (employeeRows || []).forEach(row => {
-            const rec = mapLegacyEmployeeRow(row);
+            let rec = mapLegacyEmployeeRow(row);
 
             if (normalizedTables) {
                 const snapshots = assessmentsByEmployee[row.employee_id] || {};
@@ -80,34 +91,38 @@ async function fetchEmployees() {
                 const selfSnapshot = snapshots.self;
 
                 if (managerSnapshot) {
-                    rec.percentage = toNumber(managerSnapshot.percentage, 0);
-                    rec.assessment_updated_by = managerSnapshot.assessed_by || '';
-                    rec.assessment_updated_at = managerSnapshot.assessed_at || '';
-                    rec.date_updated = managerSnapshot.source_date || toDateLabel(managerSnapshot.assessed_at, rec.date_updated);
+                    rec = setManagerAssessment(rec, {
+                        percentage: toNumber(managerSnapshot.percentage, 0),
+                        updatedBy: managerSnapshot.assessed_by || '',
+                        updatedAt: managerSnapshot.assessed_at || '',
+                        sourceDate: managerSnapshot.source_date || toDateLabel(managerSnapshot.assessed_at, rec.date_updated),
+                        scores: asArray(assessmentScoresByAssessment[managerSnapshot.id]).map(score => ({
+                            q: score.competency_name,
+                            s: toNumber(score.score, 0),
+                            n: score.note || '',
+                        })),
+                    });
                     if (!rec.date_created || rec.date_created === '-') {
                         rec.date_created = rec.date_updated || '-';
                     }
-                    rec.scores = asArray(assessmentScoresByAssessment[managerSnapshot.id]).map(score => ({
-                        q: score.competency_name,
-                        s: toNumber(score.score, 0),
-                        n: score.note || '',
-                    }));
                 }
 
                 if (selfSnapshot) {
-                    rec.self_percentage = toNumber(selfSnapshot.percentage, 0);
-                    rec.self_assessment_updated_by = selfSnapshot.assessed_by || '';
-                    rec.self_assessment_updated_at = selfSnapshot.assessed_at || '';
-                    rec.self_date = selfSnapshot.source_date || toDateLabel(selfSnapshot.assessed_at, rec.self_date || '');
-                    rec.self_scores = asArray(assessmentScoresByAssessment[selfSnapshot.id]).map(score => ({
-                        q: score.competency_name,
-                        s: toNumber(score.score, 0),
-                        n: score.note || '',
-                    }));
+                    rec = setSelfAssessment(rec, {
+                        percentage: toNumber(selfSnapshot.percentage, 0),
+                        updatedBy: selfSnapshot.assessed_by || '',
+                        updatedAt: selfSnapshot.assessed_at || '',
+                        sourceDate: selfSnapshot.source_date || toDateLabel(selfSnapshot.assessed_at, rec.self_date || ''),
+                        scores: asArray(assessmentScoresByAssessment[selfSnapshot.id]).map(score => ({
+                            q: score.competency_name,
+                            s: toNumber(score.score, 0),
+                            n: score.note || '',
+                        })),
+                    });
                 }
 
                 if (historyByEmployee[row.employee_id]) {
-                    rec.history = historyByEmployee[row.employee_id]
+                    rec = setAssessmentHistory(rec, historyByEmployee[row.employee_id]
                         .slice()
                         .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
                         .map(item => ({
@@ -115,11 +130,11 @@ async function fetchEmployees() {
                             score: toNumber(item.percentage, 0),
                             seniority: item.seniority || rec.seniority || '-',
                             position: item.position || rec.position || '',
-                        }));
+                        })));
                 }
 
                 if (trainingByEmployee[row.employee_id]) {
-                    rec.training_history = trainingByEmployee[row.employee_id]
+                    rec = setTrainingRecords(rec, trainingByEmployee[row.employee_id]
                         .slice()
                         .sort((a, b) => String(a.created_at || '').localeCompare(String(b.created_at || '')))
                         .map(item => ({
@@ -128,11 +143,11 @@ async function fetchEmployees() {
                             end: item.end_date || '',
                             provider: item.provider || '',
                             status: item.status || 'ongoing',
-                        }));
+                        })));
                 }
             }
 
-            db[row.employee_id] = rec;
+            db[row.employee_id] = hydrateEmployeeRecord(rec);
         });
 
         state.db = db;
@@ -147,13 +162,12 @@ async function fetchEmployees() {
 
 async function upsertAssessmentSnapshot(rec, assessmentType) {
     const isSelf = assessmentType === 'self';
-    const percentage = toNumber(isSelf ? rec.self_percentage : rec.percentage, 0);
-    const assessedAt = isSelf ? (rec.self_assessment_updated_at || null) : (rec.assessment_updated_at || null);
-    const assessedBy = isSelf ? (rec.self_assessment_updated_by || null) : (rec.assessment_updated_by || null);
-    const sourceDate = isSelf
-        ? (rec.self_date || '-')
-        : (rec.date_updated || rec.date_created || '-');
-    const scoreRows = normalizeScoreRows(isSelf ? rec.self_scores : rec.scores);
+    const snapshotState = isSelf ? getSelfAssessment(rec) : getManagerAssessment(rec);
+    const percentage = toNumber(snapshotState.percentage, 0);
+    const assessedAt = snapshotState.updatedAt || null;
+    const assessedBy = snapshotState.updatedBy || null;
+    const sourceDate = snapshotState.sourceDate || '-';
+    const scoreRows = normalizeScoreRows(snapshotState.scores);
 
     const hasData = percentage > 0 || scoreRows.length > 0 || Boolean(assessedAt);
 
@@ -245,7 +259,7 @@ async function replaceAssessmentHistoryRows(rec) {
         { retries: 0 }
     );
 
-    const rows = asArray(rec.history)
+    const rows = asArray(getAssessmentHistory(rec))
         .map(item => ({
             employee_id: rec.id,
             assessment_type: 'manager',
@@ -275,7 +289,7 @@ async function replaceTrainingRows(rec) {
         { retries: 0 }
     );
 
-    const rows = asArray(rec.training_history)
+    const rows = asArray(getTrainingRecords(rec))
         .map(item => ({
             employee_id: rec.id,
             course: String(item?.course || '').trim(),
@@ -313,47 +327,34 @@ async function syncEmployeeNormalizedRecords(rec) {
 }
 
 async function saveEmployee(rec) {
+    const hydrated = hydrateEmployeeRecord(rec);
     const payload = {
-        employee_id: rec.id,
-        name: rec.name,
-        position: rec.position,
-        seniority: rec.seniority,
-        join_date: rec.join_date,
-        department: rec.department || getDepartment(rec.position),
-        manager_id: rec.manager_id || null,
-        auth_email: rec.auth_email || null,
-        auth_id: rec.auth_id || null,
-        role: rec.role || 'employee',
-        percentage: rec.percentage || 0,
-        scores: rec.scores || [],
-        self_scores: rec.self_scores || [],
-        self_percentage: rec.self_percentage || 0,
-        self_date: rec.self_date || null,
-        history: rec.history || [],
-        training_history: rec.training_history || [],
-        date_created: rec.date_created || '-',
-        date_updated: rec.date_updated || '-',
-        date_next: rec.date_next || '-',
-        tenure_display: rec.tenure_display || '',
-        kpi_targets: rec.kpi_targets || {},
-        must_change_password: Boolean(rec.must_change_password),
-        assessment_updated_by: rec.assessment_updated_by || null,
-        assessment_updated_at: rec.assessment_updated_at || null,
-        self_assessment_updated_by: rec.self_assessment_updated_by || null,
-        self_assessment_updated_at: rec.self_assessment_updated_at || null,
+        employee_id: hydrated.id,
+        name: hydrated.name,
+        position: hydrated.position,
+        seniority: hydrated.seniority,
+        join_date: hydrated.join_date,
+        department: hydrated.department || getDepartment(hydrated.position),
+        manager_id: hydrated.manager_id || null,
+        auth_email: hydrated.auth_email || null,
+        auth_id: hydrated.auth_id || null,
+        role: hydrated.role || 'employee',
+        tenure_display: hydrated.tenure_display || '',
+        kpi_targets: hydrated.kpi_targets || {},
+        must_change_password: Boolean(hydrated.must_change_password),
     };
 
     await execSupabase(
-        `Save employee "${rec.id}"`,
+        `Save employee "${hydrated.id}"`,
         () => supabase
             .from('employees')
             .upsert(payload, { onConflict: 'employee_id' }),
         { interactiveRetry: true, retries: 1 }
     );
 
-    await syncEmployeeNormalizedRecords(rec);
+    await syncEmployeeNormalizedRecords(hydrated);
 
-    state.db[rec.id] = rec;
+    state.db[hydrated.id] = hydrated;
     emit('data:employees', state.db);
 }
 

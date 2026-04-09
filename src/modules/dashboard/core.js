@@ -4,6 +4,7 @@
 
 import { Chart } from 'chart.js/auto';
 import { state } from '../../lib/store.js';
+import { getManagerAssessment } from '../../lib/employee-records.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../../lib/utils.js';
 import * as notify from '../../lib/notify.js';
 import { getFilteredEmployeeIds } from '../../lib/reportFilters.js';
@@ -53,7 +54,8 @@ function renderAssessmentSummary() {
     if (selectedPeriod) {
         keys = keys.filter(id => {
             const rec = db[id];
-            return toPeriodKey(rec?.assessment_updated_at || rec?.date_updated || rec?.date_created) === selectedPeriod;
+            const managerAssessment = getManagerAssessment(rec);
+            return toPeriodKey(managerAssessment.updatedAt || managerAssessment.sourceDate || rec?.date_created) === selectedPeriod;
         });
     }
 
@@ -71,7 +73,7 @@ function renderAssessmentSummary() {
         if (!deptMap[dept]) deptMap[dept] = { total: 0, completed: 0, pending: 0, sumScore: 0 };
         deptMap[dept].total++;
 
-        const score = rec.percentage || 0;
+        const score = getManagerAssessment(rec).percentage || 0;
         if (score > 0) {
             completedCount++;
             totalScore += score;
@@ -100,8 +102,9 @@ function renderAssessmentSummary() {
     let gapMap = {};
     keys.forEach(id => {
         const rec = db[id];
-        if (rec.percentage > 0 && rec.scores) {
-            rec.scores.forEach(s => { if (s.s < 7) gapMap[s.q] = (gapMap[s.q] || 0) + 1; });
+        const managerAssessment = getManagerAssessment(rec);
+        if (managerAssessment.percentage > 0 && managerAssessment.scores) {
+            managerAssessment.scores.forEach(s => { if (s.s < 7) gapMap[s.q] = (gapMap[s.q] || 0) + 1; });
         }
     });
 
@@ -125,7 +128,7 @@ function renderAssessmentSummary() {
     // Distribution Doughnut
     let cHigh = 0, cMid = 0, cLow = 0;
     keys.forEach(id => {
-        const s = db[id].percentage || 0;
+        const s = getManagerAssessment(db[id]).percentage || 0;
         if (s > 0) { if (s >= 80) cHigh++; else if (s >= 60) cMid++; else cLow++; }
     });
 
@@ -647,7 +650,7 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
                 .map(employeeId => selectedScoreMap.get(employeeId))
                 .filter(score => score !== undefined);
             const assessmentScores = teamEmployeeIds
-                .map(employeeId => Number(state.db[employeeId]?.percentage || 0))
+                .map(employeeId => Number(getManagerAssessment(state.db[employeeId]).percentage || 0))
                 .filter(score => score > 0);
             const teamClosedReviews = closedProbationReviews.filter(review => teamSet.has(normalizeEmployeeId(review.employee_id)));
             const teamPassedReviews = teamClosedReviews.filter(review => String(review.decision || '').toLowerCase() === 'pass');
@@ -1742,4 +1745,3 @@ export async function exportEmployeeKpiPDF(employeeId) {
 
 
 export { renderAssessmentSummary, renderKpiSummary, renderDeptKpiCards };
-

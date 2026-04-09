@@ -4,6 +4,7 @@
 // ==================================================
 
 import { state, emit, isAdmin } from '../lib/store.js';
+import { getManagerAssessment } from '../lib/employee-records.js';
 import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } from '../lib/utils.js';
 import { saveEmployee, deleteEmployee as deleteEmpFromDB, logActivity } from './data.js';
 import { requireRecentAuth } from './auth.js';
@@ -110,11 +111,7 @@ function readInlineEmployeeForm() {
 function buildEmployeeRecordFromValues(values) {
     const isEdit = Boolean(values.isEdit);
     const existing = isEdit ? state.db[values.id] : null;
-    const rec = isEdit && existing ? { ...existing } : {
-        id: values.id,
-        date_created: '-',
-        date_updated: '-',
-        date_next: '-',
+    const derivedDefaults = {
         percentage: 0,
         scores: [],
         training_history: [],
@@ -122,6 +119,13 @@ function buildEmployeeRecordFromValues(values) {
         self_scores: [],
         self_percentage: 0,
         self_date: '',
+        date_created: '-',
+        date_updated: '-',
+        date_next: '-',
+    };
+    const rec = isEdit && existing ? { ...derivedDefaults, ...existing } : {
+        id: values.id,
+        ...derivedDefaults,
         kpi_targets: {},
         must_change_password: false,
     };
@@ -245,7 +249,7 @@ export function renderEmployeeManager() {
     const managerCountEl = document.getElementById('emp-manager-count');
     if (managerCountEl) managerCountEl.innerText = String(filteredIds.filter(id => ['manager', 'director', 'superadmin'].includes(db[id]?.role)).length);
     const assessedCountEl = document.getElementById('emp-assessed-count');
-    if (assessedCountEl) assessedCountEl.innerText = String(filteredIds.filter(id => (db[id]?.percentage || 0) > 0).length);
+    if (assessedCountEl) assessedCountEl.innerText = String(filteredIds.filter(id => (getManagerAssessment(db[id]).percentage || 0) > 0).length);
 
     if (filteredIds.length === 0) {
         tbody.innerHTML = `
@@ -260,8 +264,9 @@ export function renderEmployeeManager() {
 
     filteredIds.forEach(id => {
         const rec = db[id];
+        const managerAssessment = getManagerAssessment(rec);
         const managerName = rec.manager_id ? (db[rec.manager_id]?.name || rec.manager_id) : 'Direct to Director';
-        const statusBadge = rec.percentage && rec.percentage > 0
+        const statusBadge = managerAssessment.percentage && managerAssessment.percentage > 0
             ? '<span class="badge bg-success">Assessed</span>'
             : '<span class="badge bg-secondary">Pending</span>';
 
