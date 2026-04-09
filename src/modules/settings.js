@@ -3,11 +3,12 @@
 // (Superadmin only)
 // ==================================================
 
-import { state, emit, isAdmin } from '../lib/store.js';
+import { state, isAdmin } from '../lib/store.js';
 import { applyBranding } from '../lib/branding.js';
+import { createManagedUser, updateManagedEmployeeRole } from '../lib/edge/admin.js';
 import { escapeHTML, escapeInlineArg, formatDateTime } from '../lib/utils.js';
-import { saveSetting, saveEmployee, fetchActivityLogs, logActivity, getDefaultProbationAttendanceRulesJson } from './data.js';
-import { createAuthUser, requireRecentAuth } from './auth.js';
+import { saveSetting, fetchActivityLogs, logActivity, getDefaultProbationAttendanceRulesJson } from './data.js';
+import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
 // ---- RENDER SETTINGS PAGE ----
@@ -351,22 +352,14 @@ export async function editUserRole(empId) {
 
     if (role === null) return;
 
-    const oldRole = rec.role;
-    rec.role = role;
     try {
         await notify.withLoading(async () => {
-            await saveEmployee(rec);
+            await updateManagedEmployeeRole({
+                employeeId: rec.id,
+                role,
+            });
         }, 'Updating Role', `Applying role change for ${rec.name}...`);
-        await logActivity({
-            action: 'user.role.change',
-            entityType: 'employee',
-            entityId: rec.id,
-            details: {
-                employee_name: rec.name,
-                previous_role: oldRole,
-                new_role: role,
-            },
-        });
+        rec.role = role;
         await notify.success(`${rec.name} is now "${role}"`);
         renderUserManagement();
         await renderActivityLog();
@@ -415,51 +408,23 @@ export async function setupUserLogin(empId) {
 
     try {
         const authData = await notify.withLoading(async () => {
-            return await createAuthUser(emailVal, passwordVal);
+            return await createManagedUser({
+                employeeId: rec.id,
+                email: emailVal,
+                password: passwordVal,
+                mustChangePassword: true,
+            });
         }, 'Creating Login', `Provisioning auth account for ${rec.name}...`);
 
         rec.auth_email = emailVal;
-        if (authData?.user?.id) rec.auth_id = authData.user.id;
+        if (authData?.auth_user_id) rec.auth_id = authData.auth_user_id;
         rec.must_change_password = true;
-        await saveEmployee(rec);
-        await logActivity({
-            action: 'user.login.setup',
-            entityType: 'employee',
-            entityId: rec.id,
-            details: {
-                employee_name: rec.name,
-                auth_email: emailVal,
-                auth_user_id: authData?.user?.id || null,
-                must_change_password: true,
-            },
-        });
 
         await notify.success(`Login created for ${rec.name}.\nEmail: ${emailVal}\nTemporary password has been set.\n\nAsk the user to change the password immediately.`);
         renderUserManagement();
         await renderActivityLog();
     } catch (err) {
-        // If user already exists, just update the email
-        if (err.message?.includes('already registered') || err.message?.includes('already been registered')) {
-            rec.auth_email = emailVal;
-            rec.must_change_password = true;
-            await saveEmployee(rec);
-            await logActivity({
-                action: 'user.login.email_update',
-                entityType: 'employee',
-                entityId: rec.id,
-                details: {
-                    employee_name: rec.name,
-                    auth_email: emailVal,
-                    reason: 'auth_user_exists',
-                    must_change_password: true,
-                },
-            });
-            await notify.info(`Email updated for ${rec.name}. User already exists in auth system.`);
-            renderUserManagement();
-            await renderActivityLog();
-        } else {
-            await notify.error('Error creating login: ' + err.message);
-        }
+        await notify.error('Error creating login: ' + err.message);
     }
 }
 

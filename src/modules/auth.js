@@ -3,6 +3,7 @@
 // ==================================================
 
 import { supabase } from '../lib/supabase.js';
+import { normalizeAuthCallback } from '../lib/edge/auth.js';
 import { state, emit } from '../lib/store.js';
 import * as notify from '../lib/notify.js';
 
@@ -15,13 +16,17 @@ function getHashParams() {
 }
 
 export function isRecoveryMode() {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    if (searchParams.get('recovery') === '1') return true;
     const params = getHashParams();
     return params.get('type') === 'recovery';
 }
 
 export function clearAuthHash() {
-    if (!window.location.hash) return;
-    history.replaceState(null, '', window.location.pathname + window.location.search);
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.searchParams.delete('auth_callback');
+    history.replaceState(null, '', `${url.pathname}${url.search}`);
 }
 
 async function findProfileByAuthUser(user) {
@@ -101,6 +106,19 @@ async function resolveProfileWithRetry(authUser) {
     return null;
 }
 
+function getAuthCallbackType() {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    const explicit = String(searchParams.get('type') || '').trim().toLowerCase();
+    if (explicit) return explicit;
+    const hashType = String(getHashParams().get('type') || '').trim().toLowerCase();
+    return hashType;
+}
+
+function isAuthCallbackRequest() {
+    const searchParams = new URLSearchParams(window.location.search || '');
+    return searchParams.get('auth_callback') === '1' || Boolean(getHashParams().get('type'));
+}
+
 function persistCurrentUser() {
     if (!state.currentUser) return;
     sessionStorage.setItem('hr_user', JSON.stringify(state.currentUser));
@@ -171,7 +189,30 @@ export async function restoreSession() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return null;
 
-    const profile = await resolveProfileWithRetry(session.user);
+    let profile = null;
+
+    if (isAuthCallbackRequest()) {
+        try {
+            const normalized = await normalizeAuthCallback({
+                currentUrl: window.location.href,
+                type: getAuthCallbackType(),
+            });
+
+            profile = normalized?.profile || null;
+            const redirectTo = String(normalized?.redirect_to || '').trim();
+            if (redirectTo) {
+                clearAuthHash();
+                history.replaceState(null, '', redirectTo);
+            } else {
+                clearAuthHash();
+            }
+        } catch {
+            profile = await resolveProfileWithRetry(session.user);
+        }
+    } else {
+        profile = await resolveProfileWithRetry(session.user);
+    }
+
     const user = setCurrentUser(profile, session.user, { persist: Boolean(profile) });
     if (!profile) {
         sessionStorage.removeItem('hr_user');
@@ -188,7 +229,9 @@ function resolveAuthRedirectUrl() {
 
     try {
         const normalized = /^https?:\/\//i.test(base) ? base : `https://${base}`;
-        return new URL(normalized).origin;
+        const url = new URL(normalized);
+        url.searchParams.set('auth_callback', '1');
+        return url.toString();
     } catch {
         return DEFAULT_AUTH_REDIRECT_URL;
     }
