@@ -4,6 +4,7 @@
 
 import { Chart } from 'chart.js/auto';
 import { state } from '../../lib/store.js';
+import { downloadEdgeExportFile, requestDepartmentKpiExport, requestEmployeeKpiExport } from '../../lib/edge/exports.js';
 import { getManagerAssessment } from '../../lib/employee-records.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../../lib/utils.js';
 import * as notify from '../../lib/notify.js';
@@ -1343,402 +1344,64 @@ export function searchDeptKpiModal() {
     });
 }
 
-// ==================================================
-// EXPORT: EXCEL
-// ==================================================
-function getDeptReportSnapshot() {
-    const rows = [..._currentDeptRows];
-    const generatedAt = new Date();
-    const appName = state.appSettings?.app_name || 'HR Performance Suite';
-
-    const employeeCount = new Set(rows.map(r => r.employee_id)).size;
-    const totalRecords = rows.length;
-    const avgAch = totalRecords > 0 ? Math.round(rows.reduce((sum, r) => sum + r.achievement, 0) / totalRecords) : 0;
-    const metTarget = rows.filter(r => r.achievement >= 100).length;
-    const atRisk = rows.filter(r => r.achievement < 75).length;
-
-    const empMap = {};
-    rows.forEach(r => {
-        if (!empMap[r.employee_id]) {
-            empMap[r.employee_id] = { name: r.name, sum: 0, count: 0 };
-        }
-        empMap[r.employee_id].sum += r.achievement;
-        empMap[r.employee_id].count++;
-    });
-
-    const topPerformer = Object.values(empMap)
-        .map(e => ({ name: e.name, avg: Math.round(e.sum / Math.max(1, e.count)) }))
-        .sort((a, b) => b.avg - a.avg)[0] || null;
-
-    return {
-        appName,
-        generatedAt,
-        generatedDate: generatedAt.toLocaleDateString('en-GB'),
-        generatedDateTime: generatedAt.toLocaleString('en-GB'),
-        periodLabel: formatPeriod(_currentDeptMonth),
-        employeeCount,
-        totalRecords,
-        avgAch,
-        metTarget,
-        atRisk,
-        topPerformer: topPerformer ? `${topPerformer.name} (${topPerformer.avg}%)` : '-',
-        rows,
-    };
-}
-
-function getAchievementStatus(achievement) {
-    return getKpiStatus(achievement).label;
-}
-
-function getPdfTableRunner(doc, autoTableMod) {
-    const autoTable = autoTableMod?.default || autoTableMod?.autoTable;
-    return opts => {
-        if (typeof autoTable === 'function') {
-            autoTable(doc, opts);
-            return;
-        }
-        if (typeof doc.autoTable === 'function') {
-            doc.autoTable(opts);
-            return;
-        }
-        throw new Error('jspdf-autotable failed to load.');
-    };
-}
-
-function groupRowsByEmployee(rows) {
-    const byEmp = {};
-    rows.forEach(r => {
-        if (!byEmp[r.employee_id]) {
-            byEmp[r.employee_id] = {
-                employee_id: r.employee_id,
-                name: r.name,
-                position: r.position,
-                rows: [],
-            };
-        }
-        byEmp[r.employee_id].rows.push(r);
-    });
-
-    return Object.values(byEmp)
-        .map(emp => {
-            const avg = emp.rows.length > 0
-                ? Math.round(emp.rows.reduce((sum, r) => sum + r.achievement, 0) / emp.rows.length)
-                : 0;
-            return { ...emp, avg };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-}
-
 export async function exportDeptKpiExcel() {
-    const ExcelJS = await import('exceljs');
-    const report = getDeptReportSnapshot();
-
-    const detailRows = report.rows.map((r, i) => {
-        let status = 'At Risk';
-        if (r.achievement >= 100) status = 'On Track';
-        else if (r.achievement >= 75) status = 'Delayed';
-
-        return [
-            i + 1,
-            r.name,
-            r.position,
-            r.kpi,
-            r.unit || '-',
-            r.target,
-            r.value,
-            r.achievement,
-            status,
-        ];
-    });
-
-    const wsData = [
-        [`${report.appName} - KPI Department Report`],
-        [`Department: ${_currentDeptName}`],
-        [`Period: ${report.periodLabel}`],
-        [`Generated: ${report.generatedDateTime}`],
-        [],
-        ['Summary', 'Value'],
-        ['Total Employees', report.employeeCount],
-        ['Total KPI Records', report.totalRecords],
-        ['Average Achievement', `${report.avgAch}%`],
-        ['Met Target', report.metTarget],
-        ['At Risk', report.atRisk],
-        ['Top Performer', report.topPerformer],
-        [],
-        ['No', 'Employee', 'Position', 'KPI Metric', 'Unit', 'Target', 'Actual', 'Achievement (%)', 'Status'],
-        ...detailRows,
-    ];
-
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet((_currentDeptName || 'Department').substring(0, 31));
-
-    wsData.forEach(row => ws.addRow(row));
-
-    // Merge top heading rows across all report columns.
-    ws.mergeCells('A1:I1');
-    ws.mergeCells('A2:I2');
-    ws.mergeCells('A3:I3');
-    ws.mergeCells('A4:I4');
-
-    ws.columns = [
-        { width: 6 },   // No
-        { width: 28 },  // Employee
-        { width: 24 },  // Position
-        { width: 28 },  // KPI
-        { width: 10 },  // Unit
-        { width: 14 },  // Target
-        { width: 14 },  // Actual
-        { width: 16 },  // Achievement
-        { width: 14 },  // Status
-    ];
-
-    const tableHeadRow = 14;
-    const tableLastRow = Math.max(tableHeadRow, tableHeadRow + detailRows.length);
-    ws.autoFilter = {
-        from: { row: tableHeadRow, column: 1 },
-        to: { row: tableLastRow, column: 9 },
-    };
-
-    const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob(
-        [buffer],
-        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `KPI_Report_${_currentDeptName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    if (!_currentDeptName) {
+        await notify.warn('Open a department KPI modal first.');
+        return;
+    }
+    try {
+        const result = await requestDepartmentKpiExport({
+            department: _currentDeptName,
+            period: _currentDeptMonth,
+            action: 'department_kpi_excel',
+        });
+        await downloadEdgeExportFile({
+            signedUrl: result?.signed_url,
+            filename: result?.filename,
+        });
+        await notify.success('Department KPI Excel exported.');
+    } catch (error) {
+        await notify.error(`Failed to export department KPI Excel: ${error.message}`);
+    }
 }
 
-// ==================================================
-// EXPORT: PDF
-// ==================================================
 export async function exportDeptKpiPDF() {
-    const { jsPDF } = await import('jspdf');
-    const autoTableMod = await import('jspdf-autotable');
-    const report = getDeptReportSnapshot();
-
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const runAutoTable = getPdfTableRunner(doc, autoTableMod);
-    const groupedRows = groupRowsByEmployee(report.rows);
-
-    // Header banner
-    doc.setFillColor(47, 84, 150);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${report.appName} - KPI Department Report`, 14, 12);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Department: ${_currentDeptName} | Period: ${report.periodLabel}`, 14, 18);
-    doc.text(`Generated: ${report.generatedDateTime}`, 210, 18, { align: 'right' });
-
-    // Summary grid
-    doc.setTextColor(0);
-    runAutoTable({
-        startY: 30,
-        head: [['Total Employees', 'KPI Records', 'Avg Achievement', 'Met Target', 'At Risk', 'Top Performer']],
-        body: [[
-            report.employeeCount,
-            report.totalRecords,
-            `${report.avgAch}%`,
-            report.metTarget,
-            report.atRisk,
-            report.topPerformer,
-        ]],
-        theme: 'grid',
-        headStyles: { fillColor: [237, 242, 247], textColor: [45, 55, 72], fontStyle: 'bold', halign: 'center' },
-        bodyStyles: { fontSize: 9, halign: 'center' },
-        margin: { left: 14, right: 14 },
-        didDrawPage: data => {
-            doc.setFontSize(8);
-            doc.setTextColor(130);
-            doc.text(
-                `Page ${data.pageNumber} | ${report.appName}`,
-                283,
-                205,
-                { align: 'right' }
-            );
-        },
-    });
-
-    let currentY = doc.lastAutoTable.finalY + 8;
-
-    if (groupedRows.length === 0) {
-        doc.setFontSize(11);
-        doc.setTextColor(80);
-        doc.text('No KPI records for this period.', 14, currentY);
-    } else {
-        groupedRows.forEach((emp, empIndex) => {
-            if (currentY > 178) {
-                doc.addPage();
-                currentY = 16;
-            }
-
-            const onTrackCount = emp.rows.filter(r => r.achievement >= 100).length;
-            const atRiskCount = emp.rows.filter(r => r.achievement < 75).length;
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(30, 41, 59);
-            doc.text(`${empIndex + 1}. ${emp.name}`, 14, currentY);
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(9);
-            doc.setTextColor(90);
-            doc.text(
-                `Position: ${emp.position} | KPI Items: ${emp.rows.length} | Avg: ${emp.avg}% | On Track: ${onTrackCount} | At Risk: ${atRiskCount}`,
-                14,
-                currentY + 5
-            );
-
-            const tableRows = emp.rows.map((r, rowIndex) => [
-                rowIndex + 1,
-                r.kpi,
-                `${formatNumber(r.target)} ${r.unit || ''}`.trim(),
-                `${formatNumber(r.value)} ${r.unit || ''}`.trim(),
-                `${r.achievement}%`,
-                getAchievementStatus(r.achievement),
-            ]);
-
-            runAutoTable({
-                startY: currentY + 8,
-                head: [['#', 'KPI Metric', 'Target', 'Actual', 'Achievement', 'Status']],
-                body: tableRows,
-                theme: 'grid',
-                headStyles: { fillColor: [47, 84, 150], fontSize: 8.5, fontStyle: 'bold' },
-                bodyStyles: { fontSize: 8, valign: 'middle' },
-                alternateRowStyles: { fillColor: [247, 250, 252] },
-                columnStyles: {
-                    0: { halign: 'center', cellWidth: 10 },
-                    2: { halign: 'right' },
-                    3: { halign: 'right' },
-                    4: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
-                    5: { halign: 'center', cellWidth: 24 },
-                },
-                margin: { left: 14, right: 14 },
-                didDrawPage: data => {
-                    doc.setFontSize(8);
-                    doc.setTextColor(130);
-                    doc.text(
-                        `Page ${data.pageNumber} | ${report.appName}`,
-                        283,
-                        205,
-                        { align: 'right' }
-                    );
-                },
-            });
-
-            currentY = doc.lastAutoTable.finalY + 7;
-        });
+    if (!_currentDeptName) {
+        await notify.warn('Open a department KPI modal first.');
+        return;
     }
-
-    doc.save(`KPI_Report_${_currentDeptName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    try {
+        const result = await requestDepartmentKpiExport({
+            department: _currentDeptName,
+            period: _currentDeptMonth,
+            action: 'department_kpi_pdf',
+        });
+        await downloadEdgeExportFile({
+            signedUrl: result?.signed_url,
+            filename: result?.filename,
+        });
+        await notify.success('Department KPI PDF exported.');
+    } catch (error) {
+        await notify.error(`Failed to export department KPI PDF: ${error.message}`);
+    }
 }
 
 export async function exportEmployeeKpiPDF(employeeId) {
-    const { jsPDF } = await import('jspdf');
-    const autoTableMod = await import('jspdf-autotable');
-    const report = getDeptReportSnapshot();
-    const empRows = report.rows.filter(r => String(r.employee_id) === String(employeeId));
-    if (empRows.length === 0) {
-        await notify.info('No KPI records found for this employee in the selected period.');
-        return;
+    try {
+        const result = await requestEmployeeKpiExport({
+            employeeId,
+            period: _currentDeptMonth,
+            action: 'employee_kpi_pdf',
+        });
+        await downloadEdgeExportFile({
+            signedUrl: result?.signed_url,
+            filename: result?.filename,
+        });
+        await notify.success('Employee KPI PDF exported.');
+    } catch (error) {
+        await notify.error(`Failed to export employee KPI PDF: ${error.message}`);
     }
-
-    const emp = empRows[0];
-    const avgAch = Math.round(empRows.reduce((sum, r) => sum + r.achievement, 0) / Math.max(1, empRows.length));
-    const metTarget = empRows.filter(r => r.achievement >= 100).length;
-    const atRisk = empRows.filter(r => r.achievement < 75).length;
-
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const runAutoTable = getPdfTableRunner(doc, autoTableMod);
-
-    doc.setFillColor(13, 110, 253);
-    doc.rect(0, 0, 297, 24, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${report.appName} - Employee KPI Report`, 14, 12);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Department: ${_currentDeptName} | Period: ${report.periodLabel}`, 14, 18);
-    doc.text(`Generated: ${report.generatedDateTime}`, 210, 18, { align: 'right' });
-
-    runAutoTable({
-        startY: 30,
-        head: [['Employee', 'Position', 'KPI Items', 'Avg Achievement', 'Met Target', 'At Risk']],
-        body: [[
-            emp.name,
-            emp.position,
-            empRows.length,
-            `${avgAch}%`,
-            metTarget,
-            atRisk,
-        ]],
-        theme: 'grid',
-        headStyles: { fillColor: [237, 242, 247], textColor: [45, 55, 72], fontStyle: 'bold', halign: 'center' },
-        bodyStyles: { fontSize: 9, halign: 'center' },
-        margin: { left: 14, right: 14 },
-        didDrawPage: data => {
-            doc.setFontSize(8);
-            doc.setTextColor(130);
-            doc.text(
-                `Page ${data.pageNumber} | ${report.appName}`,
-                283,
-                205,
-                { align: 'right' }
-            );
-        },
-    });
-
-    const tableRows = empRows.map((r, idx) => [
-        idx + 1,
-        r.kpi,
-        `${formatNumber(r.target)} ${r.unit || ''}`.trim(),
-        `${formatNumber(r.value)} ${r.unit || ''}`.trim(),
-        `${r.achievement}%`,
-        getAchievementStatus(r.achievement),
-    ]);
-
-    runAutoTable({
-        startY: doc.lastAutoTable.finalY + 6,
-        head: [['#', 'KPI Metric', 'Target', 'Actual', 'Achievement', 'Status']],
-        body: tableRows,
-        theme: 'grid',
-        headStyles: { fillColor: [13, 110, 253], fontSize: 9, fontStyle: 'bold' },
-        bodyStyles: { fontSize: 8, valign: 'middle' },
-        alternateRowStyles: { fillColor: [247, 250, 252] },
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 10 },
-            2: { halign: 'right' },
-            3: { halign: 'right' },
-            4: { halign: 'center', fontStyle: 'bold', cellWidth: 24 },
-            5: { halign: 'center', cellWidth: 24 },
-        },
-        margin: { left: 14, right: 14 },
-        didDrawPage: data => {
-            doc.setFontSize(8);
-            doc.setTextColor(130);
-            doc.text(
-                `Page ${data.pageNumber} | ${report.appName}`,
-                283,
-                205,
-                { align: 'right' }
-            );
-        },
-    });
-
-    const safeEmp = emp.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const safeDept = _currentDeptName.replace(/[^a-zA-Z0-9]/g, '_');
-    doc.save(`KPI_Employee_${safeDept}_${safeEmp}_${new Date().toISOString().split('T')[0]}.pdf`);
 }
-
 
 
 

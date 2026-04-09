@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const allowedRootSql = new Set(['complete-setup.sql']);
+const allowedNonMigrationSql = new Set(['supabase/01_dummy_seed.sql']);
 const allowedReferencePrefixes = ['docs/qa/'];
 const failures = [];
 
@@ -39,7 +40,7 @@ for (const filePath of sqlFiles) {
         continue;
     }
 
-    if (allowedRootSql.has(rel)) continue;
+    if (allowedRootSql.has(rel) || allowedNonMigrationSql.has(rel)) continue;
 
     failures.push(`${rel}: schema SQL must live in complete-setup.sql or numbered migrations/ files only`);
 }

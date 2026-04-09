@@ -4,8 +4,9 @@
 
 import Swal from 'sweetalert2';
 import { state, isAdmin, isManager } from '../../lib/store.js';
-import { escapeHTML, escapeInlineArg, formatNumber } from '../../lib/utils.js';
-import { buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getKpiRecordTarget, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction, logActivity } from '../data.js';
+import { downloadEdgeExportFile, requestProbationExport } from '../../lib/edge/exports.js';
+import { escapeHTML, escapeInlineArg } from '../../lib/utils.js';
+import { buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction, logActivity } from '../data.js';
 import * as notify from '../../lib/notify.js';
 import { getFilteredEmployeeIds } from '../../lib/reportFilters.js';
 import { getProbationScoreBandClass } from '../../lib/uiContracts.js';
@@ -102,14 +103,6 @@ function getMonthlyRows(reviewId) {
 
 function getAttendanceRows(reviewId) {
     return (state.probationAttendanceRecords || []).filter(row => row.probation_review_id === reviewId);
-}
-
-function monthAttendanceSummary(reviewId, monthNo) {
-    const items = getAttendanceRows(reviewId).filter(row => Number(row.month_no) === Number(monthNo));
-    if (items.length === 0) return '-';
-    return items
-        .map(row => `${row.event_date || '-'} ${row.event_type || 'attendance'} x${Number(row.qty || 1)} (-${toFixedScore(row.deduction_points || 0, 1)})`)
-        .join('; ');
 }
 
 function suggestAttendanceDeduction(eventType, qty) {
@@ -656,32 +649,17 @@ export async function addProbationAttendanceEntry(reviewId = '') {
     }
 }
 
-function getPdfTableRunner(doc, autoTableMod) {
-    const autoTable = autoTableMod?.default || autoTableMod?.autoTable;
-    return opts => {
-        if (typeof autoTable === 'function') {
-            autoTable(doc, opts);
-            return;
-        }
-        if (typeof doc.autoTable === 'function') {
-            doc.autoTable(opts);
-            return;
-        }
-        throw new Error('jspdf-autotable failed to load.');
-    };
-}
-
-export async function exportProbationPdf() {
+async function selectProbationReviewForExport(confirmButtonText) {
     const reviews = getScopedProbationReviews();
     if (reviews.length === 0) {
         await notify.warn('No probation review to export.');
-        return;
+        return null;
     }
 
     const options = {};
-    reviews.forEach(r => {
-        const emp = state.db[r.employee_id];
-        options[r.id] = `${emp?.name || r.employee_id} (${r.review_period_start || '-'})`;
+    reviews.forEach(review => {
+        const employee = state.db[review.employee_id];
+        options[review.id] = `${employee?.name || review.employee_id} (${review.review_period_start || '-'})`;
     });
 
     const selected = await notify.input({
@@ -689,457 +667,51 @@ export async function exportProbationPdf() {
         input: 'select',
         inputOptions: options,
         inputValue: reviews[0]?.id || '',
-        confirmButtonText: 'Export PDF',
+        confirmButtonText,
     });
-    if (selected === null) return;
+    if (selected === null) return null;
 
-    const review = reviews.find(r => r.id === selected);
+    const review = reviews.find(row => row.id === selected);
     if (!review) {
         await notify.error('Probation review not found.');
-        return;
+        return null;
     }
 
+    return review;
+}
+
+export async function exportProbationPdf() {
+    const review = await selectProbationReviewForExport('Export PDF');
+    if (!review) return;
+
     try {
-        const draft = await ensureProbationMonthlyRows(review, { persist: false });
-        const employee = state.db[review.employee_id] || { id: review.employee_id, name: review.employee_id, position: '-' };
-        const managerName = state.db[employee.manager_id || '']?.name || 'Manager';
-        const directorName = state.appSettings?.director_name || 'Director';
-        const company = state.appSettings?.company_name || 'Company';
-        const appName = state.appSettings?.app_name || 'HR Performance Suite';
-        const rules = getProbationRules();
-        const passThreshold = Number(rules.pass_threshold || 75) || 75;
-        const workWeightLabel = formatScoreLabel(rules.work_weight);
-        const managingWeightLabel = formatScoreLabel(rules.managing_weight);
-        const attitudeWeightLabel = formatScoreLabel(rules.attitude_weight);
-        const generatedAt = new Date();
-        const generatedDate = generatedAt.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'long',
-            year: 'numeric',
+        const result = await requestProbationExport({
+            reviewId: review.id,
+            action: 'probation_pdf',
         });
-
-        const { jsPDF } = await import('jspdf');
-        const autoTableMod = await import('jspdf-autotable');
-
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-        const runAutoTable = getPdfTableRunner(doc, autoTableMod);
-
-        // ---- Page 1: Summary + Signatures ----
-        doc.setFillColor(17, 24, 39);
-        doc.rect(0, 0, 210, 24, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(13);
-        doc.text(`${company} - Probation Assessment Report`, 14, 11);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(appName, 14, 17);
-        doc.text(`Generated Date: ${generatedDate}`, 196, 17, { align: 'right' });
-
-        doc.setTextColor(20, 20, 20);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
-        doc.text('Employee Information', 14, 31);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9.5);
-        doc.text(`Name: ${employee.name || '-'}`, 14, 37);
-        doc.text(`Position: ${employee.position || '-'}`, 14, 42);
-        doc.text(`Probation Window: ${review.review_period_start || draft.review_period_start || '-'} to ${review.review_period_end || draft.review_period_end || '-'}`, 14, 47);
-
-        const monthRows = (draft.monthly_rows || []).map(row => [
-            `Month ${row.month_no}`,
-            `${row.period_start} to ${row.period_end}`,
-            toFixedScore(row.work_performance_score, 2),
-            toFixedScore(row.managing_task_score, 2),
-            toFixedScore(row.attitude_score, 2),
-            toFixedScore(row.attendance_deduction, 2),
-            toFixedScore(row.monthly_total, 2),
-            row.manager_qualitative_text || review.manager_notes || '-',
-        ]);
-
-        runAutoTable({
-            startY: 52,
-            head: [[
-                'Month',
-                'Period',
-                `Work (${workWeightLabel})`,
-                `Managing (${managingWeightLabel})`,
-                `Attitude (${attitudeWeightLabel})`,
-                'Deduction',
-                'Total',
-                'Qualitative',
-            ]],
-            body: monthRows,
-            theme: 'grid',
-            headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 8, valign: 'top' },
-            styles: { overflow: 'linebreak', cellPadding: 1.4 },
-            columnStyles: {
-                0: { cellWidth: 14, halign: 'center' },
-                1: { cellWidth: 27 },
-                2: { cellWidth: 14, halign: 'right' },
-                3: { cellWidth: 15, halign: 'right' },
-                4: { cellWidth: 14, halign: 'right' },
-                5: { cellWidth: 13, halign: 'right' },
-                6: { cellWidth: 13, halign: 'right', fontStyle: 'bold' },
-                7: { cellWidth: 72 },
-            },
-            margin: { left: 14, right: 14 },
+        await downloadEdgeExportFile({
+            signedUrl: result?.signed_url,
+            filename: result?.filename,
         });
-
-        const summaryY = (doc.lastAutoTable?.finalY || 52) + 6;
-        runAutoTable({
-            startY: summaryY,
-            head: [['Quantitative', 'Managing+Attitude Avg', 'Final Score', 'Pass Min', 'Decision']],
-            body: [[
-                toFixedScore(draft.quantitative_score, 2),
-                toFixedScore(draft.qualitative_score, 2),
-                toFixedScore(review.final_score || draft.final_score, 2),
-                toFixedScore(passThreshold, 1),
-                String(review.decision || 'pending').toUpperCase(),
-            ]],
-            theme: 'grid',
-            headStyles: { fillColor: [229, 231, 235], textColor: [31, 41, 55], fontStyle: 'bold', halign: 'center' },
-            bodyStyles: { fontSize: 9, halign: 'center' },
-            margin: { left: 14, right: 14 },
-        });
-
-        const contextTop = (doc.lastAutoTable?.finalY || summaryY) + 7;
-        runAutoTable({
-            startY: contextTop,
-            head: [['Score Context (For Director)']],
-            body: [[
-                `Work (${workWeightLabel}): auto-generated from KPI records (target vs actual achievement) within probation window.\n`
-                + `Managing (${managingWeightLabel}): manager score input based on responsibility, innovation, and communication.\n`
-                + `Attitude (${attitudeWeightLabel}): auto-calculated from attendance deductions (${attitudeWeightLabel} - deduction points, min 0).\n`
-                + 'See attachment below for Work score details.',
-            ]],
-            theme: 'grid',
-            headStyles: { fillColor: [243, 244, 246], textColor: [31, 41, 55], fontStyle: 'bold' },
-            bodyStyles: { fontSize: 8.3, valign: 'top' },
-            styles: { overflow: 'linebreak', cellPadding: 1.6 },
-            columnStyles: { 0: { cellWidth: 182 } },
-            margin: { left: 14, right: 14 },
-        });
-
-        let recapTop = (doc.lastAutoTable?.finalY || contextTop) + 8;
-        if (recapTop > 220) {
-            doc.addPage();
-            recapTop = 20;
-        }
-
-        const recapText = String(review.manager_notes || '-').trim() || '-';
-        const recapLines = doc.splitTextToSize(recapText, 176);
-        const recapBoxHeight = Math.max(18, (recapLines.length * 4.3) + 8);
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9.5);
-        doc.text('Overall Performance Report (Manager)', 14, recapTop);
-
-        const recapBoxY = recapTop + 3;
-        doc.setDrawColor(140, 140, 140);
-        doc.rect(14, recapBoxY, 182, recapBoxHeight);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(recapLines, 16, recapBoxY + 6);
-
-        let signatureTop = recapBoxY + recapBoxHeight + 18;
-        if (signatureTop > 248) {
-            doc.addPage();
-            signatureTop = 35;
-        }
-
-        const lineY = signatureTop;
-        const labelY = lineY + 7;
-        const nameY = lineY + 13;
-
-        doc.setDrawColor(100, 100, 100);
-        doc.line(18, lineY, 66, lineY);
-        doc.line(81, lineY, 129, lineY);
-        doc.line(144, lineY, 192, lineY);
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.text('Employee', 42, labelY, { align: 'center' });
-        doc.text('Manager', 105, labelY, { align: 'center' });
-        doc.text('Director', 168, labelY, { align: 'center' });
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8.5);
-        doc.text(employee.name || '-', 42, nameY, { align: 'center' });
-        doc.text(managerName, 105, nameY, { align: 'center' });
-        doc.text(directorName, 168, nameY, { align: 'center' });
-
-        // ---- Page 2: KPI detail basis for Work score ----
-        doc.addPage('a4', 'landscape');
-
-        doc.setFillColor(17, 24, 39);
-        doc.rect(0, 0, 297, 20, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.text('KPI Performance Detail (Work Score Basis)', 14, 11);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.text(`${employee.name || '-'} | ${review.review_period_start || draft.review_period_start || '-'} to ${review.review_period_end || draft.review_period_end || '-'}`, 14, 17);
-        doc.text(`Generated Date: ${generatedDate}`, 283, 17, { align: 'right' });
-
-        const kpiDetailRows = [];
-        (draft.monthly_rows || []).forEach(monthRow => {
-            const contributions = Array.isArray(monthRow.contributions) ? monthRow.contributions : [];
-            if (contributions.length === 0) {
-                kpiDetailRows.push([
-                    `Month ${monthRow.month_no}`,
-                    `${monthRow.period_start} to ${monthRow.period_end}`,
-                    '-',
-                    '-',
-                    '-',
-                    '-',
-                    '-',
-                    '-',
-                    'No KPI contribution rows',
-                ]);
-                return;
-            }
-
-            contributions.forEach(contrib => {
-                const period = String(contrib.period || '').trim();
-                const periodRecords = (state.kpiRecords || []).filter(r => r.employee_id === review.employee_id && r.period === period);
-                if (periodRecords.length === 0) {
-                    kpiDetailRows.push([
-                        `Month ${monthRow.month_no}`,
-                        `${monthRow.period_start} to ${monthRow.period_end}`,
-                        period || '-',
-                        '-',
-                        '-',
-                        '-',
-                        '-',
-                        `${Number(contrib.overlap_days || 0)}d`,
-                        'No KPI records on this period',
-                    ]);
-                    return;
-                }
-
-                periodRecords.forEach(record => {
-                    const kpiDef = (state.kpiConfig || []).find(k => k.id === record.kpi_id);
-                    const kpiName = record.kpi_name_snapshot || kpiDef?.name || record.kpi_id || '-';
-                    const unit = record.kpi_unit_snapshot || kpiDef?.unit || '';
-                    const target = getKpiRecordTarget(record, employee);
-                    const actual = Number(record.value || 0);
-                    const achievement = target > 0 ? (actual / target) * 100 : 0;
-
-                    kpiDetailRows.push([
-                        `Month ${monthRow.month_no}`,
-                        `${monthRow.period_start} to ${monthRow.period_end}`,
-                        period || '-',
-                        kpiName,
-                        `${formatNumber(target)} ${unit}`.trim(),
-                        `${formatNumber(actual)} ${unit}`.trim(),
-                        target > 0 ? `${toFixedScore(achievement, 2)}%` : '-',
-                        `${Number(contrib.overlap_days || 0)}d`,
-                        record.notes || '-',
-                    ]);
-                });
-            });
-        });
-
-        runAutoTable({
-            startY: 24,
-            head: [[
-                'Month',
-                'Probation Window',
-                'KPI Period',
-                'KPI Metric',
-                'Target',
-                'Actual',
-                'Ach%',
-                'Overlap',
-                'Record Note',
-            ]],
-            body: kpiDetailRows.length > 0 ? kpiDetailRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-']],
-            theme: 'grid',
-            headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold' },
-            bodyStyles: { fontSize: 7.8, valign: 'top' },
-            styles: { overflow: 'linebreak', cellPadding: 1.2 },
-            columnStyles: {
-                0: { cellWidth: 14, halign: 'center' },
-                1: { cellWidth: 28 },
-                2: { cellWidth: 16, halign: 'center' },
-                3: { cellWidth: 58 },
-                4: { cellWidth: 28, halign: 'right' },
-                5: { cellWidth: 28, halign: 'right' },
-                6: { cellWidth: 14, halign: 'right', fontStyle: 'bold' },
-                7: { cellWidth: 16, halign: 'center' },
-                8: { cellWidth: 55 },
-            },
-            margin: { left: 14, right: 14 },
-            didDrawPage: data => {
-                doc.setFontSize(8);
-                doc.setTextColor(120);
-                doc.text(`Page ${data.pageNumber}`, 283, 205, { align: 'right' });
-            },
-        });
-
-        const safeName = String(employee.name || review.employee_id || 'employee').replace(/[^a-zA-Z0-9_-]/g, '_');
-        const todayIso = `${generatedAt.getFullYear()}-${String(generatedAt.getMonth() + 1).padStart(2, '0')}-${String(generatedAt.getDate()).padStart(2, '0')}`;
-        doc.save(`probation_report_${safeName}_${todayIso}.pdf`);
         await notify.success('Probation PDF exported.');
     } catch (error) {
         await notify.error(`Failed to export probation PDF: ${getErrorMessage(error)}`);
     }
 }
+
 export async function exportProbationCsv() {
-    const reviews = getScopedProbationReviews();
-    if (reviews.length === 0) {
-        await notify.warn('No probation review to export.');
-        return;
-    }
-
-    const options = {};
-    reviews.forEach(r => {
-        const emp = state.db[r.employee_id];
-        options[r.id] = `${emp?.name || r.employee_id} (${r.review_period_start || '-'})`;
-    });
-
-    const selected = await notify.input({
-        title: 'Select Probation Review to Export',
-        input: 'select',
-        inputOptions: options,
-        inputValue: reviews[0]?.id || '',
-        confirmButtonText: 'Export Excel',
-    });
-    if (selected === null) return;
-
-    const review = reviews.find(r => r.id === selected);
-    if (!review) {
-        await notify.error('Probation review not found.');
-        return;
-    }
+    const review = await selectProbationReviewForExport('Export Excel');
+    if (!review) return;
 
     try {
-        const draft = await ensureProbationMonthlyRows(review, { persist: false });
-        const employee = state.db[review.employee_id] || { id: review.employee_id, name: review.employee_id, position: '-' };
-        const attendanceRows = getAttendanceRows(review.id);
-        const company = state.appSettings?.company_name || 'Company';
-        const appName = state.appSettings?.app_name || 'HR Performance Suite';
-        const rules = getProbationRules();
-        const workWeightLabel = formatScoreLabel(rules.work_weight);
-        const managingWeightLabel = formatScoreLabel(rules.managing_weight);
-        const attitudeWeightLabel = formatScoreLabel(rules.attitude_weight);
-
-        const ExcelJS = await import('exceljs');
-        const wb = new ExcelJS.Workbook();
-
-        (draft.monthly_rows || []).forEach(monthRow => {
-            const ws = wb.addWorksheet(`Bulan ${monthRow.month_no}`);
-            ws.columns = [
-                { width: 6 },
-                { width: 38 },
-                { width: 16 },
-                { width: 52 },
-                { width: 40 },
-            ];
-
-            ws.addRow([company]);
-            ws.addRow([appName]);
-            ws.addRow([]);
-            ws.addRow(['Probationary Employee Assessment']);
-            ws.mergeCells('A4:E4');
-            ws.addRow([]);
-            ws.addRow(['Employee', employee.name, '', 'Position', employee.position || '-']);
-            ws.addRow(['Month Window', `${monthRow.period_start} to ${monthRow.period_end}`]);
-            ws.addRow([]);
-            ws.addRow(['No', 'Tugas & tanggung Jawab', 'Realisasi', 'Penilaian Qualitative', 'Catatan']);
-            ws.addRow([1, `Work Performance (${workWeightLabel} points)`, Number(monthRow.work_performance_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
-            ws.addRow([2, `Managing Task (${managingWeightLabel} points)`, Number(monthRow.managing_task_score || 0), monthRow.manager_qualitative_text || '', monthAttendanceSummary(review.id, monthRow.month_no)]);
-            ws.addRow([3, `Attitude (${attitudeWeightLabel} points)`, Number(monthRow.attitude_score || 0), `Attendance deduction: ${toFixedScore(monthRow.attendance_deduction || 0, 2)}`, monthAttendanceSummary(review.id, monthRow.month_no)]);
-            ws.addRow(['', 'Score Rata-rata', Number(monthRow.monthly_total || 0), '', '']);
-
-            const headRow = ws.getRow(9);
-            headRow.font = { bold: true };
-            headRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            [9, 10, 11, 12, 13].forEach(rn => {
-                const row = ws.getRow(rn);
-                row.eachCell(cell => {
-                    cell.border = {
-                        top: { style: 'thin' },
-                        left: { style: 'thin' },
-                        bottom: { style: 'thin' },
-                        right: { style: 'thin' },
-                    };
-                });
-            });
-            ws.getCell('A4').font = { bold: true, size: 14 };
-            ws.getCell('A4').alignment = { horizontal: 'center' };
+        const result = await requestProbationExport({
+            reviewId: review.id,
+            action: 'probation_excel',
         });
-
-        const recap = wb.addWorksheet('Rekap');
-        recap.columns = [
-            { width: 10 },
-            { width: 22 },
-            { width: 20 },
-            { width: 14 },
-            { width: 14 },
-            { width: 14 },
-            { width: 14 },
-            { width: 42 },
-        ];
-
-        recap.addRow([company]);
-        recap.addRow([appName]);
-        recap.addRow([]);
-        recap.addRow(['Probationary Employee Assessment - Recap']);
-        recap.mergeCells('A4:H4');
-        recap.addRow([]);
-        recap.addRow(['Nama', employee.name, '', 'Jabatan', employee.position || '-']);
-        recap.addRow(['Mulai Probation', review.review_period_start || draft.review_period_start || '-', '', 'Akhir Probation', review.review_period_end || draft.review_period_end || '-']);
-        recap.addRow([]);
-        recap.addRow(['No', 'Task', 'Period', `Work (${workWeightLabel})`, `Managing (${managingWeightLabel})`, `Attitude (${attitudeWeightLabel})`, 'Total', 'Qualitative']);
-
-        (draft.monthly_rows || []).forEach(row => {
-            recap.addRow([
-                row.month_no,
-                `Hasil Progres Bulan ${row.month_no}`,
-                `${row.period_start} to ${row.period_end}`,
-                Number(row.work_performance_score || 0),
-                Number(row.managing_task_score || 0),
-                Number(row.attitude_score || 0),
-                Number(row.monthly_total || 0),
-                row.manager_qualitative_text || review.manager_notes || '-',
-            ]);
+        await downloadEdgeExportFile({
+            signedUrl: result?.signed_url,
+            filename: result?.filename,
         });
-
-        recap.addRow(['', 'Score Rata-rata', '', Number(draft.quantitative_score || 0), Number(draft.qualitative_score || 0), '', Number(review.final_score || draft.final_score || 0), '']);
-        recap.addRow([]);
-        recap.addRow(['Decision', review.decision || 'pending']);
-        recap.addRow(['Summary', review.manager_notes || '-']);
-
-        [9, 10, 11, 12].forEach(rn => {
-            const row = recap.getRow(rn);
-            row.eachCell(cell => {
-                cell.border = {
-                    top: { style: 'thin' },
-                    left: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                    right: { style: 'thin' },
-                };
-            });
-        });
-        recap.getCell('A4').font = { bold: true, size: 14 };
-        recap.getCell('A4').alignment = { horizontal: 'center' };
-
-        const buffer = await wb.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const safeName = String(employee.name || review.employee_id || 'employee').replace(/[^a-zA-Z0-9_-]/g, '_');
-        a.href = url;
-        a.download = `probation_${safeName}_${getCurrentPeriodKey()}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-
         await notify.success('Probation Excel exported.');
     } catch (error) {
         await notify.error(`Failed to export probation Excel: ${getErrorMessage(error)}`);

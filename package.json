@@ -7,6 +7,7 @@
 		"dev": "vite",
 		"build": "vite build",
 		"preview": "vite preview",
+		"e2e:bootstrap:local": "node scripts/e2e/bootstrap-local-supabase.mjs",
 		"qa:schema-discipline": "node scripts/qa/schema-discipline-check.mjs",
 		"qa:bootstrap-grants": "node scripts/qa/bootstrap-grants-check.mjs",
 		"qa:rls-audit": "node scripts/qa/rls-policy-audit.mjs",
@@ -19,6 +20,7 @@
 	"devDependencies": {
 		"@playwright/test": "^1.58.2",
 		"@tailwindcss/vite": "^4.2.2",
+		"pg": "^8.16.3",
 		"tailwindcss": "^4.2.2",
 		"vite": "^7.3.1",
 		"vite-plugin-compression": "^0.5.1"

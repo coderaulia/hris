@@ -22,6 +22,20 @@ INSERT INTO app_settings (key, value) VALUES
   ('assessment_threshold', '7')
 ON CONFLICT (key) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS employees (
+  employee_id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  position TEXT DEFAULT '',
+  seniority TEXT DEFAULT '',
+  join_date DATE,
+  department TEXT DEFAULT '',
+  manager_id TEXT,
+  auth_id UUID,
+  role TEXT NOT NULL DEFAULT 'employee',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- 1. EMPLOYEES TABLE — add missing columns if needed
 DO $$ BEGIN
   ALTER TABLE employees ADD COLUMN IF NOT EXISTS auth_email TEXT;
