@@ -710,6 +710,9 @@ body,
 .app-main {
   min-width: 0;
   padding: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.06), transparent 24%),
+    linear-gradient(180deg, rgba(247, 255, 253, 0.72) 0%, rgba(248, 250, 252, 0.96) 100%);
 }
 
 .app-main-inner {
@@ -721,6 +724,7 @@ body,
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 100%;
 }
 
 .sidebar-brand {
@@ -769,6 +773,7 @@ body,
   background: rgba(255, 255, 255, 0.82);
   padding: 14px;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+  flex: 1 1 auto;
 }
 
 .sidebar-nav-groups {
@@ -889,6 +894,7 @@ body,
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+  margin-top: auto;
 }
 
 .sidebar-utility-btn,
@@ -925,6 +931,10 @@ body,
   margin-bottom: 18px;
 }
 
+.main-menu-toggle {
+  display: none;
+}
+
 .topbar-head {
   display: flex;
   justify-content: space-between;
@@ -949,6 +959,74 @@ body,
   background: rgba(255, 255, 255, 0.88);
 }
 
+.employee-directory-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.employee-directory-title {
+  margin: 4px 0 8px;
+  font-size: clamp(1.4rem, 2vw, 1.85rem);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.employee-directory-copy {
+  color: var(--wei-text-muted);
+  max-width: 760px;
+}
+
+.employee-directory-actions {
+  min-width: 320px;
+}
+
+.employee-directory-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.employee-stat-card {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 14px 16px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+}
+
+.employee-stat-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--wei-text-muted);
+  margin-bottom: 6px;
+}
+
+.employee-stat-card strong {
+  font-size: 1.3rem;
+  color: #0f172a;
+}
+
+.employee-directory-table thead th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--wei-text-muted);
+  font-weight: 800;
+}
+
+.employee-row td {
+  vertical-align: middle;
+}
+
+.employee-actions .btn {
+  border-radius: 12px !important;
+}
+
 [data-bs-theme="dark"] .app-sidebar {
   background:
     radial-gradient(circle at top left, rgba(45, 212, 191, 0.12), transparent 30%),
@@ -960,7 +1038,8 @@ body,
 [data-bs-theme="dark"] .sidebar-nav-wrap,
 [data-bs-theme="dark"] .sidebar-group,
 [data-bs-theme="dark"] .topbar-card,
-[data-bs-theme="dark"] .report-filter-card {
+[data-bs-theme="dark"] .report-filter-card,
+[data-bs-theme="dark"] .employee-stat-card {
   background: rgba(15, 23, 42, 0.75);
   border-color: rgba(148, 163, 184, 0.16);
 }
@@ -969,14 +1048,18 @@ body,
 [data-bs-theme="dark"] .sidebar-group-toggle,
 [data-bs-theme="dark"] .sidebar-utility-btn,
 [data-bs-theme="dark"] .sidebar-mobile-toggle,
-[data-bs-theme="dark"] .topbar-title {
+[data-bs-theme="dark"] .topbar-title,
+[data-bs-theme="dark"] .employee-directory-title,
+[data-bs-theme="dark"] .employee-stat-card strong {
   color: #e2e8f0;
 }
 
 [data-bs-theme="dark"] .sidebar-link-copy,
 [data-bs-theme="dark"] .topbar-copy,
 [data-bs-theme="dark"] .sidebar-kicker,
-[data-bs-theme="dark"] .topbar-kicker {
+[data-bs-theme="dark"] .topbar-kicker,
+[data-bs-theme="dark"] .employee-directory-copy,
+[data-bs-theme="dark"] .employee-stat-label {
   color: #94a3b8;
 }
 
@@ -1022,5 +1105,18 @@ body,
 
   .topbar-head {
     flex-direction: column;
+  }
+
+  .employee-directory-toolbar {
+    flex-direction: column;
+  }
+
+  .employee-directory-actions {
+    min-width: 100%;
+    width: 100%;
+  }
+
+  .main-menu-toggle {
+    display: inline-flex;
   }
 }

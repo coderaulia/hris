@@ -31,7 +31,7 @@ import { renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExc
 import { renderRecordsTable, openReportByVal, openTrainingLog, closeTrainingLog, closeReport, searchRecords, deleteRecordSafe, editRecordSafe, saveTrainingLog, approveTraining, editTrainingItem, deleteTrainingItem, resetTrainingForm, fillTrainingRec, toggleOngoing, initiateSelfAssessment as recordSelfAssess, renderProbationPipView, generateProbationDrafts, reviewProbation, addProbationAttendanceEntry, exportProbationPdf, exportProbationCsv, generatePipPlans, updatePipPlanStatus } from './modules/records.js';
 import { renderPendingList, loadPendingEmployee, startAssessment, renderQuestions, reviewAssessment, finalSubmit, goBack, initiateSelfAssessment } from './modules/assessment.js';
 import { renderAdminList, savePositionConfig, loadPositionForEdit, deletePositionConfig, clearAdminForm, exportConfigJSON, triggerConfigImport, importConfigJSON, addCompetencyRow, removeCompetencyRow } from './modules/admin.js';
-import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV } from './modules/employees.js';
+import { renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm, deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV, clearEmployeeDirectoryFilters } from './modules/employees.js';
 import { renderKpiManager, submitKpiRecord, saveKpiDef, editKpiDef, copyKpiDef, removeKpiDef, editKpiRecord, removeKpiRecord, clearKpiDefForm, onKpiMetricChange, calcKpiPercentage, onKpiEmployeeChange, onKpiTargetPeriodChange, exportKpiJSON, importKpiJSON, startKpiInput, saveKpiTargets, renderKpiHistory, saveKpiGovernanceConfig, approveKpiDefinitionVersion, rejectKpiDefinitionVersion, approveKpiTargetVersion, rejectKpiTargetVersion } from './modules/kpi.js';
 import {
     renderSettings,
@@ -346,7 +346,7 @@ window.__app = {
 
     // Employees
     renderEmployeeManager, saveEmployeeData, loadEmployeeForEdit, resetEmployeeForm,
-    deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV,
+    deleteEmployeeData, exportEmployeeCSV, importEmployeeCSV, clearEmployeeDirectoryFilters,
 
     // Dashboard
     renderDashboard, openDeptKpiModal, renderDeptKpiTable, exportDeptKpiExcel, exportDeptKpiPDF, exportEmployeeKpiPDF, searchDeptKpiModal,
