@@ -1,11 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
+import { formatSupabaseEnvError, validateSupabaseEnv } from './env.js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const validation = validateSupabaseEnv();
+const SUPABASE_URL = validation.url;
+const SUPABASE_ANON_KEY = validation.anonKey;
+const SUPABASE_ENV_ERROR = formatSupabaseEnvError(validation);
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error('Missing Supabase env vars: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+function createInvalidSupabaseClient(message) {
+    return new Proxy({}, {
+        get() {
+            throw new Error(message);
+        },
+    });
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export function getSupabaseEnvValidation() {
+    return validation;
+}
 
+export const supabase = validation.ok
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : createInvalidSupabaseClient(SUPABASE_ENV_ERROR);

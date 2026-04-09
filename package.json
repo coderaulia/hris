@@ -7,12 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "qa:bootstrap-grants": "node scripts/qa/bootstrap-grants-check.mjs",
     "qa:rls-audit": "node scripts/qa/rls-policy-audit.mjs",
     "qa:migrations": "node scripts/qa/migration-safety-check.mjs",
     "qa:negative": "node scripts/qa/rls-negative-path.mjs",
     "qa:e2e": "playwright test",
     "qa:e2e:ui": "playwright test --ui",
-    "qa:hardening": "npm run qa:migrations && npm run qa:rls-audit"
+    "qa:hardening": "npm run qa:migrations && npm run qa:rls-audit && npm run qa:bootstrap-grants"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

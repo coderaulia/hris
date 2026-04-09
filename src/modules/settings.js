@@ -155,11 +155,14 @@ export function applyBranding() {
     const headerSub = document.getElementById('app-header-subtitle');
     if (headerSub) {
         const dept = appSettings.department_label || 'Human Resources Department';
-        const userName = state.currentUser?.name || '';
-        const role = state.currentUser?.role || 'employee';
-        const roleLabel = role === 'superadmin' ? 'Super Admin' : role === 'manager' ? 'Manager' : role === 'hr' ? 'HR' : role === 'director' ? 'Director' : 'Employee';
-        const roleClass = role === 'superadmin' ? 'bg-danger' : role === 'manager' ? 'bg-warning text-dark' : role === 'hr' ? 'bg-success' : role === 'director' ? 'bg-info text-dark' : 'bg-secondary';
-        headerSub.innerHTML = `${escapeHTML(dept)} &middot; <span id="user-display-name" class="fw-bold">${escapeHTML(userName)}</span> <span id="user-role-badge" class="badge ms-2 ${roleClass}">${roleLabel}</span>`;
+        headerSub.innerText = dept;
+    }
+
+    const sidebarUserLabel = document.getElementById('sidebar-user-label');
+    if (sidebarUserLabel) {
+        sidebarUserLabel.innerText = appSettings.company_name
+            ? `${appSettings.company_name} Workspace`
+            : 'Active Session';
     }
 
     const loginCompany = document.getElementById('login-company');

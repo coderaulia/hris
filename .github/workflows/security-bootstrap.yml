@@ -1,0 +1,30 @@
+name: Security Bootstrap Guard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  bootstrap-hardening:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate migrations, RLS, and bootstrap grants
+        run: npm run qa:hardening
+
+      - name: Production build
+        run: npm run build

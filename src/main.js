@@ -48,6 +48,8 @@ import {
 } from './modules/settings.js';
 
 import { debugError, escapeHTML } from './lib/utils.js';
+import { getSupabaseEnvValidation } from './lib/supabase.js';
+import { renderBootErrorScreen } from './lib/env.js';
 import { getRoleScopedEmployeeIds } from './lib/reportFilters.js';
 import * as notify from './lib/notify.js';
 import { initMonitoring } from './lib/monitoring.js';
@@ -874,6 +876,12 @@ subscribe('data:employees', () => {
 
 // ---- Initialize ----
 document.addEventListener('DOMContentLoaded', async function () {
+    const envValidation = getSupabaseEnvValidation();
+    if (!envValidation.ok) {
+        renderBootErrorScreen('Supabase environment variables are not configured correctly.', envValidation.issues);
+        throw new Error(envValidation.issues.join(' '));
+    }
+
     initMonitoring();
 
     // Restore Theme
