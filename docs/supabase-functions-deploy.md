@@ -55,6 +55,48 @@ supabase secrets set EMAIL_FROM="noreply@example.com"
 supabase secrets set EMAIL_REPLY_TO="hr@example.com"
 ```
 
+## First-time CLI setup on Windows
+
+If `supabase --version` says the command is not recognized, install the CLI first.
+
+Recommended options:
+
+```bash
+npm install -g supabase
+```
+
+or
+
+```bash
+winget install Supabase.CLI
+```
+
+Then verify:
+
+```bash
+supabase --version
+```
+
+## Login and link project
+
+From the project root, log in first:
+
+```bash
+supabase login
+```
+
+Then link this local repo to the Supabase project:
+
+```bash
+supabase link --project-ref ujokielntvbyzyvjayrr
+```
+
+Notes:
+
+- run this from the repo root
+- the project ref is the subdomain part of `URL`
+- if the project is already linked, Supabase CLI will tell you
+
 ## Functions to deploy
 
 Deploy all current functions:
@@ -67,6 +109,20 @@ supabase functions deploy report-exports
 ```
 
 If you only changed one function, redeploy just that one.
+
+## Quick deploy flow
+
+This is the shortest successful deploy sequence for this repo:
+
+```bash
+supabase --version
+supabase login
+supabase link --project-ref ujokielntvbyzyvjayrr
+supabase functions deploy admin-user-mutations
+supabase functions deploy auth-callbacks
+supabase functions deploy approval-notifications
+supabase functions deploy report-exports
+```
 
 ## Current function purpose
 
@@ -105,3 +161,11 @@ After deploy, verify:
 4. Dashboard KPI PDF/XLSX export downloads successfully.
 5. Probation PDF/XLSX export downloads successfully.
 6. Approval notifications return dry-run or unconfigured behavior without failing the app.
+
+## Local file reminder
+
+The local file `supabase/functions/.env` is only for local development and testing.
+
+- do not rely on it for production deploys
+- do not commit real secret values
+- production functions read secrets from the Supabase project dashboard / CLI secret store

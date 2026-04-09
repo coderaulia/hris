@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createServiceClient } from "../_shared/auth.ts";
+import { createServiceClient, createUserClient } from "../_shared/auth.ts";
 import { corsHeaders, withCorsHeaders } from "../_shared/cors.ts";
 
 type Payload = {
@@ -85,6 +85,7 @@ serve(async (req) => {
   try {
     const accessToken = getAccessToken(req);
     const admin = createServiceClient();
+    const actorClient = createUserClient(accessToken);
     const { data: authData, error: authError } = await admin.auth.getUser(accessToken);
 
     if (authError || !authData.user) {
@@ -98,25 +99,44 @@ serve(async (req) => {
     const authId = String(user.id || "").trim();
     const email = String(user.email || "").trim().toLowerCase();
 
-    let profileQuery = admin
-      .from("employees")
-      .select("employee_id, name, role, position, department, seniority, auth_id, auth_email, must_change_password")
-      .limit(1);
+    let profile = null;
 
-    if (authId && email) {
-      profileQuery = profileQuery.or(`auth_id.eq.${authId},auth_email.ilike.${email}`);
-    } else if (authId) {
-      profileQuery = profileQuery.eq("auth_id", authId);
-    } else if (email) {
-      profileQuery = profileQuery.ilike("auth_email", email);
+    if (authId) {
+      const { data: byAuthId, error: byAuthIdError } = await actorClient
+        .from("employees")
+        .select("employee_id, name, role, position, department, seniority, auth_id, auth_email, must_change_password")
+        .eq("auth_id", authId)
+        .limit(1)
+        .maybeSingle();
+
+      if (byAuthIdError) {
+        return jsonResponse(500, {
+          ok: false,
+          error: { code: "profile_lookup_failed", message: byAuthIdError.message },
+        });
+      }
+      if (byAuthId) {
+        profile = byAuthId;
+      }
     }
 
-    const { data: profile, error: profileError } = await profileQuery.maybeSingle();
-    if (profileError) {
-      return jsonResponse(500, {
-        ok: false,
-        error: { code: "profile_lookup_failed", message: profileError.message },
-      });
+    if (!profile && email) {
+      const { data: byEmail, error: byEmailError } = await actorClient
+        .from("employees")
+        .select("employee_id, name, role, position, department, seniority, auth_id, auth_email, must_change_password")
+        .ilike("auth_email", email)
+        .limit(1)
+        .maybeSingle();
+
+      if (byEmailError) {
+        return jsonResponse(500, {
+          ok: false,
+          error: { code: "profile_lookup_failed", message: byEmailError.message },
+        });
+      }
+      if (byEmail) {
+        profile = byEmail;
+      }
     }
 
     if (profile && !profile.auth_id && authId) {

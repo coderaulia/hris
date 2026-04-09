@@ -200,8 +200,25 @@
                             <div class="small text-muted">Probation windows are date-to-date from join date, not fixed calendar month.</div>
                         </section>
 
+                        <section class="manual-section mb-4">
+                            <h2 class="fw-bold">6. Attendance Deduction Rules Setup</h2>
+                            <ol>
+                                <li>Open <strong>Settings &gt; General</strong>.</li>
+                                <li>Find <strong>Probation Attendance Deduction Rules</strong>.</li>
+                                <li>Use <strong>Reset Template</strong> to restore the default structure or <strong>Format JSON</strong> to clean up spacing.</li>
+                                <li><strong>monthly_cap</strong> is the maximum deduction allowed in one month.</li>
+                                <li>Each event inside <strong>events</strong> must have a user-friendly <strong>label</strong>.</li>
+                                <li>Use <strong>mode: "per_qty"</strong> for simple rules like 1 point per incident, with <strong>per_qty</strong> and <strong>max_points</strong>.</li>
+                                <li>Use <strong>mode: "tiered"</strong> for threshold-based rules, with a <strong>tiers</strong> list of <strong>min_qty</strong> and <strong>points</strong>.</li>
+                            </ol>
+                            <div class="small text-muted">
+                                Example:
+                                <code>{ "monthly_cap": 20, "events": { "late_in": { "label": "Late Clock In", "mode": "tiered", "tiers": [ { "min_qty": 3, "points": 1 } ] } } }</code>
+                            </div>
+                        </section>
+
                         <section class="manual-section">
-                            <h2 class="fw-bold">6. Troubleshooting</h2>
+                            <h2 class="fw-bold">7. Troubleshooting</h2>
                             <ul class="mb-0">
                                 <li>Missing menu/action: check role and filter scope first.</li>
                                 <li>KPI request not active: verify pending approval status.</li>
@@ -323,8 +340,25 @@
                             <div class="small text-muted">Window probation dihitung date-to-date dari join date, bukan bulan kalender tetap.</div>
                         </section>
 
+                        <section class="manual-section mb-4">
+                            <h2 class="fw-bold">6. Setup Aturan Attendance Deduction</h2>
+                            <ol>
+                                <li>Buka <strong>Settings &gt; General</strong>.</li>
+                                <li>Cari field <strong>Probation Attendance Deduction Rules</strong>.</li>
+                                <li>Gunakan <strong>Reset Template</strong> untuk mengembalikan format default atau <strong>Format JSON</strong> untuk merapikan isi JSON.</li>
+                                <li><strong>monthly_cap</strong> adalah batas maksimal deduction dalam satu bulan.</li>
+                                <li>Setiap event di dalam <strong>events</strong> wajib punya <strong>label</strong> yang mudah dibaca user.</li>
+                                <li>Gunakan <strong>mode: "per_qty"</strong> untuk aturan sederhana, misalnya 1 poin per kejadian, dengan field <strong>per_qty</strong> dan <strong>max_points</strong>.</li>
+                                <li>Gunakan <strong>mode: "tiered"</strong> untuk aturan bertingkat, dengan daftar <strong>tiers</strong> berisi <strong>min_qty</strong> dan <strong>points</strong>.</li>
+                            </ol>
+                            <div class="small text-muted">
+                                Contoh:
+                                <code>{ "monthly_cap": 20, "events": { "late_in": { "label": "Late Clock In", "mode": "tiered", "tiers": [ { "min_qty": 3, "points": 1 } ] } } }</code>
+                            </div>
+                        </section>
+
                         <section class="manual-section">
-                            <h2 class="fw-bold">6. Troubleshooting</h2>
+                            <h2 class="fw-bold">7. Troubleshooting</h2>
                             <ul class="mb-0">
                                 <li>Jika menu/aksi tidak muncul, cek role dan scope filter.</li>
                                 <li>Jika perubahan KPI belum aktif, cek status pending approval.</li>

@@ -25,9 +25,22 @@ export function createServiceClient(): SupabaseClient {
   });
 }
 
+export function createUserClient(token: string): SupabaseClient {
+  const env = getSupabaseEnv();
+  return createClient(env.url, env.anonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export async function requireActor(req: Request) {
   const token = getAccessToken(req);
   const admin = createServiceClient();
+  const actorClient = createUserClient(token);
   const { data, error } = await admin.auth.getUser(token);
 
   if (error || !data.user) {
@@ -37,28 +50,45 @@ export async function requireActor(req: Request) {
   const email = String(data.user.email || "").trim().toLowerCase();
   const authId = String(data.user.id || "").trim();
 
-  let query = admin
-    .from("employees")
-    .select("employee_id, role, name, auth_id, auth_email")
-    .limit(1);
+  let profile: ActorProfile | null = null;
 
-  if (authId && email) {
-    query = query.or(`auth_id.eq.${authId},auth_email.ilike.${email}`);
-  } else if (authId) {
-    query = query.eq("auth_id", authId);
-  } else if (email) {
-    query = query.ilike("auth_email", email);
+  if (authId) {
+    const { data: byAuthId, error: byAuthIdError } = await actorClient
+      .from("employees")
+      .select("employee_id, role, name, auth_id, auth_email")
+      .eq("auth_id", authId)
+      .limit(1)
+      .maybeSingle<ActorProfile>();
+
+    if (byAuthIdError) {
+      throw new Error(`Failed to resolve actor profile by auth_id: ${byAuthIdError.message}`);
+    }
+    if (byAuthId) {
+      profile = byAuthId;
+    }
   }
 
-  const { data: profile, error: profileError } = await query.maybeSingle<ActorProfile>();
-  if (profileError) {
-    throw new Error(`Failed to resolve actor profile: ${profileError.message}`);
+  if (!profile && email) {
+    const { data: byEmail, error: byEmailError } = await actorClient
+      .from("employees")
+      .select("employee_id, role, name, auth_id, auth_email")
+      .ilike("auth_email", email)
+      .limit(1)
+      .maybeSingle<ActorProfile>();
+
+    if (byEmailError) {
+      throw new Error(`Failed to resolve actor profile by auth_email: ${byEmailError.message}`);
+    }
+    if (byEmail) {
+      profile = byEmail;
+    }
   }
+
   if (!profile) {
     throw new Error("Authenticated user is not linked to an employee profile.");
   }
 
-  return { admin, authUser: data.user, actor: profile };
+  return { admin, actorClient, authUser: data.user, actor: profile };
 }
 
 export async function requireSuperadmin(req: Request) {

@@ -47,7 +47,21 @@ export async function renderSettings() {
 // ---- APP SETTINGS ----
 function renderAppSettings() {
     const { appSettings } = state;
-    const attendanceTemplate = JSON.stringify(JSON.parse(getDefaultProbationAttendanceRulesJson()));
+    const attendanceTemplate = getDefaultProbationAttendanceRulesJson();
+    const attendancePlaceholder = `{
+  "monthly_cap": 20,
+  "events": {
+    "late_in": {
+      "label": "Late Clock In",
+      "mode": "tiered",
+      "tiers": [
+        { "min_qty": 15, "points": 5 },
+        { "min_qty": 9, "points": 3 },
+        { "min_qty": 3, "points": 1 }
+      ]
+    }
+  }
+}`;
     const fields = [
         { key: 'app_name', label: 'Application Name', placeholder: 'e.g. HR Performance Suite' },
         { key: 'company_name', label: 'Company Name', placeholder: 'e.g. Your Company' },
@@ -59,7 +73,14 @@ function renderAppSettings() {
         { key: 'probation_weight_work', label: 'Probation Work Weight', placeholder: '50' },
         { key: 'probation_weight_managing', label: 'Probation Managing Weight', placeholder: '30' },
         { key: 'probation_weight_attitude', label: 'Probation Attitude Weight', placeholder: '20' },
-        { key: 'probation_attendance_rules_json', label: 'Probation Attendance Deduction Rules JSON', placeholder: '{"monthly_cap":20,"events":{...}}', defaultValue: attendanceTemplate },
+        {
+            key: 'probation_attendance_rules_json',
+            label: 'Probation Attendance Deduction Rules',
+            placeholder: attendancePlaceholder,
+            defaultValue: attendanceTemplate,
+            helper: 'Use readable JSON. "monthly_cap" limits total monthly deduction. Each event needs a label plus either "mode: per_qty" with "per_qty" and "max_points", or "mode: tiered" with a "tiers" list.',
+            example: 'Example events: "late_in", "missed_clock_out", "absent", "event_absent", "discipline", "other".',
+        },
     ];
 
     const container = document.getElementById('settings-app-fields');
@@ -70,15 +91,51 @@ function renderAppSettings() {
         const value = appSettings[f.key] || f.defaultValue || '';
         const isJsonField = f.key === 'probation_attendance_rules_json';
         const control = isJsonField
-            ? `<textarea class="form-control font-monospace small" id="setting-${f.key}" rows="4" placeholder="${f.placeholder}">${escapeHTML(value)}</textarea>`
+            ? `<textarea class="form-control font-monospace small" id="setting-${f.key}" rows="14" spellcheck="false" placeholder="${escapeHTML(f.placeholder)}">${escapeHTML(value)}</textarea>`
             : `<input type="text" class="form-control" id="setting-${f.key}" value="${escapeHTML(value)}" placeholder="${f.placeholder}">`;
+        const helper = f.helper
+            ? `<div class="form-text">${escapeHTML(f.helper)}</div>${f.example ? `<div class="form-text text-primary-emphasis">${escapeHTML(f.example)}</div>` : ''}`
+            : '';
+        const actions = isJsonField
+            ? `<div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.__app.resetProbationAttendanceRulesTemplate()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Template
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.__app.formatProbationAttendanceRulesJSON()">
+                    <i class="bi bi-braces-asterisk me-1"></i> Format JSON
+                </button>
+            </div>`
+            : '';
 
         container.innerHTML += `
       <div class="${isJsonField ? 'col-12' : 'col-md-6'} mb-3">
         <label class="form-label small fw-bold text-muted">${f.label}</label>
         ${control}
+        ${helper}
+        ${actions}
       </div>`;
     });
+}
+
+export function resetProbationAttendanceRulesTemplate() {
+    const el = document.getElementById('setting-probation_attendance_rules_json');
+    if (!el) return;
+    el.value = getDefaultProbationAttendanceRulesJson();
+}
+
+export async function formatProbationAttendanceRulesJSON() {
+    const el = document.getElementById('setting-probation_attendance_rules_json');
+    if (!el) return;
+
+    try {
+        const parsed = JSON.parse(el.value || '{}');
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Probation attendance rules must be a valid JSON object.');
+        }
+        el.value = JSON.stringify(parsed, null, 2);
+    } catch (err) {
+        await notify.error('Invalid probation attendance rules JSON: ' + err.message);
+    }
 }
 
 export async function saveAppSettings() {
@@ -104,7 +161,7 @@ export async function saveAppSettings() {
                     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
                         throw new Error('Probation attendance rules must be a valid JSON object.');
                     }
-                    newVal = JSON.stringify(parsed);
+                    newVal = JSON.stringify(parsed, null, 2);
                     el.value = newVal;
                 }
                 const prevVal = state.appSettings[key] || '';

@@ -43,9 +43,12 @@ async function authorizeRequest(req: Request) {
   const incomingSecret = getWebhookSecret(req).trim();
 
   if (configuredSecret && incomingSecret && configuredSecret === incomingSecret) {
+    const admin = createServiceClient();
     return {
       mode: "webhook",
-      admin: createServiceClient(),
+      admin,
+      dataClient: admin,
+      logClient: admin,
       actor: {
         employee_id: "system",
         role: "system",
@@ -54,7 +57,7 @@ async function authorizeRequest(req: Request) {
     };
   }
 
-  const { admin, actor } = await requireActor(req);
+  const { admin, actorClient, actor } = await requireActor(req);
   const role = String(actor.role || "").toLowerCase();
   if (!["superadmin", "hr", "manager", "director"].includes(role)) {
     throw new Error("Access denied.");
@@ -63,6 +66,8 @@ async function authorizeRequest(req: Request) {
   return {
     mode: "authenticated",
     admin,
+    dataClient: actorClient,
+    logClient: actorClient,
     actor,
   };
 }
@@ -120,8 +125,8 @@ async function sendEmail({
   };
 }
 
-async function logNotification(admin: ReturnType<typeof createServiceClient>, payload: Record<string, unknown>) {
-  await admin.from("admin_activity_log").insert({
+async function logNotification(client: ReturnType<typeof createServiceClient>, payload: Record<string, unknown>) {
+  await client.from("admin_activity_log").insert({
     actor_employee_id: payload.actor_employee_id || null,
     actor_role: payload.actor_role || "system",
     action: "approval.notification.send",
@@ -372,21 +377,22 @@ serve(async (req) => {
 
   try {
     const context = await authorizeRequest(req);
-    const admin = context.admin;
+    const dataClient = context.dataClient;
+    const logClient = context.logClient;
 
     let notification;
     switch (String(payload.action || "").trim()) {
       case "employee_kpi_target_versions":
-        notification = await buildKpiTargetNotification(admin, String(payload.version_id || "").trim());
+        notification = await buildKpiTargetNotification(dataClient, String(payload.version_id || "").trim());
         break;
       case "kpi_definition_versions":
-        notification = await buildKpiDefinitionNotification(admin, String(payload.version_id || "").trim());
+        notification = await buildKpiDefinitionNotification(dataClient, String(payload.version_id || "").trim());
         break;
       case "probation_reviews":
-        notification = await buildProbationNotification(admin, String(payload.review_id || "").trim());
+        notification = await buildProbationNotification(dataClient, String(payload.review_id || "").trim());
         break;
       case "pip_plans":
-        notification = await buildPipNotification(admin, String(payload.pip_plan_id || "").trim());
+        notification = await buildPipNotification(dataClient, String(payload.pip_plan_id || "").trim());
         break;
       default:
         return jsonResponse(400, {
@@ -417,7 +423,7 @@ serve(async (req) => {
           html: notification.html,
         });
 
-    await logNotification(admin, {
+    await logNotification(logClient, {
       actor_employee_id: context.actor.employee_id,
       actor_role: context.actor.role,
       entity_id: notification.entity_id,

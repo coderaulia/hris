@@ -63,7 +63,7 @@ async function logAdminAction(
 }
 
 async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
-  const { admin, actor } = await requireSuperadmin(req);
+  const { admin, actorClient, actor } = await requireSuperadmin(req);
   const employeeId = String(payload.employee_id || "").trim();
   const email = String(payload.email || "").trim().toLowerCase();
   const password = String(payload.password || "");
@@ -79,7 +79,7 @@ async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
     return errorResponse(400, "invalid_password", "Password must be at least 6 characters.");
   }
 
-  const { data: employee, error: employeeError } = await admin
+  const { data: employee, error: employeeError } = await actorClient
     .from("employees")
     .select("employee_id, name, auth_id, auth_email, role")
     .eq("employee_id", employeeId)
@@ -98,7 +98,7 @@ async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
     });
   }
 
-  const { data: duplicateEmployee } = await admin
+  const { data: duplicateEmployee } = await actorClient
     .from("employees")
     .select("employee_id")
     .ilike("auth_email", email)
@@ -123,7 +123,7 @@ async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
     return errorResponse(409, "auth_user_create_failed", createError?.message || "Unable to create auth user.");
   }
 
-  const { error: updateError } = await admin
+  const { error: updateError } = await actorClient
     .from("employees")
     .update({
       auth_email: email,
@@ -137,7 +137,7 @@ async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
   }
 
   await logAdminAction(
-    admin,
+    actorClient,
     actor.employee_id,
     actor.role,
     "user.login.setup",
@@ -160,7 +160,7 @@ async function handleCreateManagedUser(payload: ActionPayload, req: Request) {
 }
 
 async function handleUpdateEmployeeRole(payload: ActionPayload, req: Request) {
-  const { admin, actor } = await requireSuperadmin(req);
+  const { actorClient, actor } = await requireSuperadmin(req);
   const employeeId = String(payload.employee_id || "").trim();
   const role = String(payload.role || "").trim().toLowerCase();
 
@@ -171,7 +171,7 @@ async function handleUpdateEmployeeRole(payload: ActionPayload, req: Request) {
     return errorResponse(400, "invalid_role", "Role must be one of employee, manager, director, superadmin, hr.");
   }
 
-  const { data: employee, error: employeeError } = await admin
+  const { data: employee, error: employeeError } = await actorClient
     .from("employees")
     .select("employee_id, name, role")
     .eq("employee_id", employeeId)
@@ -185,7 +185,7 @@ async function handleUpdateEmployeeRole(payload: ActionPayload, req: Request) {
   }
 
   const previousRole = String(employee.role || "").toLowerCase();
-  const { error: updateError } = await admin
+  const { error: updateError } = await actorClient
     .from("employees")
     .update({ role })
     .eq("employee_id", employeeId);
@@ -195,7 +195,7 @@ async function handleUpdateEmployeeRole(payload: ActionPayload, req: Request) {
   }
 
   await logAdminAction(
-    admin,
+    actorClient,
     actor.employee_id,
     actor.role,
     "user.role.change",

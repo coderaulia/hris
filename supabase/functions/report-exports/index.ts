@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import ExcelJS from "npm:exceljs";
-import { jsPDF } from "npm:jspdf";
+import * as XLSX from "npm:xlsx";
+import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib";
 import { createServiceClient, requireActor } from "../_shared/auth.ts";
 import { corsHeaders, withCorsHeaders } from "../_shared/cors.ts";
 import { getOptionalEnv } from "../_shared/env.ts";
@@ -16,6 +16,7 @@ type Payload = {
 type ExportContext = {
   mode: string;
   admin: ReturnType<typeof createServiceClient>;
+  dataClient: ReturnType<typeof createServiceClient>;
   actor: { employee_id: string; role: string; name?: string };
 };
 
@@ -55,19 +56,21 @@ async function authorizeExport(req: Request): Promise<ExportContext> {
   const incomingSecret = req.headers.get("x-webhook-secret") || "";
 
   if (webhookSecret && incomingSecret && incomingSecret === webhookSecret) {
+    const admin = createServiceClient();
     return {
       mode: "webhook",
-      admin: createServiceClient(),
+      admin,
+      dataClient: admin,
       actor: { employee_id: "system", role: "system", name: "System Webhook" },
     };
   }
 
-  const { admin, actor } = await requireActor(req);
+  const { admin, actorClient, actor } = await requireActor(req);
   if (!canExportRole(actor.role)) {
     throw new Error("Access denied.");
   }
 
-  return { mode: "authenticated", admin, actor };
+  return { mode: "authenticated", admin, dataClient: actorClient, actor };
 }
 
 async function fetchEmployees(admin: ReturnType<typeof createServiceClient>) {
@@ -113,13 +116,14 @@ async function fetchProbationMonthlyScores(admin: ReturnType<typeof createServic
 }
 
 async function fetchProbationAttendance(admin: ReturnType<typeof createServiceClient>, reviewId: string) {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("probation_attendance_records")
     .select("month_no, event_date, event_type, qty, deduction_points, note")
     .eq("probation_review_id", reviewId)
     .order("month_no")
     .order("event_date");
 
+  if (error) throw new Error(`Failed to fetch probation attendance: ${error.message}`);
   return data || [];
 }
 
@@ -177,33 +181,46 @@ function formatDateForFilename() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
-function splitLongText(doc: jsPDF, text: string, maxWidth = 260): string[] {
-  return doc.splitTextToSize(String(text || ""), maxWidth);
+function wrapText(text: string, maxChars = 110): string[] {
+  const source = String(text || "").trim();
+  if (!source) return [""];
+
+  const words = source.split(/\s+/);
+  const lines: string[] = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length <= maxChars) {
+      current = next;
+      return;
+    }
+    if (current) lines.push(current);
+    current = word;
+  });
+
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [source];
 }
 
 async function generateDepartmentExcel(rows: Array<Record<string, unknown>>, department: string, period: string) {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet(department.substring(0, 31) || "Department");
-
   const avgAchievement = rows.length
     ? Math.round(rows.reduce((sum, row) => sum + safeNumber(row.achievement), 0) / rows.length)
     : 0;
   const employeeCount = new Set(rows.map((row) => String(row.employee_id))).size;
-
-  sheet.addRow([`KPI Department Report`]);
-  sheet.addRow([`Department: ${department}`]);
-  sheet.addRow([`Period: ${period}`]);
-  sheet.addRow([`Generated: ${new Date().toLocaleString("en-GB")}`]);
-  sheet.addRow([]);
-  sheet.addRow(["Summary", "Value"]);
-  sheet.addRow(["Total Employees", employeeCount]);
-  sheet.addRow(["Total KPI Records", rows.length]);
-  sheet.addRow(["Average Achievement", `${avgAchievement}%`]);
-  sheet.addRow([]);
-  sheet.addRow(["No", "Employee", "Position", "KPI Metric", "Unit", "Target", "Actual", "Achievement (%)", "Status"]);
-
-  rows.forEach((row, index) => {
-    sheet.addRow([
+  const worksheetData = [
+    ["KPI Department Report"],
+    [`Department: ${department}`],
+    [`Period: ${period}`],
+    [`Generated: ${new Date().toISOString()}`],
+    [],
+    ["Summary", "Value"],
+    ["Total Employees", employeeCount],
+    ["Total KPI Records", rows.length],
+    ["Average Achievement", `${avgAchievement}%`],
+    [],
+    ["No", "Employee", "Position", "KPI Metric", "Unit", "Target", "Actual", "Achievement (%)", "Status"],
+    ...rows.map((row, index) => ([
       index + 1,
       row.employee_name,
       row.position,
@@ -213,15 +230,17 @@ async function generateDepartmentExcel(rows: Array<Record<string, unknown>>, dep
       safeNumber(row.actual),
       safeNumber(row.achievement),
       row.status,
-    ]);
-  });
-
-  sheet.columns = [
-    { width: 6 }, { width: 26 }, { width: 22 }, { width: 28 }, { width: 10 },
-    { width: 14 }, { width: 14 }, { width: 16 }, { width: 14 },
+    ])),
   ];
 
-  const buffer = await workbook.xlsx.writeBuffer();
+  const workbook = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(worksheetData);
+  sheet["!cols"] = [
+    { wch: 6 }, { wch: 26 }, { wch: 22 }, { wch: 28 }, { wch: 10 },
+    { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+  ];
+  XLSX.utils.book_append_sheet(workbook, sheet, slugify(department, "Department").slice(0, 31));
+  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   return new Uint8Array(buffer);
 }
 
@@ -230,18 +249,15 @@ async function generateProbationExcel(payload: {
   review: Record<string, unknown>;
   monthlyScores: Array<Record<string, unknown>>;
 }) {
-  const workbook = new ExcelJS.Workbook();
-  const monthly = workbook.addWorksheet("Monthly");
-  const recap = workbook.addWorksheet("Recap");
   const employeeName = String(payload.employee.name || payload.review.employee_id || "Employee");
 
-  monthly.addRow(["Probation Assessment"]);
-  monthly.addRow(["Employee", employeeName, "", "Position", String(payload.employee.position || "-")]);
-  monthly.addRow(["Period", `${payload.review.review_period_start || "-"} to ${payload.review.review_period_end || "-"}`]);
-  monthly.addRow([]);
-  monthly.addRow(["Month", "Window", "Work", "Managing", "Attitude", "Deduction", "Total", "Qualitative"]);
-  payload.monthlyScores.forEach((row) => {
-    monthly.addRow([
+  const monthlyData = [
+    ["Probation Assessment"],
+    ["Employee", employeeName, "", "Position", String(payload.employee.position || "-")],
+    ["Period", `${payload.review.review_period_start || "-"} to ${payload.review.review_period_end || "-"}`],
+    [],
+    ["Month", "Window", "Work", "Managing", "Attitude", "Deduction", "Total", "Qualitative"],
+    ...payload.monthlyScores.map((row) => ([
       `Month ${row.month_no}`,
       `${row.period_start || "-"} to ${row.period_end || "-"}`,
       safeNumber(row.work_performance_score),
@@ -250,146 +266,133 @@ async function generateProbationExcel(payload: {
       safeNumber(row.attendance_deduction),
       safeNumber(row.monthly_total),
       String(row.manager_qualitative_text || row.manager_note || ""),
-    ]);
-  });
+    ])),
+  ];
 
-  recap.addRow(["Probation Recap"]);
-  recap.addRow(["Employee", employeeName]);
-  recap.addRow(["Decision", String(payload.review.decision || "pending")]);
-  recap.addRow(["Final Score", safeNumber(payload.review.final_score)]);
-  recap.addRow(["Quantitative Score", safeNumber(payload.review.quantitative_score)]);
-  recap.addRow(["Qualitative Score", safeNumber(payload.review.qualitative_score)]);
-  recap.addRow(["Summary", String(payload.review.manager_notes || "-")]);
+  const recapData = [
+    ["Probation Recap"],
+    ["Employee", employeeName],
+    ["Decision", String(payload.review.decision || "pending")],
+    ["Final Score", safeNumber(payload.review.final_score)],
+    ["Quantitative Score", safeNumber(payload.review.quantitative_score)],
+    ["Qualitative Score", safeNumber(payload.review.qualitative_score)],
+    ["Summary", String(payload.review.manager_notes || "-")],
+  ];
 
-  const buffer = await workbook.xlsx.writeBuffer();
+  const workbook = XLSX.utils.book_new();
+  const monthly = XLSX.utils.aoa_to_sheet(monthlyData);
+  const recap = XLSX.utils.aoa_to_sheet(recapData);
+  monthly["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 40 }];
+  recap["!cols"] = [{ wch: 20 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(workbook, monthly, "Monthly");
+  XLSX.utils.book_append_sheet(workbook, recap, "Recap");
+  const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   return new Uint8Array(buffer);
 }
 
-function generateDepartmentPdf(rows: Array<Record<string, unknown>>, department: string, period: string) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  let y = 14;
-  doc.setFontSize(14);
-  doc.text("KPI Department Report", 14, y);
-  y += 6;
-  doc.setFontSize(10);
-  doc.text(`Department: ${department} | Period: ${period}`, 14, y);
-  y += 8;
+async function createTextPdf(lines: string[], options?: { title?: string; subtitle?: string }) {
+  const pdf = await PDFDocument.create();
+  const pageSize: [number, number] = [841.89, 595.28];
+  let page = pdf.addPage(pageSize);
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const margin = 40;
+  const lineHeight = 16;
+  let y = page.getHeight() - margin;
 
-  rows.forEach((row, index) => {
-    const line = `${index + 1}. ${row.employee_name} | ${row.position} | ${row.kpi_name} | Target ${row.target} ${row.unit || ""} | Actual ${row.actual} ${row.unit || ""} | ${row.achievement}% | ${row.status}`;
-    const lines = splitLongText(doc, line, 270);
-    lines.forEach((text) => {
-      if (y > 200) {
-        doc.addPage();
-        y = 14;
-      }
-      doc.text(text, 14, y);
-      y += 5;
+  const addLine = (text: string, bold = false, size = 10) => {
+    if (y < margin) {
+      page = pdf.addPage(pageSize);
+      y = page.getHeight() - margin;
+    }
+    page.drawText(text, {
+      x: margin,
+      y,
+      size,
+      font: bold ? fontBold : font,
+      color: rgb(0.1, 0.1, 0.1),
     });
+    y -= lineHeight;
+  };
+
+  if (options?.title) addLine(options.title, true, 16);
+  if (options?.subtitle) addLine(options.subtitle, false, 11);
+  if (options?.title || options?.subtitle) y -= 4;
+
+  lines.forEach((line) => {
+    wrapText(line, 125).forEach((part) => addLine(part));
   });
 
-  return new Uint8Array(doc.output("arraybuffer"));
+  return await pdf.save();
 }
 
-function generateEmployeePdf(rows: Array<Record<string, unknown>>, employeeId: string, period: string) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+async function generateDepartmentPdf(rows: Array<Record<string, unknown>>, department: string, period: string) {
+  const lines = rows.map((row, index) =>
+    `${index + 1}. ${row.employee_name} | ${row.position} | ${row.kpi_name} | Target ${row.target} ${row.unit || ""} | Actual ${row.actual} ${row.unit || ""} | ${row.achievement}% | ${row.status}`,
+  );
+  return await createTextPdf(lines, {
+    title: "KPI Department Report",
+    subtitle: `Department: ${department} | Period: ${period}`,
+  });
+}
+
+async function generateEmployeePdf(rows: Array<Record<string, unknown>>, employeeId: string, period: string) {
   const first = rows[0];
-  let y = 14;
-  doc.setFontSize(14);
-  doc.text("Employee KPI Report", 14, y);
-  y += 6;
-  doc.setFontSize(10);
-  doc.text(`Employee: ${first?.employee_name || employeeId} | Position: ${first?.position || "-"} | Period: ${period}`, 14, y);
-  y += 8;
-
-  rows.forEach((row, index) => {
-    const line = `${index + 1}. ${row.kpi_name} | Target ${row.target} ${row.unit || ""} | Actual ${row.actual} ${row.unit || ""} | ${row.achievement}% | ${row.status}`;
-    const lines = splitLongText(doc, line, 270);
-    lines.forEach((text) => {
-      if (y > 200) {
-        doc.addPage();
-        y = 14;
-      }
-      doc.text(text, 14, y);
-      y += 5;
-    });
+  const lines = rows.map((row, index) =>
+    `${index + 1}. ${row.kpi_name} | Target ${row.target} ${row.unit || ""} | Actual ${row.actual} ${row.unit || ""} | ${row.achievement}% | ${row.status}`,
+  );
+  return await createTextPdf(lines, {
+    title: "Employee KPI Report",
+    subtitle: `Employee: ${first?.employee_name || employeeId} | Position: ${first?.position || "-"} | Period: ${period}`,
   });
-
-  return new Uint8Array(doc.output("arraybuffer"));
 }
 
-function generateProbationPdf(payload: {
+async function generateProbationPdf(payload: {
   employee: Record<string, unknown>;
   review: Record<string, unknown>;
   monthlyScores: Array<Record<string, unknown>>;
   attendance: Array<Record<string, unknown>>;
 }) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  let y = 14;
-  doc.setFontSize(14);
-  doc.text("Probation Assessment Report", 14, y);
-  y += 6;
-  doc.setFontSize(10);
-  doc.text(`Employee: ${payload.employee.name || payload.review.employee_id}`, 14, y);
-  y += 5;
-  doc.text(`Position: ${payload.employee.position || "-"}`, 14, y);
-  y += 5;
-  doc.text(`Window: ${payload.review.review_period_start || "-"} to ${payload.review.review_period_end || "-"}`, 14, y);
-  y += 5;
-  doc.text(`Decision: ${payload.review.decision || "pending"} | Final Score: ${safeNumber(payload.review.final_score)}`, 14, y);
-  y += 8;
-
-  payload.monthlyScores.forEach((row) => {
-    const block = [
+  const lines = [
+    `Employee: ${payload.employee.name || payload.review.employee_id}`,
+    `Position: ${payload.employee.position || "-"}`,
+    `Window: ${payload.review.review_period_start || "-"} to ${payload.review.review_period_end || "-"}`,
+    `Decision: ${payload.review.decision || "pending"} | Final Score: ${safeNumber(payload.review.final_score)}`,
+    "",
+    ...payload.monthlyScores.flatMap((row) => ([
       `Month ${row.month_no}: ${row.period_start || "-"} to ${row.period_end || "-"}`,
       `Work ${safeNumber(row.work_performance_score)} | Managing ${safeNumber(row.managing_task_score)} | Attitude ${safeNumber(row.attitude_score)} | Deduction ${safeNumber(row.attendance_deduction)} | Total ${safeNumber(row.monthly_total)}`,
       `Qualitative: ${String(row.manager_qualitative_text || row.manager_note || "-")}`,
-    ];
-    block.forEach((line) => {
-      const lines = splitLongText(doc, line, 180);
-      lines.forEach((text) => {
-        if (y > 275) {
-          doc.addPage();
-          y = 14;
-        }
-        doc.text(text, 14, y);
-        y += 5;
-      });
-    });
-    y += 2;
+      "",
+    ])),
+    ...(payload.attendance.length > 0
+      ? [
+        "Attendance:",
+        ...payload.attendance.map((row) =>
+          `Month ${row.month_no} | ${row.event_date || "-"} | ${row.event_type || "-"} x${safeNumber(row.qty)} | Deduction ${safeNumber(row.deduction_points)} | ${String(row.note || "")}`,
+        ),
+      ]
+      : []),
+  ];
+
+  return await createTextPdf(lines, {
+    title: "Probation Assessment Report",
+    subtitle: `${payload.employee.name || payload.review.employee_id}`,
   });
-
-  if (payload.attendance.length > 0) {
-    if (y > 250) {
-      doc.addPage();
-      y = 14;
-    }
-    doc.setFontSize(11);
-    doc.text("Attendance", 14, y);
-    y += 6;
-    doc.setFontSize(9);
-    payload.attendance.forEach((row) => {
-      const line = `Month ${row.month_no} | ${row.event_date || "-"} | ${row.event_type || "-"} x${safeNumber(row.qty)} | Deduction ${safeNumber(row.deduction_points)} | ${String(row.note || "")}`;
-      const lines = splitLongText(doc, line, 180);
-      lines.forEach((text) => {
-        if (y > 275) {
-          doc.addPage();
-          y = 14;
-        }
-        doc.text(text, 14, y);
-        y += 5;
-      });
-    });
-  }
-
-  return new Uint8Array(doc.output("arraybuffer"));
 }
 
 async function ensureExportBucket(admin: ReturnType<typeof createServiceClient>) {
   const bucket = getOptionalEnv("REPORT_EXPORT_BUCKET", "report-exports");
-  const { data } = await admin.storage.getBucket(bucket);
-  if (!data) {
-    await admin.storage.createBucket(bucket, { public: false });
+  const { data, error } = await admin.storage.getBucket(bucket);
+  if (data) return bucket;
+
+  if (error && !/not found/i.test(String(error.message || ""))) {
+    console.warn("report-exports:getBucket-warning", { bucket, message: error.message });
+  }
+
+  const { error: createError } = await admin.storage.createBucket(bucket, { public: false });
+  if (createError && !/already exists/i.test(String(createError.message || ""))) {
+    throw new Error(`Failed to ensure export bucket: ${createError.message}`);
   }
   return bucket;
 }
@@ -495,6 +498,14 @@ serve(async (req) => {
   }
 
   try {
+    console.info("report-exports:request", {
+      action: payload.action || null,
+      department: payload.department || null,
+      period: payload.period || null,
+      employee_id: payload.employee_id || null,
+      review_id: payload.review_id || null,
+    });
+
     const context = await authorizeExport(req);
     let bytes: Uint8Array;
     let contentType = "application/octet-stream";
@@ -502,36 +513,41 @@ serve(async (req) => {
 
     switch (String(payload.action || "").trim()) {
       case "department_kpi_excel": {
-        const exportData = await buildDepartmentExport(context.admin, payload);
+        const exportData = await buildDepartmentExport(context.dataClient, payload);
+        console.info("report-exports:department-export", { action: payload.action, rows: exportData.rows.length, department: exportData.department, period: exportData.period });
         bytes = await generateDepartmentExcel(exportData.rows, exportData.department, exportData.period);
         contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         filename = `KPI_Report_${slugify(exportData.department)}_${formatDateForFilename()}.xlsx`;
         break;
       }
       case "department_kpi_pdf": {
-        const exportData = await buildDepartmentExport(context.admin, payload);
-        bytes = generateDepartmentPdf(exportData.rows, exportData.department, exportData.period);
+        const exportData = await buildDepartmentExport(context.dataClient, payload);
+        console.info("report-exports:department-export", { action: payload.action, rows: exportData.rows.length, department: exportData.department, period: exportData.period });
+        bytes = await generateDepartmentPdf(exportData.rows, exportData.department, exportData.period);
         contentType = "application/pdf";
         filename = `KPI_Report_${slugify(exportData.department)}_${formatDateForFilename()}.pdf`;
         break;
       }
       case "employee_kpi_pdf": {
-        const exportData = await buildEmployeeExport(context.admin, payload);
-        bytes = generateEmployeePdf(exportData.rows, exportData.employeeId, exportData.period);
+        const exportData = await buildEmployeeExport(context.dataClient, payload);
+        console.info("report-exports:employee-export", { action: payload.action, rows: exportData.rows.length, employee_id: exportData.employeeId, period: exportData.period });
+        bytes = await generateEmployeePdf(exportData.rows, exportData.employeeId, exportData.period);
         contentType = "application/pdf";
         filename = `KPI_Employee_${slugify(String(exportData.rows[0]?.employee_name || exportData.employeeId))}_${formatDateForFilename()}.pdf`;
         break;
       }
       case "probation_excel": {
-        const exportData = await buildProbationExport(context.admin, payload);
+        const exportData = await buildProbationExport(context.dataClient, payload);
+        console.info("report-exports:probation-export", { action: payload.action, review_id: payload.review_id, employee_id: exportData.review.employee_id, months: exportData.monthlyScores.length, attendance: exportData.attendance.length });
         bytes = await generateProbationExcel(exportData);
         contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         filename = `probation_${slugify(String(exportData.employee.name || exportData.review.employee_id))}_${formatDateForFilename()}.xlsx`;
         break;
       }
       case "probation_pdf": {
-        const exportData = await buildProbationExport(context.admin, payload);
-        bytes = generateProbationPdf(exportData);
+        const exportData = await buildProbationExport(context.dataClient, payload);
+        console.info("report-exports:probation-export", { action: payload.action, review_id: payload.review_id, employee_id: exportData.review.employee_id, months: exportData.monthlyScores.length, attendance: exportData.attendance.length });
+        bytes = await generateProbationPdf(exportData);
         contentType = "application/pdf";
         filename = `probation_report_${slugify(String(exportData.employee.name || exportData.review.employee_id))}_${formatDateForFilename()}.pdf`;
         break;
@@ -563,6 +579,11 @@ serve(async (req) => {
       },
     });
   } catch (error) {
+    console.error("report-exports:error", {
+      action: payload?.action || null,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : null,
+    });
     return jsonResponse(/access denied/i.test(String(error)) ? 403 : 500, {
       ok: false,
       error: {
