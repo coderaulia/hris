@@ -6,5 +6,6 @@ export * from './config.js';
 export * from './kpi.js';
 export * from './probation.js';
 export * from './pip.js';
+export * from './manpower.js';
 export * from './dashboard.js';
 export * from './sync.js';

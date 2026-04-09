@@ -24,6 +24,11 @@ import {
     fetchDashboardProbationExpiry,
     fetchDashboardAssessmentCoverage,
 } from './dashboard.js';
+import {
+    fetchManpowerPlans,
+    fetchHeadcountRequests,
+    fetchRecruitmentPipeline,
+} from './manpower.js';
 
 async function syncAll() {
     const tasks = [
@@ -43,6 +48,9 @@ async function syncAll() {
         fetchProbationAttendanceRecords(),
         fetchPipPlans(),
         fetchPipActions(),
+        fetchManpowerPlans(),
+        fetchHeadcountRequests(),
+        fetchRecruitmentPipeline(),
         fetchDashboardSummary(),
         fetchDashboardProbationExpiry(),
         fetchDashboardAssessmentCoverage(),

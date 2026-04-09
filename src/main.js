@@ -221,6 +221,19 @@ const {
 
 const {
 	renderEmployeeManager,
+	renderManpowerPlanning,
+	renderHeadcountRequests,
+	saveManpowerPlanData,
+	loadManpowerPlanForEdit,
+	resetManpowerPlanForm,
+	deleteManpowerPlanData,
+	syncHeadcountFormFromPlan,
+	resetHeadcountRequestForm,
+	loadHeadcountRequestForEdit,
+	saveHeadcountRequestData,
+	approveHeadcountRequest,
+	rejectHeadcountRequest,
+	cancelHeadcountRequest,
 	saveEmployeeData,
 	loadEmployeeForEdit,
 	resetEmployeeForm,
@@ -229,6 +242,19 @@ const {
 	importEmployeeCSV,
 	clearEmployeeDirectoryFilters,
 } = createFeatureActions("employees", [
+	"renderManpowerPlanning",
+	"renderHeadcountRequests",
+	"saveManpowerPlanData",
+	"loadManpowerPlanForEdit",
+	"resetManpowerPlanForm",
+	"deleteManpowerPlanData",
+	"syncHeadcountFormFromPlan",
+	"resetHeadcountRequestForm",
+	"loadHeadcountRequestForEdit",
+	"saveHeadcountRequestData",
+	"approveHeadcountRequest",
+	"rejectHeadcountRequest",
+	"cancelHeadcountRequest",
 	"renderEmployeeManager",
 	"saveEmployeeData",
 	"loadEmployeeForEdit",
@@ -362,25 +388,27 @@ const NAVIGATION_GROUPS = [
 		id: "nav-group-employees",
 		label: "Employees",
 		icon: "bi-people-fill",
-		roles: ["superadmin"],
+		roles: ["superadmin", "hr", "manager"],
 		endpoints: ["employees", "employee_training_records"],
 		children: [
 			{
 				id: "nav-employees",
 				label: "Manpower Planning",
-				description: "Coming soon planning workspace",
+				description: "Headcount planning and approval workflow",
 				badge: "HR",
+				roles: ["superadmin", "hr", "manager"],
 				tabId: "tab-employees",
 				navId: "nav-employees",
 				contentTitle: "Manpower Planning",
 				contentDescription:
-					"Reserved for headcount planning, staffing forecasts, and hiring capacity workflows.",
+					"Plan staffing needs, submit headcount requests, and review workforce gaps by department.",
 				activate: () => switchTab("tab-employees", { employeesView: "employees-planning" }),
 			},
 			{
 				id: "nav-employees-directory",
 				label: "Staff Directory",
 				description: "Browse and export employee records",
+				roles: ["superadmin"],
 				tabId: "tab-employees",
 				navId: "nav-employees",
 				contentTitle: "Staff Directory",
@@ -392,6 +420,7 @@ const NAVIGATION_GROUPS = [
 				id: "nav-employees-add",
 				label: "Add New Employee",
 				description: "New employee insertion form",
+				roles: ["superadmin"],
 				tabId: "tab-employees",
 				navId: "nav-employees",
 				contentTitle: "Add New Employee",
@@ -622,6 +651,19 @@ window.__app = {
 	removeCompetencyRow,
 
 	// Employees
+	renderManpowerPlanning,
+	renderHeadcountRequests,
+	saveManpowerPlanData,
+	loadManpowerPlanForEdit,
+	resetManpowerPlanForm,
+	deleteManpowerPlanData,
+	syncHeadcountFormFromPlan,
+	resetHeadcountRequestForm,
+	loadHeadcountRequestForEdit,
+	saveHeadcountRequestData,
+	approveHeadcountRequest,
+	rejectHeadcountRequest,
+	cancelHeadcountRequest,
 	renderEmployeeManager,
 	saveEmployeeData,
 	loadEmployeeForEdit,
@@ -760,6 +802,7 @@ async function switchTab(tabId, options = {}) {
 	if (tabId === "tab-assessment") await renderPendingList();
 	if (tabId === "tab-employees") {
 		await renderEmployeeManager();
+		await renderManpowerPlanning();
 		toggleEmployeesView(options.employeesView || getActiveEmployeesViewId());
 	}
 	if (tabId === "tab-settings") {

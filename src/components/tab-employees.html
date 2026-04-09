@@ -1,27 +1,300 @@
         <!-- ==================== TAB: EMPLOYEES ==================== -->
         <div id="tab-employees" class="content-section">
             <div id="employees-planning" class="employee-subview">
-                <div class="card shadow-sm border-0">
-                    <div class="card-body p-4 p-lg-5">
-                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-4">
-                            <div>
-                                <span class="sidebar-link-badge mb-3 d-inline-flex">Coming Soon</span>
-                                <h3 class="fw-bold mb-2">Manpower Planning Workspace</h3>
-                                <p class="text-muted mb-4" style="max-width: 760px;">
-                                    This section will be used for headcount planning, vacancy forecasting, hiring pipeline summaries,
-                                    and department staffing recommendations. The layout is reserved so we can add planning tools
-                                    without mixing them into the employee master data screens.
-                                </p>
+                <div class="employee-directory-toolbar mb-3">
+                    <div class="employee-directory-intro">
+                        <div class="topbar-kicker">Workforce Planning</div>
+                        <h3 class="employee-directory-title">Manpower Planning Workspace</h3>
+                        <p class="employee-directory-copy mb-0">Plan approved headcount by period, compare it against the current roster, and surface staffing gaps before request and hiring workflow phases land.</p>
+                    </div>
+                    <div class="employee-directory-actions">
+                        <button id="mp-add-plan-btn" class="btn btn-primary" type="button" onclick="document.getElementById('mp-period')?.focus()">
+                            <i class="bi bi-plus-circle me-1"></i>Add Plan
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+                    <div class="col">
+                        <div class="card stat-card border-0 h-100">
+                            <div class="card-body">
+                                <div class="stat-icon bg-primary-subtle"><i class="bi bi-diagram-3 text-primary"></i></div>
+                                <small class="text-muted text-uppercase fw-bold">Plan Rows</small>
+                                <div class="fs-2 fw-bold" id="mp-total-plans">0</div>
+                                <div class="small text-muted">Active planning records</div>
                             </div>
-                            <div class="card border-0" style="min-width: 280px; background: linear-gradient(135deg, rgba(15,118,110,0.08), rgba(249,115,22,0.10));">
-                                <div class="card-body">
-                                    <div class="small text-uppercase fw-bold text-muted mb-2">Planned Modules</div>
-                                    <ul class="mb-0 ps-3 small text-muted">
-                                        <li>Headcount request intake</li>
-                                        <li>Approved vs actual manpower tracker</li>
-                                        <li>Open positions and hiring stage overview</li>
-                                        <li>Department workforce capacity dashboard</li>
-                                    </ul>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card stat-card border-0 h-100">
+                            <div class="card-body">
+                                <div class="stat-icon bg-success-subtle"><i class="bi bi-check2-square text-success"></i></div>
+                                <small class="text-muted text-uppercase fw-bold">Approved Headcount</small>
+                                <div class="fs-2 fw-bold" id="mp-approved-headcount">0</div>
+                                <div class="small text-muted">Budgeted staffing target</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card stat-card border-0 h-100">
+                            <div class="card-body">
+                                <div class="stat-icon bg-info-subtle"><i class="bi bi-people-fill text-info"></i></div>
+                                <small class="text-muted text-uppercase fw-bold">Filled Headcount</small>
+                                <div class="fs-2 fw-bold" id="mp-filled-headcount">0</div>
+                                <div class="small text-muted">Current employee roster</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card stat-card border-0 h-100">
+                            <div class="card-body">
+                                <div class="stat-icon bg-warning-subtle"><i class="bi bi-exclamation-circle text-warning"></i></div>
+                                <small class="text-muted text-uppercase fw-bold">Gap to Fill</small>
+                                <div class="fs-2 fw-bold" id="mp-gap-headcount">0</div>
+                                <div class="small text-muted">Approved minus filled</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Pending Requests</div>
+                                <div class="fs-3 fw-bold" id="mp-request-pending-count">0</div>
+                                <div class="small text-muted">Waiting for HR or superadmin review</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Approved Requests</div>
+                                <div class="fs-3 fw-bold" id="mp-request-approved-count">0</div>
+                                <div class="small text-muted">Ready to move into hiring workflow</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Rejected or Cancelled</div>
+                                <div class="fs-3 fw-bold" id="mp-request-closed-count">0</div>
+                                <div class="small text-muted">Requests not moving forward</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-xl-4">
+                        <div id="mp-plan-setup-card" class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="fw-bold m-0">Plan Setup</h6>
+                                    <div class="small text-muted">Phase 1 foundation for headcount planning.</div>
+                                </div>
+                                <span class="sidebar-link-badge">Phase 1</span>
+                            </div>
+                            <div class="card-body">
+                                <input type="hidden" id="mp-edit-id">
+                                <div class="row g-3">
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Period</label>
+                                        <input id="mp-period" type="month" class="form-control">
+                                    </div>
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Department</label>
+                                        <select id="mp-department" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Position</label>
+                                        <select id="mp-position" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Seniority</label>
+                                        <select id="mp-seniority" class="form-select"></select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small fw-bold text-muted">Planned</label>
+                                        <input id="mp-planned-headcount" type="number" min="0" step="1" class="form-control" value="0">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small fw-bold text-muted">Approved</label>
+                                        <input id="mp-approved-headcount-input" type="number" min="0" step="1" class="form-control" value="0">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Status</label>
+                                        <select id="mp-status" class="form-select">
+                                            <option value="draft">Draft</option>
+                                            <option value="submitted">Submitted</option>
+                                            <option value="approved">Approved</option>
+                                            <option value="active">Active</option>
+                                            <option value="closed">Closed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Notes</label>
+                                        <textarea id="mp-notes" rows="4" class="form-control" placeholder="Business context, staffing assumptions, or hiring constraints..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
+                                <button id="mp-cancel-btn" class="btn btn-outline-secondary hidden" type="button" onclick="window.__app.resetManpowerPlanForm()">Cancel</button>
+                                <button class="btn btn-primary" type="button" onclick="window.__app.saveManpowerPlanData()">
+                                    <i class="bi bi-save me-1"></i>Save Plan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-8">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="fw-bold m-0">Approved vs Filled Headcount</h6>
+                                    <div class="small text-muted">Current filled count is derived from employee master data by department, position, and seniority.</div>
+                                </div>
+                                <div class="small text-muted" id="mp-table-meta">No plans loaded</div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div id="mp-empty-state" class="p-4 hidden">
+                                    <div class="border rounded-4 p-4 text-center" style="background: linear-gradient(135deg, rgba(14,165,233,0.06), rgba(16,185,129,0.06));">
+                                        <div class="fs-2 mb-2"><i class="bi bi-diagram-3"></i></div>
+                                        <h5 class="fw-bold mb-2">Start your first manpower plan</h5>
+                                        <p class="text-muted mb-3">Phase 1 is ready for baseline headcount planning. Add a period, department, role, and target headcount to begin tracking workforce gaps.</p>
+                                        <button class="btn btn-primary" type="button" onclick="document.getElementById('mp-period')?.focus()">
+                                            <i class="bi bi-plus-circle me-1"></i>Create First Plan
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th class="ps-3">Period</th>
+                                                <th>Department</th>
+                                                <th>Position</th>
+                                                <th>Seniority</th>
+                                                <th class="text-end">Planned</th>
+                                                <th class="text-end">Approved</th>
+                                                <th class="text-end">Filled</th>
+                                                <th class="text-end">Gap</th>
+                                                <th>Status</th>
+                                                <th class="text-end pe-3">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="manpower-plan-body">
+                                            <tr>
+                                                <td colspan="10" class="text-center text-muted py-4 fst-italic">No manpower plans yet.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-xl-4">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="fw-bold m-0">Headcount Request Intake</h6>
+                                    <div class="small text-muted">Managers can submit scoped requests. HR and superadmin can review them.</div>
+                                </div>
+                                <span class="sidebar-link-badge">Phase 2</span>
+                            </div>
+                            <div class="card-body">
+                                <input type="hidden" id="mpr-edit-id">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Linked Plan</label>
+                                        <select id="mpr-plan-id" class="form-select" onchange="window.__app.syncHeadcountFormFromPlan()"></select>
+                                    </div>
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Department</label>
+                                        <select id="mpr-department" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6 col-xl-12">
+                                        <label class="form-label small fw-bold text-muted">Position</label>
+                                        <select id="mpr-position" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Seniority</label>
+                                        <select id="mpr-seniority" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Requested Count</label>
+                                        <input id="mpr-requested-count" type="number" min="1" step="1" class="form-control" value="1">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Priority</label>
+                                        <select id="mpr-priority" class="form-select">
+                                            <option value="normal">Normal</option>
+                                            <option value="low">Low</option>
+                                            <option value="high">High</option>
+                                            <option value="urgent">Urgent</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Target Hire Date</label>
+                                        <input id="mpr-target-hire-date" type="date" class="form-control">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Business Reason</label>
+                                        <textarea id="mpr-business-reason" rows="4" class="form-control" placeholder="Explain the staffing gap, workload risk, or business need..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
+                                <button id="mpr-cancel-btn" class="btn btn-outline-secondary hidden" type="button" onclick="window.__app.resetHeadcountRequestForm()">Cancel</button>
+                                <button class="btn btn-primary" type="button" onclick="window.__app.saveHeadcountRequestData()">
+                                    <i class="bi bi-send-check me-1"></i>Submit Request
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-8">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="fw-bold m-0">Headcount Request Queue</h6>
+                                    <div class="small text-muted">Track pending approvals, hiring demand, and request ownership by department.</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select id="mpr-filter-status" class="form-select form-select-sm" style="min-width: 180px;" onchange="window.__app.renderHeadcountRequests()">
+                                        <option value="">All Statuses</option>
+                                        <option value="pending">Pending</option>
+                                        <option value="approved">Approved</option>
+                                        <option value="rejected">Rejected</option>
+                                        <option value="cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table align-middle mb-0">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th class="ps-3">Request</th>
+                                                <th>Plan</th>
+                                                <th>Priority</th>
+                                                <th>Status</th>
+                                                <th>Owner</th>
+                                                <th class="text-end">Target Hire</th>
+                                                <th class="text-end pe-3">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="headcount-request-body">
+                                            <tr>
+                                                <td colspan="7" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>

@@ -6,7 +6,15 @@
 import { state, emit, isAdmin } from '../lib/store.js';
 import { getManagerAssessment } from '../lib/employee-records.js';
 import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } from '../lib/utils.js';
-import { saveEmployee, deleteEmployee as deleteEmpFromDB, logActivity } from './data.js';
+import {
+    saveEmployee,
+    deleteEmployee as deleteEmpFromDB,
+    saveManpowerPlan,
+    deleteManpowerPlan as deleteManpowerPlanFromDB,
+    saveHeadcountRequest,
+    updateHeadcountRequestStatus,
+    logActivity,
+} from './data.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 import { getSwal } from '../lib/swal.js';
@@ -432,6 +440,661 @@ export function loadEmployeeForEdit(id) {
     }).catch(async err => {
         await notify.error('Failed to update employee: ' + (err.message || err));
     });
+}
+
+function getManpowerOptionData() {
+    const { appConfig, appSettings, db } = state;
+    const positions = new Set();
+
+    Object.keys(appConfig || {}).forEach(pos => positions.add(pos));
+    Object.values(db || {}).forEach(rec => {
+        if (rec?.position) positions.add(rec.position);
+    });
+
+    const departmentOptions = (appSettings.departments || 'Human Resources, Finance, IT, Operations, Marketing, Sales')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    const seniorityOptions = (appSettings.levels || 'Junior, Intermediate, Senior, Lead, Manager, Director')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    return {
+        positions: [...positions].sort((a, b) => a.localeCompare(b)),
+        departments: departmentOptions,
+        seniorities: seniorityOptions,
+    };
+}
+
+function getCurrentPeriodValue() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function canApproveHeadcountRequests() {
+    return ['superadmin', 'hr'].includes(String(state.currentUser?.role || '').toLowerCase());
+}
+
+function canManageManpowerPlans() {
+    return ['superadmin', 'hr'].includes(String(state.currentUser?.role || '').toLowerCase());
+}
+
+function canAccessManpowerPlanning() {
+    return ['superadmin', 'hr', 'manager'].includes(String(state.currentUser?.role || '').toLowerCase());
+}
+
+function canEditHeadcountRequest(request) {
+    if (!request) return false;
+    if (canApproveHeadcountRequests()) return true;
+    return String(request.requested_by || '') === String(state.currentUser?.id || '')
+        && ['pending', 'cancelled'].includes(String(request.approval_status || '').toLowerCase());
+}
+
+function buildHeadcountRequestCode() {
+    const now = new Date();
+    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `REQ-${ymd}-${suffix}`;
+}
+
+function setSelectOptions(selectId, options, selectedValue = '', placeholder = '-- Select --') {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+    el.innerHTML = buildOptionsHtml(options, selectedValue, placeholder);
+}
+
+function readManpowerPlanForm() {
+    return {
+        id: document.getElementById('mp-edit-id')?.value?.trim() || '',
+        period: document.getElementById('mp-period')?.value || '',
+        department: document.getElementById('mp-department')?.value || '',
+        position: document.getElementById('mp-position')?.value || '',
+        seniority: document.getElementById('mp-seniority')?.value || '',
+        planned_headcount: Number(document.getElementById('mp-planned-headcount')?.value || 0),
+        approved_headcount: Number(document.getElementById('mp-approved-headcount-input')?.value || 0),
+        status: document.getElementById('mp-status')?.value || 'draft',
+        notes: document.getElementById('mp-notes')?.value?.trim() || '',
+    };
+}
+
+export function resetManpowerPlanForm() {
+    const periodEl = document.getElementById('mp-period');
+    if (periodEl) periodEl.value = getCurrentPeriodValue();
+
+    const editIdEl = document.getElementById('mp-edit-id');
+    if (editIdEl) editIdEl.value = '';
+
+    const plannedEl = document.getElementById('mp-planned-headcount');
+    if (plannedEl) plannedEl.value = '0';
+
+    const approvedEl = document.getElementById('mp-approved-headcount-input');
+    if (approvedEl) approvedEl.value = '0';
+
+    const statusEl = document.getElementById('mp-status');
+    if (statusEl) statusEl.value = 'draft';
+
+    const notesEl = document.getElementById('mp-notes');
+    if (notesEl) notesEl.value = '';
+
+    const cancelBtn = document.getElementById('mp-cancel-btn');
+    if (cancelBtn) cancelBtn.classList.add('hidden');
+
+    const options = getManpowerOptionData();
+    setSelectOptions('mp-department', options.departments, '', '-- Select Department --');
+    setSelectOptions('mp-position', options.positions, '', '-- Select Position --');
+    setSelectOptions('mp-seniority', options.seniorities, '', '-- Select Seniority --');
+}
+
+export function renderManpowerPlanning() {
+    const tbody = document.getElementById('manpower-plan-body');
+    if (!tbody) return;
+    if (!canAccessManpowerPlanning()) return;
+    const canManagePlans = canManageManpowerPlans();
+    document.getElementById('mp-plan-setup-card')?.classList.toggle('hidden', !canManagePlans);
+    document.getElementById('mp-add-plan-btn')?.classList.toggle('hidden', !canManagePlans);
+
+    const plans = Array.isArray(state.manpowerPlans) ? [...state.manpowerPlans] : [];
+    const metaEl = document.getElementById('mp-table-meta');
+    const emptyState = document.getElementById('mp-empty-state');
+
+    if (!document.getElementById('mp-period')?.value) {
+        resetManpowerPlanForm();
+    } else {
+        const options = getManpowerOptionData();
+        setSelectOptions('mp-department', options.departments, document.getElementById('mp-department')?.value || '', '-- Select Department --');
+        setSelectOptions('mp-position', options.positions, document.getElementById('mp-position')?.value || '', '-- Select Position --');
+        setSelectOptions('mp-seniority', options.seniorities, document.getElementById('mp-seniority')?.value || '', '-- Select Seniority --');
+    }
+
+    const totalPlans = plans.length;
+    const approvedHeadcount = plans.reduce((sum, row) => sum + Number(row.approved_headcount || 0), 0);
+    const filledHeadcount = plans.reduce((sum, row) => sum + Number(row.filled_headcount || 0), 0);
+    const gapHeadcount = plans.reduce((sum, row) => sum + Number(row.gap_headcount || 0), 0);
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = String(value);
+    };
+
+    setText('mp-total-plans', totalPlans);
+    setText('mp-approved-headcount', approvedHeadcount);
+    setText('mp-filled-headcount', filledHeadcount);
+    setText('mp-gap-headcount', gapHeadcount);
+
+    if (metaEl) {
+        metaEl.innerText = totalPlans > 0
+            ? `${totalPlans} plan${totalPlans === 1 ? '' : 's'} loaded`
+            : 'No plans loaded';
+    }
+
+    if (emptyState) emptyState.classList.toggle('hidden', totalPlans > 0);
+
+    tbody.innerHTML = '';
+    if (totalPlans === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4 fst-italic">No manpower plans yet.</td></tr>';
+        return;
+    }
+
+    plans
+        .sort((a, b) => {
+            const periodCompare = String(b.period || '').localeCompare(String(a.period || ''));
+            if (periodCompare !== 0) return periodCompare;
+            const deptCompare = String(a.department || '').localeCompare(String(b.department || ''));
+            if (deptCompare !== 0) return deptCompare;
+            return String(a.position || '').localeCompare(String(b.position || ''));
+        })
+        .forEach(plan => {
+            const status = String(plan.status || 'draft');
+            const statusClass = status === 'active' || status === 'approved'
+                ? 'bg-success-subtle text-success border'
+                : status === 'submitted'
+                    ? 'bg-warning-subtle text-warning border'
+                    : status === 'closed'
+                        ? 'bg-secondary-subtle text-secondary border'
+                        : 'bg-light text-muted border';
+
+            tbody.innerHTML += `
+                <tr>
+                    <td class="ps-3 fw-semibold">${escapeHTML(plan.period || '-')}</td>
+                    <td>${escapeHTML(plan.department || '-')}</td>
+                    <td>${escapeHTML(plan.position || '-')}</td>
+                    <td>${escapeHTML(plan.seniority || '-')}</td>
+                    <td class="text-end">${escapeHTML(String(plan.planned_headcount ?? 0))}</td>
+                    <td class="text-end">${escapeHTML(String(plan.approved_headcount ?? 0))}</td>
+                    <td class="text-end">${escapeHTML(String(plan.filled_headcount ?? 0))}</td>
+                    <td class="text-end fw-bold ${Number(plan.gap_headcount || 0) > 0 ? 'text-warning' : 'text-success'}">${escapeHTML(String(plan.gap_headcount ?? 0))}</td>
+                    <td><span class="badge ${statusClass}">${escapeHTML(status)}</span></td>
+                    <td class="text-end pe-3">
+                        ${canManagePlans ? `<div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="window.__app.loadManpowerPlanForEdit('${escapeInlineArg(plan.id)}')" title="Edit plan">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" onclick="window.__app.deleteManpowerPlanData('${escapeInlineArg(plan.id)}')" title="Delete plan">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>` : '<span class="text-muted small">Read only</span>'}
+                    </td>
+                </tr>
+            `;
+        });
+
+    renderHeadcountRequests();
+}
+
+function readHeadcountRequestForm() {
+    return {
+        id: document.getElementById('mpr-edit-id')?.value?.trim() || '',
+        plan_id: document.getElementById('mpr-plan-id')?.value || null,
+        department: document.getElementById('mpr-department')?.value || '',
+        position: document.getElementById('mpr-position')?.value || '',
+        seniority: document.getElementById('mpr-seniority')?.value || '',
+        requested_count: Number(document.getElementById('mpr-requested-count')?.value || 1),
+        priority: document.getElementById('mpr-priority')?.value || 'normal',
+        target_hire_date: document.getElementById('mpr-target-hire-date')?.value || null,
+        business_reason: document.getElementById('mpr-business-reason')?.value?.trim() || '',
+    };
+}
+
+function syncHeadcountFormFromPlan() {
+    const planId = document.getElementById('mpr-plan-id')?.value || '';
+    if (!planId) return;
+    const plan = (state.manpowerPlans || []).find(row => row.id === planId);
+    if (!plan) return;
+
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && !el.value) el.value = value ?? '';
+    };
+
+    setValue('mpr-department', plan.department || '');
+    setValue('mpr-position', plan.position || '');
+    setValue('mpr-seniority', plan.seniority || '');
+}
+
+function populateHeadcountRequestFormOptions(selected = {}) {
+    const options = getManpowerOptionData();
+    setSelectOptions('mpr-department', options.departments, selected.department || '', '-- Select Department --');
+    setSelectOptions('mpr-position', options.positions, selected.position || '', '-- Select Position --');
+    setSelectOptions('mpr-seniority', options.seniorities, selected.seniority || '', '-- Select Seniority --');
+
+    const planSelect = document.getElementById('mpr-plan-id');
+    if (planSelect) {
+        const selectedPlanId = selected.plan_id || '';
+        const plans = [{ id: '', label: 'Optional: link to manpower plan' }]
+            .concat((state.manpowerPlans || []).map(plan => ({
+                id: plan.id,
+                label: `${plan.period} · ${plan.department} · ${plan.position}${plan.seniority ? ` · ${plan.seniority}` : ''}`,
+            })));
+        planSelect.innerHTML = plans
+            .map(plan => `<option value="${escapeHTML(plan.id)}" ${selectedPlanId === plan.id ? 'selected' : ''}>${escapeHTML(plan.label)}</option>`)
+            .join('');
+    }
+}
+
+export function resetHeadcountRequestForm() {
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    };
+
+    setValue('mpr-edit-id', '');
+    setValue('mpr-requested-count', 1);
+    setValue('mpr-priority', 'normal');
+    setValue('mpr-target-hire-date', '');
+    setValue('mpr-business-reason', '');
+    document.getElementById('mpr-cancel-btn')?.classList.add('hidden');
+
+    populateHeadcountRequestFormOptions();
+
+    const role = String(state.currentUser?.role || '').toLowerCase();
+    if (role === 'manager') {
+        setValue('mpr-department', state.currentUser?.department || '');
+    }
+}
+
+export function renderHeadcountRequests() {
+    const tbody = document.getElementById('headcount-request-body');
+    if (!tbody) return;
+
+    const requests = Array.isArray(state.headcountRequests) ? [...state.headcountRequests] : [];
+    const filterStatus = document.getElementById('mpr-filter-status')?.value || '';
+
+    populateHeadcountRequestFormOptions({
+        plan_id: document.getElementById('mpr-plan-id')?.value || '',
+        department: document.getElementById('mpr-department')?.value || '',
+        position: document.getElementById('mpr-position')?.value || '',
+        seniority: document.getElementById('mpr-seniority')?.value || '',
+    });
+
+    const visibleRequests = requests.filter(request => {
+        if (!filterStatus) return true;
+        return String(request.approval_status || '').toLowerCase() === filterStatus;
+    });
+
+    const pendingCount = requests.filter(req => String(req.approval_status || '').toLowerCase() === 'pending').length;
+    const approvedCount = requests.filter(req => String(req.approval_status || '').toLowerCase() === 'approved').length;
+    const closedCount = requests.filter(req => ['rejected', 'cancelled'].includes(String(req.approval_status || '').toLowerCase())).length;
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = String(value);
+    };
+
+    setText('mp-request-pending-count', pendingCount);
+    setText('mp-request-approved-count', approvedCount);
+    setText('mp-request-closed-count', closedCount);
+
+    tbody.innerHTML = '';
+    if (visibleRequests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td></tr>';
+        return;
+    }
+
+    visibleRequests.forEach(request => {
+        const status = String(request.approval_status || 'pending').toLowerCase();
+        const statusClass = status === 'approved'
+            ? 'bg-success-subtle text-success border'
+            : status === 'pending'
+                ? 'bg-warning-subtle text-warning border'
+                : 'bg-secondary-subtle text-secondary border';
+        const priority = String(request.priority || 'normal').toLowerCase();
+        const priorityClass = priority === 'urgent'
+            ? 'text-danger'
+            : priority === 'high'
+                ? 'text-warning'
+                : 'text-muted';
+
+        const canEdit = canEditHeadcountRequest(request);
+        const canApprove = canApproveHeadcountRequests() && status === 'pending';
+        const ownerLabel = request.requested_by_name || request.requested_by || '-';
+        const targetHire = request.target_hire_date || '-';
+        const planLabel = request.plan_period
+            ? `${request.plan_period} · ${request.department} · ${request.position}`
+            : `${request.department} · ${request.position}`;
+
+        tbody.innerHTML += `
+            <tr>
+                <td class="ps-3">
+                    <div class="fw-semibold">${escapeHTML(request.request_code || 'Pending Code')}</div>
+                    <div class="small text-muted">${escapeHTML(planLabel)}</div>
+                    <div class="small text-muted">${escapeHTML(request.requested_count)} opening(s)</div>
+                </td>
+                <td>
+                    <div class="small fw-semibold">${escapeHTML(request.plan_period || '-')}</div>
+                    <div class="small text-muted">${escapeHTML(request.seniority || '-')}</div>
+                </td>
+                <td><span class="small fw-bold ${priorityClass}">${escapeHTML(priority)}</span></td>
+                <td>
+                    <span class="badge ${statusClass}">${escapeHTML(status)}</span>
+                    ${request.approval_note ? `<div class="small text-muted mt-1">${escapeHTML(request.approval_note)}</div>` : ''}
+                </td>
+                <td>
+                    <div class="small fw-semibold">${escapeHTML(ownerLabel)}</div>
+                    <div class="small text-muted">${escapeHTML(request.approved_by_name || '')}</div>
+                </td>
+                <td class="text-end">${escapeHTML(targetHire)}</td>
+                <td class="text-end pe-3">
+                    <div class="btn-group btn-group-sm">
+                        ${canEdit ? `<button class="btn btn-outline-primary" onclick="window.__app.loadHeadcountRequestForEdit('${escapeInlineArg(request.id)}')" title="Edit request"><i class="bi bi-pencil"></i></button>` : ''}
+                        ${canApprove ? `<button class="btn btn-outline-success" onclick="window.__app.approveHeadcountRequest('${escapeInlineArg(request.id)}')" title="Approve request"><i class="bi bi-check2"></i></button>` : ''}
+                        ${canApprove ? `<button class="btn btn-outline-danger" onclick="window.__app.rejectHeadcountRequest('${escapeInlineArg(request.id)}')" title="Reject request"><i class="bi bi-x-lg"></i></button>` : ''}
+                        ${!canApprove && canEdit && status === 'pending' ? `<button class="btn btn-outline-secondary" onclick="window.__app.cancelHeadcountRequest('${escapeInlineArg(request.id)}')" title="Cancel request"><i class="bi bi-slash-circle"></i></button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+export function loadHeadcountRequestForEdit(id) {
+    const request = (state.headcountRequests || []).find(row => row.id === id);
+    if (!request || !canEditHeadcountRequest(request)) return;
+
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    };
+
+    populateHeadcountRequestFormOptions(request);
+    setValue('mpr-edit-id', request.id);
+    setValue('mpr-requested-count', request.requested_count ?? 1);
+    setValue('mpr-priority', request.priority || 'normal');
+    setValue('mpr-target-hire-date', request.target_hire_date || '');
+    setValue('mpr-business-reason', request.business_reason || '');
+    document.getElementById('mpr-cancel-btn')?.classList.remove('hidden');
+    document.getElementById('mpr-plan-id')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+export async function saveHeadcountRequestData() {
+    if (!canAccessManpowerPlanning()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const values = readHeadcountRequestForm();
+    if (!values.department || !values.position || !values.business_reason) {
+        await notify.warn('Department, position, and business reason are required.');
+        return;
+    }
+    if (values.requested_count <= 0) {
+        await notify.warn('Requested count must be greater than zero.');
+        return;
+    }
+
+    const existing = values.id
+        ? (state.headcountRequests || []).find(row => row.id === values.id)
+        : null;
+    if (existing && !canEditHeadcountRequest(existing)) {
+        await notify.error('You cannot edit this request.');
+        return;
+    }
+
+    const payload = {
+        id: existing?.id || undefined,
+        plan_id: values.plan_id || null,
+        request_code: existing?.request_code || buildHeadcountRequestCode(),
+        department: values.department,
+        position: values.position,
+        seniority: values.seniority || '',
+        requested_count: Math.round(values.requested_count),
+        business_reason: values.business_reason,
+        priority: values.priority,
+        requested_by: existing?.requested_by || state.currentUser?.id || '',
+        approved_by: existing?.approved_by || null,
+        approval_status: existing?.approval_status || 'pending',
+        approval_note: existing?.approval_note || '',
+        target_hire_date: values.target_hire_date || null,
+    };
+
+    await notify.withLoading(async () => {
+        await saveHeadcountRequest(payload);
+    }, existing ? 'Updating Headcount Request' : 'Submitting Headcount Request', 'Saving request workflow...');
+
+    await logActivity({
+        action: existing ? 'headcount_request.update' : 'headcount_request.create',
+        entityType: 'headcount_request',
+        entityId: existing?.id || payload.request_code,
+        details: {
+            request_code: payload.request_code,
+            department: payload.department,
+            position: payload.position,
+            seniority: payload.seniority,
+            requested_count: payload.requested_count,
+            priority: payload.priority,
+        },
+    });
+
+    resetHeadcountRequestForm();
+    renderHeadcountRequests();
+    await notify.success(existing ? 'Headcount request updated.' : 'Headcount request submitted.');
+}
+
+async function updateHeadcountRequestDecision(id, approvalStatus, promptTitle) {
+    const request = (state.headcountRequests || []).find(row => row.id === id);
+    if (!request) return;
+
+    const note = await notify.input({
+        title: promptTitle,
+        inputLabel: 'Optional note',
+        inputPlaceholder: approvalStatus === 'approved' ? 'Approval context or hiring note' : 'Reason for rejection',
+        confirmButtonText: approvalStatus === 'approved' ? 'Confirm Approval' : 'Confirm Rejection',
+    });
+    if (note === null) return;
+
+    await notify.withLoading(async () => {
+        await updateHeadcountRequestStatus(id, {
+            approval_status: approvalStatus,
+            approved_by: state.currentUser?.id || null,
+            approval_note: note || '',
+        });
+    }, approvalStatus === 'approved' ? 'Approving Request' : 'Rejecting Request', 'Updating approval state...');
+
+    await logActivity({
+        action: approvalStatus === 'approved' ? 'headcount_request.approve' : 'headcount_request.reject',
+        entityType: 'headcount_request',
+        entityId: id,
+        details: {
+            request_code: request.request_code,
+            approval_status: approvalStatus,
+            approval_note: note || '',
+        },
+    });
+
+    renderHeadcountRequests();
+    await notify.success(approvalStatus === 'approved' ? 'Request approved.' : 'Request rejected.');
+}
+
+export async function approveHeadcountRequest(id) {
+    if (!canApproveHeadcountRequests()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+    await updateHeadcountRequestDecision(id, 'approved', 'Approve Headcount Request');
+}
+
+export async function rejectHeadcountRequest(id) {
+    if (!canApproveHeadcountRequests()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+    await updateHeadcountRequestDecision(id, 'rejected', 'Reject Headcount Request');
+}
+
+export async function cancelHeadcountRequest(id) {
+    const request = (state.headcountRequests || []).find(row => row.id === id);
+    if (!request || !canEditHeadcountRequest(request)) {
+        await notify.error('You cannot cancel this request.');
+        return;
+    }
+
+    const confirmed = await notify.confirm(`Cancel request ${request.request_code || id}?`, {
+        confirmButtonText: 'Cancel Request',
+    });
+    if (!confirmed) return;
+
+    await notify.withLoading(async () => {
+        await updateHeadcountRequestStatus(id, {
+            approval_status: 'cancelled',
+            approved_by: null,
+            approval_note: '',
+        });
+    }, 'Cancelling Request', 'Updating request state...');
+
+    await logActivity({
+        action: 'headcount_request.cancel',
+        entityType: 'headcount_request',
+        entityId: id,
+        details: {
+            request_code: request.request_code,
+        },
+    });
+
+    renderHeadcountRequests();
+    await notify.success('Request cancelled.');
+}
+
+export function loadManpowerPlanForEdit(id) {
+    if (!canManageManpowerPlans()) return;
+    const plan = (state.manpowerPlans || []).find(row => row.id === id);
+    if (!plan) return;
+
+    const options = getManpowerOptionData();
+    setSelectOptions('mp-department', options.departments, plan.department || '', '-- Select Department --');
+    setSelectOptions('mp-position', options.positions, plan.position || '', '-- Select Position --');
+    setSelectOptions('mp-seniority', options.seniorities, plan.seniority || '', '-- Select Seniority --');
+
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    };
+
+    setValue('mp-edit-id', plan.id);
+    setValue('mp-period', plan.period || getCurrentPeriodValue());
+    setValue('mp-planned-headcount', plan.planned_headcount ?? 0);
+    setValue('mp-approved-headcount-input', plan.approved_headcount ?? 0);
+    setValue('mp-status', plan.status || 'draft');
+    setValue('mp-notes', plan.notes || '');
+
+    document.getElementById('mp-cancel-btn')?.classList.remove('hidden');
+    document.getElementById('mp-period')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+export async function saveManpowerPlanData() {
+    if (!canManageManpowerPlans()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const values = readManpowerPlanForm();
+    if (!values.period || !values.department || !values.position) {
+        await notify.warn('Period, department, and position are required.');
+        return;
+    }
+    if (values.planned_headcount < 0 || values.approved_headcount < 0) {
+        await notify.warn('Headcount values cannot be negative.');
+        return;
+    }
+
+    const existing = values.id
+        ? (state.manpowerPlans || []).find(row => row.id === values.id)
+        : null;
+
+    const payload = {
+        id: existing?.id || undefined,
+        period: values.period,
+        department: values.department,
+        position: values.position,
+        seniority: values.seniority || '',
+        planned_headcount: Math.round(values.planned_headcount),
+        approved_headcount: Math.round(values.approved_headcount),
+        status: values.status,
+        notes: values.notes,
+        created_by: existing?.created_by || state.currentUser?.id || '',
+        updated_by: state.currentUser?.id || '',
+    };
+
+    await notify.withLoading(async () => {
+        await saveManpowerPlan(payload);
+    }, existing ? 'Updating Manpower Plan' : 'Saving Manpower Plan', 'Writing planning record...');
+
+    await logActivity({
+        action: existing ? 'manpower_plan.update' : 'manpower_plan.create',
+        entityType: 'manpower_plan',
+        entityId: existing?.id || 'pending',
+        details: {
+            period: payload.period,
+            department: payload.department,
+            position: payload.position,
+            seniority: payload.seniority,
+            planned_headcount: payload.planned_headcount,
+            approved_headcount: payload.approved_headcount,
+            status: payload.status,
+        },
+    });
+
+    resetManpowerPlanForm();
+    renderManpowerPlanning();
+    await notify.success(existing ? 'Manpower plan updated.' : 'Manpower plan saved.');
+}
+
+export async function deleteManpowerPlanData(id) {
+    if (!canManageManpowerPlans()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const plan = (state.manpowerPlans || []).find(row => row.id === id);
+    if (!plan) return;
+
+    const confirmed = await notify.confirm(
+        `Delete manpower plan for ${plan.department} / ${plan.position} (${plan.period})?`,
+        { confirmButtonText: 'Delete' }
+    );
+    if (!confirmed) return;
+
+    await notify.withLoading(async () => {
+        await deleteManpowerPlanFromDB(id);
+    }, 'Deleting Manpower Plan', 'Removing planning record...');
+
+    await logActivity({
+        action: 'manpower_plan.delete',
+        entityType: 'manpower_plan',
+        entityId: id,
+        details: {
+            period: plan.period,
+            department: plan.department,
+            position: plan.position,
+            seniority: plan.seniority,
+            approved_headcount: plan.approved_headcount,
+            filled_headcount: plan.filled_headcount,
+        },
+    });
+
+    resetManpowerPlanForm();
+    renderManpowerPlanning();
+    await notify.success('Manpower plan deleted.');
 }
 
 export function resetEmployeeForm() {

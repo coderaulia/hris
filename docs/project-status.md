@@ -7,7 +7,7 @@ Last updated: 2026-04-09
 - Frontend: Vite SPA with vanilla JS, Tailwind-enhanced custom UI, and Bootstrap utilities
 - Backend: Supabase Auth + Postgres + RLS, plus implemented Supabase Edge Functions for privileged, callback, notification, and export boundaries
 - Navigation: sidebar-driven app shell with role-aware menu groups
-- Core modules: dashboard, employees, assessment, records, settings, KPI governance, probation/PIP
+- Core modules: dashboard, employees, assessment, records, settings, KPI governance, probation/PIP, manpower planning with request workflow
 - Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
 - Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
 
@@ -34,7 +34,7 @@ Last updated: 2026-04-09
 
 ## Current Gaps
 
-- Manpower planning is still a placeholder
+- Manpower planning Phase 2 is implemented with baseline planning records, request intake, approval states, and pipeline-ready request tracking
 - README and setup docs have been aligned to the current bootstrap and deployment flow
 - Approval notifications still need real email provider setup before live delivery works
 - Large chart and vendor chunks still exist, but the heavier PDF/XLSX export flow has been moved out of the browser UI path
