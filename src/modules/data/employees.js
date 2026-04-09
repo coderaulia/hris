@@ -39,20 +39,6 @@ const EMPLOYEE_COLUMNS = [
     'tenure_display',
     'kpi_targets',
     'must_change_password',
-    'percentage',
-    'scores',
-    'self_scores',
-    'self_percentage',
-    'self_date',
-    'history',
-    'training_history',
-    'date_created',
-    'date_updated',
-    'date_next',
-    'assessment_updated_by',
-    'assessment_updated_at',
-    'self_assessment_updated_by',
-    'self_assessment_updated_at',
 ].join(',');
 const EMPLOYEE_ASSESSMENT_COLUMNS = 'id,employee_id,assessment_type,percentage,assessed_by,assessed_at,source_date';
 const EMPLOYEE_ASSESSMENT_SCORE_COLUMNS = 'assessment_id,competency_name,score,note';

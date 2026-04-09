@@ -417,6 +417,19 @@ const NAVIGATION_GROUPS = [
 				activate: () => switchTab("tab-employees", { employeesView: "employees-planning" }),
 			},
 			{
+				id: "nav-employees-recruitment",
+				label: "Recruitment Board",
+				description: "Candidate pipeline and hiring execution",
+				badge: "Phase 3",
+				roles: ["superadmin", "hr", "manager"],
+				tabId: "tab-employees",
+				navId: "nav-employees",
+				contentTitle: "Recruitment Board",
+				contentDescription:
+					"Manage approved demand as active recruitment cards and track candidate progress by hiring stage.",
+				activate: () => switchTab("tab-employees", { employeesView: "employees-recruitment" }),
+			},
+			{
 				id: "nav-employees-directory",
 				label: "Staff Directory",
 				description: "Browse and export employee records",
@@ -1161,7 +1174,7 @@ function toggleDashboardView(viewId, btn) {
 }
 
 function toggleEmployeesView(viewId) {
-	["employees-planning", "employees-directory", "employees-add"].forEach(
+	["employees-planning", "employees-recruitment", "employees-directory", "employees-add"].forEach(
 		(id) => {
 			const el = document.getElementById(id);
 			if (el) el.classList.add("hidden");

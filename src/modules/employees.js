@@ -1096,11 +1096,26 @@ export function renderRecruitmentBoard() {
     if (!board) return;
 
     const canManage = canManageRecruitmentBoard();
+    const isAvailable = state.recruitmentPipelineAvailable !== false;
     document.getElementById('mp-recruitment-card')?.classList.toggle('hidden', !canManage);
     populateRecruitmentFormOptions({
         request_id: document.getElementById('mpc-request-id')?.value || '',
         owner_id: document.getElementById('mpc-owner-id')?.value || '',
     });
+
+    if (!isAvailable) {
+        board.innerHTML = `
+            <div class="col-12">
+                <div class="border rounded-4 p-4 text-center bg-light">
+                    <div class="small text-uppercase fw-bold text-muted mb-2">Recruitment Board Unavailable</div>
+                    <div class="text-muted">Run migration <span class="font-monospace">20260409_manpower_planning_phase3.sql</span> in Supabase, then reload the app.</div>
+                </div>
+            </div>
+        `;
+        document.getElementById('mp-recruitment-empty-state')?.classList.add('hidden');
+        document.getElementById('mp-recruitment-card')?.classList.add('hidden');
+        return;
+    }
 
     const selectedRequestId = document.getElementById('mp-board-request-filter')?.value || '';
     const requestMap = new Map((state.headcountRequests || []).map(request => [request.id, request]));

@@ -21,6 +21,7 @@ export const state = {
     manpowerPlans: [],
     headcountRequests: [],
     recruitmentPipeline: [],
+    recruitmentPipelineAvailable: true,
     dashboardSummary: null,
     dashboardProbationExpiry: [],
     dashboardAssessmentCoverage: [],

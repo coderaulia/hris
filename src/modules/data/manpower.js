@@ -4,7 +4,6 @@ import {
     emit,
     debugError,
     execSupabase,
-    fetchOptionalCollection,
     isMissingRelationError,
     generateUuid,
 } from './runtime.js';
@@ -88,6 +87,12 @@ async function fetchHeadcountRequests() {
 }
 
 async function fetchRecruitmentPipeline() {
+    if (state.recruitmentPipelineAvailable === false) {
+        state.recruitmentPipeline = [];
+        emit('data:recruitmentPipeline', state.recruitmentPipeline);
+        return [];
+    }
+
     try {
         const { data } = await execSupabase(
             'Fetch recruitment pipeline',
@@ -97,22 +102,19 @@ async function fetchRecruitmentPipeline() {
                 .order('stage_updated_at', { ascending: false }),
             { retries: 1 }
         );
+        state.recruitmentPipelineAvailable = true;
         state.recruitmentPipeline = data || [];
         emit('data:recruitmentPipeline', state.recruitmentPipeline);
         return state.recruitmentPipeline;
     } catch (error) {
         if (!isMissingRelationError(error)) {
             debugError('Fetch recruitment pipeline error:', error);
+        } else {
+            state.recruitmentPipelineAvailable = false;
         }
-        return fetchOptionalCollection({
-            label: 'Fetch recruitment pipeline (fallback)',
-            table: 'recruitment_pipeline',
-            selectColumns: RECRUITMENT_PIPELINE_COLUMNS,
-            stateKey: 'recruitmentPipeline',
-            eventName: 'data:recruitmentPipeline',
-            orderBy: 'stage_updated_at',
-            ascending: false,
-        });
+        state.recruitmentPipeline = [];
+        emit('data:recruitmentPipeline', state.recruitmentPipeline);
+        return [];
     }
 }
 
@@ -152,6 +154,10 @@ async function updateHeadcountRequestStatus(id, {
 }
 
 async function saveRecruitmentCard(card) {
+    if (state.recruitmentPipelineAvailable === false) {
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+    }
+
     const payload = {
         id: card?.id || generateUuid(),
         request_id: card?.request_id || null,
@@ -183,6 +189,10 @@ async function saveRecruitmentCard(card) {
 }
 
 async function updateRecruitmentStage(id, stage) {
+    if (state.recruitmentPipelineAvailable === false) {
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+    }
+
     await execSupabase(
         `Update recruitment stage "${id}"`,
         () => supabase
@@ -203,6 +213,10 @@ async function updateRecruitmentStage(id, stage) {
 }
 
 async function deleteRecruitmentCard(id) {
+    if (state.recruitmentPipelineAvailable === false) {
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+    }
+
     await execSupabase(
         `Delete recruitment card "${id}"`,
         () => supabase
