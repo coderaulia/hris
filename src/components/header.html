@@ -1,69 +1,63 @@
-        <!-- Header -->
-        <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
-            <div>
-                <h4 class="fw-bold m-0 gradient-text" id="app-header-title">HR Performance Suite</h4>
-                <small class="text-muted" id="app-header-subtitle">
-                    Human Resources Department &middot; <span id="user-display-name" class="fw-bold"></span>
-                    <span id="user-role-badge" class="badge bg-secondary ms-2">Employee</span>
-                </small>
-            </div>
-            <div class="d-flex gap-2">
-                <a class="btn btn-outline-info btn-sm" href="./manual.html" target="_blank" rel="noopener noreferrer">
-                    <i class="bi bi-journal-text"></i> Manual
-                </a>
-                <button class="btn btn-outline-secondary btn-sm" id="theme-toggle" onclick="window.__app.toggleTheme()"
-                    title="Toggle Dark Mode">
-                    <i class="bi bi-moon-stars"></i>
-                </button>
-                <button class="btn btn-outline-primary btn-sm" onclick="window.__app.changeMyPassword()">
-                    <i class="bi bi-key"></i> Password
-                </button>
-                <button class="btn btn-outline-danger btn-sm" onclick="window.__app.doLogout()">
-                    <i class="bi bi-box-arrow-right"></i> Logout
-                </button>
-            </div>
-        </div>
-
-        <!-- Navigation Tabs -->
-        <div class="card shadow-sm border-0 mb-4 nav-card">
-            <div class="card-body p-2">
-                <div class="nav nav-pills nav-fill gap-1 flex-nowrap overflow-auto">
-                    <div class="nav-item" data-role="admin-manager">
-                        <button class="nav-link nav-tab" id="nav-dashboard"
-                            onclick="window.__app.switchTab('tab-dashboard')">
-                            <i class="bi bi-speedometer2 me-1"></i><span class="nav-label">Dashboard</span>
-                        </button>
-                    </div>
-                    <div class="nav-item" data-role="admin">
-                        <button class="nav-link nav-tab" id="nav-employees"
-                            onclick="window.__app.switchTab('tab-employees')">
-                            <i class="bi bi-people-fill me-1"></i><span class="nav-label">Employees</span>
-                        </button>
-                    </div>
-                    <div class="nav-item" data-role="admin-manager">
-                        <button class="nav-link nav-tab" id="nav-assessment"
-                            onclick="window.__app.switchTab('tab-assessment')">
-                            <i class="bi bi-clipboard-check me-1"></i><span class="nav-label">Assessment & KPI</span>
-                        </button>
-                    </div>
-                    <div class="nav-item" data-role="all">
-                        <button class="nav-link nav-tab" id="nav-records"
-                            onclick="window.__app.switchTab('tab-records')">
-                            <i class="bi bi-table me-1"></i><span class="nav-label">Records</span>
-                        </button>
-                    </div>
-                    <div class="nav-item" data-role="admin">
-                        <button class="nav-link nav-tab" id="nav-settings"
-                            onclick="window.__app.switchTab('tab-settings')">
-                            <i class="bi bi-sliders me-1"></i><span class="nav-label">Settings</span>
-                        </button>
-                    </div>
+        <div class="sidebar-shell">
+            <div class="sidebar-brand">
+                <div class="sidebar-brand-mark">
+                    <i class="bi bi-grid-1x2-fill"></i>
+                </div>
+                <div>
+                    <div class="sidebar-kicker">Vanaila HRIS</div>
+                    <h4 class="fw-bold m-0 gradient-text" id="app-header-title">HR Performance Suite</h4>
+                    <small class="text-muted d-block mt-1" id="app-header-subtitle">Human Resources Department</small>
                 </div>
             </div>
+
+            <div class="sidebar-user-card">
+                <div class="small text-uppercase fw-bold text-muted">Signed in as</div>
+                <div class="fw-bold text-dark" id="user-display-name"></div>
+                <div class="mt-2">
+                    <span id="user-role-badge" class="badge bg-secondary">Employee</span>
+                </div>
+            </div>
+
+            <div class="sidebar-nav-wrap">
+                <div id="sidebar-nav-groups" class="sidebar-nav-groups"></div>
+            </div>
+
+            <div class="sidebar-utility-panel">
+                <a class="sidebar-utility-btn" href="./manual.html" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-journal-text"></i>
+                    <span>Manual</span>
+                </a>
+                <button class="sidebar-utility-btn" id="theme-toggle" onclick="window.__app.toggleTheme()" title="Toggle Dark Mode">
+                    <i class="bi bi-moon-stars"></i>
+                    <span>Theme</span>
+                </button>
+                <button class="sidebar-utility-btn" onclick="window.__app.changeMyPassword()">
+                    <i class="bi bi-key"></i>
+                    <span>Password</span>
+                </button>
+                <button class="sidebar-utility-btn sidebar-utility-btn-danger" onclick="window.__app.doLogout()">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Logout</span>
+                </button>
+            </div>
         </div>
 
-        <div class="card shadow-sm border-0 mb-4" id="report-filters-card">
-            <div class="card-body py-2">
+        <div class="topbar-card">
+            <div class="topbar-head">
+                <div>
+                    <div class="topbar-kicker">Workspace Navigation</div>
+                    <h2 class="topbar-title" id="content-title">Dashboard</h2>
+                    <p class="topbar-copy mb-0" id="content-description">Track company performance, workforce activity, and HR operations in one place.</p>
+                </div>
+                <button class="sidebar-mobile-toggle" type="button" onclick="window.__app.toggleSidebarMobile()">
+                    <i class="bi bi-list"></i>
+                    <span>Menu</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-4 report-filter-card" id="report-filters-card">
+            <div class="card-body py-3">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="small fw-bold text-muted text-uppercase me-1"><i class="bi bi-funnel me-1"></i>Report Filters</span>
                     <select id="report-filter-department" class="form-select form-select-sm" style="max-width: 240px;"
@@ -82,4 +76,3 @@
                 </div>
             </div>
         </div>
-

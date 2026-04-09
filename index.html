@@ -4,51 +4,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HR Performance Suite — Assessment & KPI</title>
+    <title>HR Performance Suite - Vanaila HRIS</title>
     <meta name="description" content="HR employee performance assessment and KPI tracking platform.">
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="shortcut icon" href="/favicon.svg">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 
 <body class="bg-light">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://browser.sentry-cdn.com/8.42.0/bundle.tracing.min.js" crossorigin="anonymous"></script>
 
-    <!-- ============================== LOGIN ============================== -->
     <div id="component-login"></div>
 
-    <!-- ============================== MAIN APP ============================== -->
-    <div class="container-lg py-4 hidden" id="main-app">
+    <div class="hidden" id="main-app">
+        <div class="app-shell">
+            <aside class="app-sidebar" id="app-sidebar">
+                <div id="component-header"></div>
+            </aside>
 
-        <!-- Header + Nav -->
-        <div id="component-header"></div>
+            <main class="app-main">
+                <div class="app-main-inner">
+                    <div id="component-dashboard"></div>
+                    <div id="component-employees"></div>
+                    <div id="component-assessment"></div>
+                    <div id="component-records"></div>
+                    <div id="component-settings"></div>
 
-        <!-- TAB: DASHBOARD -->
-        <div id="component-dashboard"></div>
-
-        <!-- TAB: EMPLOYEES -->
-        <div id="component-employees"></div>
-
-        <!-- TAB: ASSESSMENT -->
-        <div id="component-assessment"></div>
-
-        <!-- TAB: RECORDS -->
-        <div id="component-records"></div>
-
-        <!-- TAB: SETTINGS -->
-        <div id="component-settings"></div>
-
-        <!-- Footer -->
-        <div class="text-center text-muted small mt-4 pb-4">
-            Copyright &copy; 2026 — Powered by <a href="https://vanaila.com" target="_blank">Vanaila.com</a> & Supabase
-            &middot; <a href="/manual.html" target="_blank" rel="noopener noreferrer">User Manual</a>
+                    <div class="text-center text-muted small mt-4 pb-4">
+                        Copyright &copy; 2026 - Powered by <a href="https://vanaila.com" target="_blank">Vanaila.com</a> & Supabase
+                        &middot; <a href="/manual.html" target="_blank" rel="noopener noreferrer">User Manual</a>
+                    </div>
+                </div>
+            </main>
         </div>
     </div>
 
-    <!-- ==================== OVERLAYS ==================== -->
     <div id="component-overlays"></div>
 
     <script type="module" src="/src/main.js"></script>
