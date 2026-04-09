@@ -69,8 +69,9 @@ const NAVIGATION_GROUPS = [
             {
                 id: 'nav-dashboard-overview',
                 label: 'Overview',
-                description: 'Company pulse and analytics',
+                description: 'KPI overview and performance analytics',
                 badge: 'Live',
+                endpoints: ['kpi_records', 'employee_performance_scores', 'employee_kpi_target_versions'],
                 tabId: 'tab-dashboard',
                 navId: 'nav-dashboard',
                 contentTitle: 'Dashboard',
@@ -83,11 +84,12 @@ const NAVIGATION_GROUPS = [
             {
                 id: 'nav-dashboard-assessment',
                 label: 'Assessment Summary',
-                description: 'Department progress and skill gaps',
+                description: 'Assessment and TNA summary only',
+                endpoints: ['employee_assessments', 'employee_assessment_scores', 'employee_assessment_history', 'employee_training_records', 'competency_config'],
                 tabId: 'tab-dashboard',
                 navId: 'nav-dashboard',
-                contentTitle: 'Assessment Summary',
-                contentDescription: 'Review competency coverage, score distribution, and assessment performance by department.',
+                contentTitle: 'Assessment & TNA Summary',
+                contentDescription: 'Review competency coverage, training needs, score distribution, and assessment performance by department.',
                 activate: () => {
                     switchTab('tab-dashboard');
                     toggleDashboardView('dashboard-assessment');
@@ -105,25 +107,28 @@ const NAVIGATION_GROUPS = [
             {
                 id: 'nav-employees',
                 label: 'Manpower Planning',
-                description: 'Headcount and staffing structure',
+                description: 'Coming soon planning workspace',
                 badge: 'HR',
                 tabId: 'tab-employees',
                 navId: 'nav-employees',
-                contentTitle: 'Employee Operations',
-                contentDescription: 'Manage workforce planning, staffing structure, and employee master data.',
-                activate: () => switchTab('tab-employees'),
+                contentTitle: 'Manpower Planning',
+                contentDescription: 'Reserved for headcount planning, staffing forecasts, and hiring capacity workflows.',
+                activate: () => {
+                    switchTab('tab-employees');
+                    toggleEmployeesView('employees-planning');
+                },
             },
             {
                 id: 'nav-employees-add',
                 label: 'Add New Employee',
-                description: 'Open the employee entry form',
+                description: 'New employee insertion form',
                 tabId: 'tab-employees',
                 navId: 'nav-employees',
                 contentTitle: 'Add New Employee',
                 contentDescription: 'Create or update employee records with role, department, manager, and access data.',
                 activate: () => {
                     switchTab('tab-employees');
-                    document.getElementById('emp-form-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    toggleEmployeesView('employees-add');
                 },
             },
             {
@@ -136,7 +141,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Review the active employee roster, export lists, and manage imported records.',
                 activate: () => {
                     switchTab('tab-employees');
-                    document.getElementById('employee-list-body')?.closest('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    toggleEmployeesView('employees-directory');
                 },
             },
         ],
@@ -181,8 +186,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Maintain KPI definitions, employee targets, weighting, and approval workflows.',
                 activate: () => {
                     switchTab('tab-settings');
-                    const btn = document.querySelector('#settingsPills [data-target="set-kpi"]');
-                    toggleSettingsView('set-kpi', btn);
+                    toggleSettingsView('set-kpi');
                 },
             },
         ],
@@ -265,8 +269,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Configure branding, organization structure, user permissions, and system setup.',
                 activate: () => {
                     switchTab('tab-settings');
-                    const btn = document.querySelector('#settingsPills [data-target="set-general"]');
-                    toggleSettingsView('set-general', btn);
+                    toggleSettingsView('set-general');
                 },
             },
             {
@@ -280,8 +283,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Manage login access, role assignments, and recent admin activity.',
                 activate: () => {
                     switchTab('tab-settings');
-                    const btn = document.querySelector('#settingsPills [data-target="set-users"]');
-                    toggleSettingsView('set-users', btn);
+                    toggleSettingsView('set-users');
                 },
             },
             {
@@ -295,8 +297,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Maintain competencies, organizational role maps, and benchmark requirements.',
                 activate: () => {
                     switchTab('tab-settings');
-                    const btn = document.querySelector('#settingsPills [data-target="set-competencies"]');
-                    toggleSettingsView('set-competencies', btn);
+                    toggleSettingsView('set-competencies');
                 },
             },
             {
@@ -310,8 +311,7 @@ const NAVIGATION_GROUPS = [
                 contentDescription: 'Organize departments, positions, and reporting relationships across the company.',
                 activate: () => {
                     switchTab('tab-settings');
-                    const btn = document.querySelector('#settingsPills [data-target="set-org"]');
-                    toggleSettingsView('set-org', btn);
+                    toggleSettingsView('set-org');
                 },
             },
         ],
@@ -324,7 +324,7 @@ window.__app = {
     attemptLogin, doLogout, forgotPassword, changeMyPassword,
 
     // Navigation
-    switchTab, toggleTheme, toggleDashboardView, updateReportFilters, clearReportFilters,
+    switchTab, toggleTheme, toggleDashboardView, toggleEmployeesView, updateReportFilters, clearReportFilters,
     handleSidebarItemClick, toggleSidebarGroup, toggleSidebarMobile,
 
     // Assessment
@@ -398,7 +398,11 @@ function switchTab(tabId) {
         renderProbationPipView();
     }
     if (tabId === 'tab-assessment') renderPendingList();
-    if (tabId === 'tab-employees') renderEmployeeManager();
+    if (tabId === 'tab-employees') {
+        renderEmployeeManager();
+        const activeEmployeeView = document.querySelector('.employee-subview:not(.hidden)')?.id || 'employees-planning';
+        toggleEmployeesView(activeEmployeeView);
+    }
     if (tabId === 'tab-settings') {
         renderSettings();
         renderAdminList();
@@ -673,7 +677,6 @@ function toggleSettingsView(viewId, btn) {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
     });
-    document.querySelectorAll('#settingsPills .nav-link').forEach(el => el.classList.remove('active'));
     const target = document.getElementById(viewId);
     if (target) target.classList.remove('hidden');
     if (btn) btn.classList.add('active');
@@ -692,6 +695,15 @@ function toggleDashboardView(viewId, btn) {
     const target = document.getElementById(viewId);
     if (target) target.classList.remove('hidden');
     if (btn) btn.classList.add('active');
+}
+
+function toggleEmployeesView(viewId) {
+    ['employees-planning', 'employees-directory', 'employees-add'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+    const target = document.getElementById(viewId);
+    if (target) target.classList.remove('hidden');
 }
 
 // ---- Sub-View Toggle (Records) ----

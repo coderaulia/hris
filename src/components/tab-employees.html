@@ -1,119 +1,149 @@
         <!-- ==================== TAB: EMPLOYEES ==================== -->
         <div id="tab-employees" class="content-section">
-            <div class="row">
-                <!-- Employee Form (Superadmin only) -->
-                <div class="col-md-4" id="emp-form-panel">
-                    <div class="card shadow-sm border-0 mb-4">
-                        <div class="card-header bg-primary text-white">
-                            <h6 class="m-0 fw-bold"><i class="bi bi-person-plus-fill"></i> Employee Data</h6>
-                        </div>
-                        <div class="card-body">
-                            <input type="hidden" id="emp-edit-mode" value="false">
-                            <div class="mb-2">
-                                <label class="small text-muted fw-bold">Employee ID</label>
-                                <input type="text" id="emp-id" class="form-control form-control-sm"
-                                    placeholder="e.g. 101">
+            <div id="employees-planning" class="employee-subview">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4 p-lg-5">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-4">
+                            <div>
+                                <span class="sidebar-link-badge mb-3 d-inline-flex">Coming Soon</span>
+                                <h3 class="fw-bold mb-2">Manpower Planning Workspace</h3>
+                                <p class="text-muted mb-4" style="max-width: 760px;">
+                                    This section will be used for headcount planning, vacancy forecasting, hiring pipeline summaries,
+                                    and department staffing recommendations. The layout is reserved so we can add planning tools
+                                    without mixing them into the employee master data screens.
+                                </p>
                             </div>
-                            <div class="mb-2">
-                                <label class="small text-muted fw-bold">Full Name</label>
-                                <input type="text" id="emp-name" class="form-control form-control-sm"
-                                    placeholder="e.g. Budi Santoso">
-                            </div>
-                            <div class="mb-2">
-                                <label class="small text-muted fw-bold">Position</label>
-                                <select id="emp-position" class="form-select form-select-sm">
-                                    <option value="">-- Select Position --</option>
-                                </select>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col-6">
-                                    <label class="small text-muted fw-bold">Seniority</label>
-                                    <select id="emp-seniority" class="form-select form-select-sm">
-                                        <option value="Junior">Junior</option>
-                                        <option value="Intermediate">Intermediate</option>
-                                        <option value="Senior">Senior</option>
-                                        <option value="Lead">Lead</option>
-                                        <option value="Sr. Lead">Sr. Lead</option>
-                                        <option value="Manager">Manager</option>
-                                    </select>
+                            <div class="card border-0" style="min-width: 280px; background: linear-gradient(135deg, rgba(15,118,110,0.08), rgba(249,115,22,0.10));">
+                                <div class="card-body">
+                                    <div class="small text-uppercase fw-bold text-muted mb-2">Planned Modules</div>
+                                    <ul class="mb-0 ps-3 small text-muted">
+                                        <li>Headcount request intake</li>
+                                        <li>Approved vs actual manpower tracker</li>
+                                        <li>Open positions and hiring stage overview</li>
+                                        <li>Department workforce capacity dashboard</li>
+                                    </ul>
                                 </div>
-                                <div class="col-6">
-                                    <label class="small text-muted fw-bold">Department</label>
-                                    <select id="emp-department" class="form-select form-select-sm">
-                                        <option value="">-- Department --</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row g-2 mb-2">
-                                <div class="col-12">
-                                    <label class="small text-muted fw-bold">Role</label>
-                                    <select id="emp-role" class="form-select form-select-sm">
-                                        <option value="employee">Employee</option>
-                                        <option value="manager">Manager</option>
-                                        <option value="director">Director</option>
-                                        <option value="superadmin">Super Admin</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="mb-2">
-                                <label class="small text-muted fw-bold">Date Joined</label>
-                                <input type="date" id="emp-join" class="form-control form-control-sm">
-                            </div>
-                            <div class="mb-2">
-                                <label class="small text-muted fw-bold">Reports To</label>
-                                <select id="emp-manager-id" class="form-select form-select-sm">
-                                    <option value="">-- Direct to Director --</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="small text-muted fw-bold">Login Email (optional)</label>
-                                <input type="email" id="emp-auth-email" class="form-control form-control-sm"
-                                    placeholder="user@company.com">
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button class="btn btn-success btn-sm" onclick="window.__app.saveEmployeeData()">
-                                    <i class="bi bi-save"></i> Save Employee
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm hidden" id="emp-cancel-btn"
-                                    onclick="window.__app.resetEmployeeForm()">
-                                    Cancel Edit
-                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-                <!-- Employee List -->
-                <div class="col">
-                    <div class="card shadow-sm border-0">
-                        <div class="card-header bg-white border-bottom py-2">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="m-0 fw-bold text-dark">Staff Directory</h6>
-                                <div class="d-flex gap-2 align-items-center">
-                                    <button class="btn btn-success btn-sm" onclick="window.__app.exportEmployeeCSV()"><i
-                                            class="bi bi-download"></i> Export</button>
-                                    <input type="file" id="emp-csv-upload" class="hidden" accept=".csv"
-                                        onchange="window.__app.importEmployeeCSV(this)">
-                                    <button class="btn btn-outline-secondary btn-sm"
-                                        onclick="document.getElementById('emp-csv-upload').click()"><i
-                                            class="bi bi-upload"></i> Import</button>
-                                    <span class="badge bg-light text-dark border" id="emp-count-badge">0 Staff</span>
-                                </div>
+            </div>
+
+            <div id="employees-directory" class="employee-subview hidden">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="m-0 fw-bold text-dark">Staff Directory</h6>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button class="btn btn-success btn-sm" onclick="window.__app.exportEmployeeCSV()"><i
+                                        class="bi bi-download"></i> Export</button>
+                                <input type="file" id="emp-csv-upload" class="hidden" accept=".csv"
+                                    onchange="window.__app.importEmployeeCSV(this)">
+                                <button class="btn btn-outline-secondary btn-sm"
+                                    onclick="document.getElementById('emp-csv-upload').click()"><i
+                                        class="bi bi-upload"></i> Import</button>
+                                <span class="badge bg-light text-dark border" id="emp-count-badge">0 Staff</span>
                             </div>
                         </div>
-                        <div class="card-body p-0">
-                            <div class="table-responsive" style="max-height: 600px;">
-                                <table class="table table-hover align-middle mb-0">
-                                    <thead class="table-light sticky-top">
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Name</th>
-                                            <th>Position</th>
-                                            <th class="text-center">Status</th>
-                                            <th class="text-end">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="employee-list-body"></tbody>
-                                </table>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 600px;">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Name</th>
+                                        <th>Position</th>
+                                        <th class="text-center">Status</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="employee-list-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="employees-add" class="employee-subview hidden">
+                <div class="row justify-content-center">
+                    <div class="col-12 col-xl-7">
+                        <div class="card shadow-sm border-0" id="emp-form-panel">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="m-0 fw-bold"><i class="bi bi-person-plus-fill"></i> Add New Employee</h6>
+                            </div>
+                            <div class="card-body">
+                                <input type="hidden" id="emp-edit-mode" value="false">
+                                <div class="mb-2">
+                                    <label class="small text-muted fw-bold">Employee ID</label>
+                                    <input type="text" id="emp-id" class="form-control form-control-sm"
+                                        placeholder="e.g. 101">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="small text-muted fw-bold">Full Name</label>
+                                    <input type="text" id="emp-name" class="form-control form-control-sm"
+                                        placeholder="e.g. Budi Santoso">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="small text-muted fw-bold">Position</label>
+                                    <select id="emp-position" class="form-select form-select-sm">
+                                        <option value="">-- Select Position --</option>
+                                    </select>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="small text-muted fw-bold">Seniority</label>
+                                        <select id="emp-seniority" class="form-select form-select-sm">
+                                            <option value="Junior">Junior</option>
+                                            <option value="Intermediate">Intermediate</option>
+                                            <option value="Senior">Senior</option>
+                                            <option value="Lead">Lead</option>
+                                            <option value="Sr. Lead">Sr. Lead</option>
+                                            <option value="Manager">Manager</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="small text-muted fw-bold">Department</label>
+                                        <select id="emp-department" class="form-select form-select-sm">
+                                            <option value="">-- Department --</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-12">
+                                        <label class="small text-muted fw-bold">Role</label>
+                                        <select id="emp-role" class="form-select form-select-sm">
+                                            <option value="employee">Employee</option>
+                                            <option value="manager">Manager</option>
+                                            <option value="director">Director</option>
+                                            <option value="superadmin">Super Admin</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="small text-muted fw-bold">Date Joined</label>
+                                    <input type="date" id="emp-join" class="form-control form-control-sm">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="small text-muted fw-bold">Reports To</label>
+                                    <select id="emp-manager-id" class="form-select form-select-sm">
+                                        <option value="">-- Direct to Director --</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="small text-muted fw-bold">Login Email (optional)</label>
+                                    <input type="email" id="emp-auth-email" class="form-control form-control-sm"
+                                        placeholder="user@company.com">
+                                </div>
+                                <div class="d-grid gap-2">
+                                    <button class="btn btn-success btn-sm" onclick="window.__app.saveEmployeeData()">
+                                        <i class="bi bi-save"></i> Save Employee
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm hidden" id="emp-cancel-btn"
+                                        onclick="window.__app.resetEmployeeForm()">
+                                        Cancel Edit
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
