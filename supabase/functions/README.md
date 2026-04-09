@@ -3,17 +3,17 @@
 Current status:
 
 - `admin-user-mutations`: implemented first-pass privileged user management
-- `auth-callbacks`: scaffolded
-- `approval-notifications`: scaffolded
-- `report-exports`: scaffolded
+- `approval-notifications`: implemented first-pass recipient resolution and provider-ready email dispatch
+- `auth-callbacks`: implemented first-pass callback normalization and profile resolution
+- `report-exports`: implemented first-pass server-side dataset preparation for KPI/probation exports
 
 ## Required secrets
 
 Set these in the Supabase project before deploying:
 
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
+- `URL`
+- `ANON_KEY`
+- `SERVICE_ROLE_KEY`
 
 ## First deploy targets
 
