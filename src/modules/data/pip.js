@@ -8,10 +8,14 @@ import {
     fetchOptionalCollection,
 } from './runtime.js';
 
+const PIP_PLAN_COLUMNS = 'id,employee_id,owner_manager_id,trigger_reason,trigger_period,start_date,target_end_date,status,summary,closed_at,created_at,updated_at';
+const PIP_ACTION_COLUMNS = 'id,pip_plan_id,action_title,action_detail,due_date,progress_pct,status,checkpoint_note,created_at,updated_at';
+
 async function fetchPipPlans() {
     return fetchOptionalCollection({
         label: 'Fetch PIP plans',
         table: 'pip_plans',
+        selectColumns: PIP_PLAN_COLUMNS,
         stateKey: 'pipPlans',
         eventName: 'data:pipPlans',
         orderBy: 'created_at',
@@ -23,6 +27,7 @@ async function fetchPipActions() {
     return fetchOptionalCollection({
         label: 'Fetch PIP actions',
         table: 'pip_actions',
+        selectColumns: PIP_ACTION_COLUMNS,
         stateKey: 'pipActions',
         eventName: 'data:pipActions',
         orderBy: 'created_at',

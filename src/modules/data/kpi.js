@@ -18,6 +18,14 @@ import {
     getKpiRecordTarget,
 } from './targets.js';
 
+const KPI_DEFINITION_COLUMNS = 'id,name,description,category,target,unit,effective_period,approval_status,approval_required,is_active,latest_version_no,approved_by,approved_at,created_at,updated_at';
+const KPI_DEFINITION_VERSION_COLUMNS = 'id,kpi_definition_id,version_no,effective_period,name,description,category,target,unit,status,request_note,rejection_reason,requested_by,requested_at,approved_by,approved_at,rejected_by,rejected_at,created_at,updated_at';
+const EMPLOYEE_KPI_TARGET_VERSION_COLUMNS = 'id,employee_id,kpi_id,effective_period,target_value,unit,version_no,status,request_note,rejection_reason,requested_by,requested_at,approved_by,approved_at,rejected_by,rejected_at,created_at,updated_at';
+const KPI_WEIGHT_PROFILE_COLUMNS = 'id,profile_name,department,position,active,created_at,updated_at';
+const KPI_WEIGHT_ITEM_COLUMNS = 'id,profile_id,kpi_id,weight_pct,created_at,updated_at';
+const EMPLOYEE_PERFORMANCE_SCORE_COLUMNS = 'id,employee_id,period,score_type,total_score,detail,calculated_by,calculated_at,created_at,updated_at';
+const KPI_RECORD_COLUMNS = 'id,employee_id,kpi_id,period,value,target_snapshot,kpi_name_snapshot,kpi_unit_snapshot,kpi_category_snapshot,definition_version_id,target_version_id,updated_by,submitted_by,created_at,updated_at';
+
 function nowIso() {
     return new Date().toISOString();
 }
@@ -118,7 +126,7 @@ async function fetchKpiDefinitions() {
     try {
         const { data } = await execSupabase(
             'Fetch KPI definitions',
-            () => supabase.from('kpi_definitions').select('*').order('category').order('name'),
+            () => supabase.from('kpi_definitions').select(KPI_DEFINITION_COLUMNS).order('category').order('name'),
             { retries: 1 }
         );
         state.kpiConfig = data || [];
@@ -134,6 +142,7 @@ async function fetchKpiDefinitionVersions() {
     return fetchOptionalCollection({
         label: 'Fetch KPI definition versions',
         table: 'kpi_definition_versions',
+        selectColumns: KPI_DEFINITION_VERSION_COLUMNS,
         stateKey: 'kpiDefinitionVersions',
         eventName: 'data:kpiDefinitionVersions',
         orderBy: 'requested_at',
@@ -145,6 +154,7 @@ async function fetchEmployeeKpiTargetVersions() {
     return fetchOptionalCollection({
         label: 'Fetch employee KPI target versions',
         table: 'employee_kpi_target_versions',
+        selectColumns: EMPLOYEE_KPI_TARGET_VERSION_COLUMNS,
         stateKey: 'employeeKpiTargetVersions',
         eventName: 'data:employeeKpiTargetVersions',
         orderBy: 'requested_at',
@@ -417,7 +427,7 @@ async function submitEmployeeKpiTargetVersions({ employee_id, effective_period, 
             try {
                 const { data } = await execSupabase(
                     'Save employee KPI target version',
-                    () => supabase.from('employee_kpi_target_versions').insert(payload).select('*').single(),
+                    () => supabase.from('employee_kpi_target_versions').insert(payload).select(EMPLOYEE_KPI_TARGET_VERSION_COLUMNS).single(),
                     { interactiveRetry: true, retries: 1 }
                 );
                 inserted = data || payload;
@@ -680,6 +690,7 @@ async function fetchKpiWeightProfiles() {
     return fetchOptionalCollection({
         label: 'Fetch KPI weight profiles',
         table: 'kpi_weight_profiles',
+        selectColumns: KPI_WEIGHT_PROFILE_COLUMNS,
         stateKey: 'kpiWeightProfiles',
         eventName: 'data:kpiWeightProfiles',
         orderBy: 'updated_at',
@@ -691,6 +702,7 @@ async function fetchKpiWeightItems() {
     return fetchOptionalCollection({
         label: 'Fetch KPI weight items',
         table: 'kpi_weight_items',
+        selectColumns: KPI_WEIGHT_ITEM_COLUMNS,
         stateKey: 'kpiWeightItems',
         eventName: 'data:kpiWeightItems',
         orderBy: 'updated_at',
@@ -702,6 +714,7 @@ async function fetchEmployeePerformanceScores() {
     return fetchOptionalCollection({
         label: 'Fetch employee performance scores',
         table: 'employee_performance_scores',
+        selectColumns: EMPLOYEE_PERFORMANCE_SCORE_COLUMNS,
         stateKey: 'employeePerformanceScores',
         eventName: 'data:employeePerformanceScores',
         orderBy: 'calculated_at',
@@ -756,7 +769,7 @@ async function saveKpiWeightItems(profileId, items = []) {
 
 async function fetchKpiRecords(filters = {}) {
     try {
-        let query = supabase.from('kpi_records').select('*');
+        let query = supabase.from('kpi_records').select(KPI_RECORD_COLUMNS);
         if (filters.employee_id) query = query.eq('employee_id', filters.employee_id);
         if (filters.period) query = query.eq('period', filters.period);
         const { data } = await execSupabase(

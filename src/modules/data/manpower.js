@@ -9,13 +9,18 @@ import {
     generateUuid,
 } from './runtime.js';
 
+const MANPOWER_PLAN_OVERVIEW_COLUMNS = 'id,period,department,position,seniority,planned_headcount,approved_headcount,filled_headcount,gap_headcount,status,notes,created_by,updated_by,created_at,updated_at';
+const HEADCOUNT_REQUEST_OVERVIEW_COLUMNS = 'id,plan_id,request_code,plan_period,department,position,seniority,requested_count,hired_total,pipeline_total,priority,business_reason,approval_status,approval_note,requested_by,requested_by_name,approved_by,approved_by_name,target_hire_date,created_at,updated_at';
+const RECRUITMENT_PIPELINE_OVERVIEW_COLUMNS = 'id,request_id,request_code,department,position,priority,target_hire_date,remaining_openings,candidate_name,stage,source,owner_id,owner_name,stage_updated_at,stage_age_days,offer_status,expected_start_date,notes,overdue_days,created_at,updated_at';
+const RECRUITMENT_PIPELINE_COLUMNS = 'id,request_id,candidate_name,stage,source,owner_id,stage_updated_at,offer_status,expected_start_date,notes,created_at,updated_at';
+
 async function fetchManpowerPlans() {
     try {
         const { data } = await execSupabase(
             'Fetch manpower plans',
             () => supabase
                 .from('manpower_plan_overview')
-                .select('*')
+                .select(MANPOWER_PLAN_OVERVIEW_COLUMNS)
                 .order('period', { ascending: false })
                 .order('department', { ascending: true })
                 .order('position', { ascending: true }),
@@ -65,7 +70,7 @@ async function fetchHeadcountRequests() {
             'Fetch headcount requests',
             () => supabase
                 .from('headcount_request_overview')
-                .select('*')
+                .select(HEADCOUNT_REQUEST_OVERVIEW_COLUMNS)
                 .order('created_at', { ascending: false }),
             { retries: 1 }
         );
@@ -88,7 +93,7 @@ async function fetchRecruitmentPipeline() {
             'Fetch recruitment pipeline',
             () => supabase
                 .from('recruitment_pipeline_overview')
-                .select('*')
+                .select(RECRUITMENT_PIPELINE_OVERVIEW_COLUMNS)
                 .order('stage_updated_at', { ascending: false }),
             { retries: 1 }
         );
@@ -102,6 +107,7 @@ async function fetchRecruitmentPipeline() {
         return fetchOptionalCollection({
             label: 'Fetch recruitment pipeline (fallback)',
             table: 'recruitment_pipeline',
+            selectColumns: RECRUITMENT_PIPELINE_COLUMNS,
             stateKey: 'recruitmentPipeline',
             eventName: 'data:recruitmentPipeline',
             orderBy: 'stage_updated_at',
@@ -116,7 +122,7 @@ async function saveHeadcountRequest(request) {
         () => supabase
             .from('headcount_requests')
             .upsert(request)
-            .select('*')
+            .select('id')
             .single(),
         { interactiveRetry: true, retries: 1 }
     );
@@ -164,7 +170,7 @@ async function saveRecruitmentCard(card) {
         () => supabase
             .from('recruitment_pipeline')
             .upsert(payload)
-            .select('*')
+            .select('id')
             .single(),
         { interactiveRetry: true, retries: 1 }
     );

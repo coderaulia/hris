@@ -19,6 +19,11 @@ import {
 } from './runtime.js';
 import { calculateEmployeeWeightedKpiScore } from './kpi.js';
 
+const PROBATION_REVIEW_COLUMNS = 'id,employee_id,review_period_start,review_period_end,quantitative_score,qualitative_score,final_score,decision,manager_notes,reviewed_by,reviewed_at,created_at,updated_at';
+const PROBATION_QUALITATIVE_ITEM_COLUMNS = 'id,probation_review_id,item_name,score,note,created_at,updated_at';
+const PROBATION_MONTHLY_SCORE_COLUMNS = 'id,probation_review_id,month_no,period_start,period_end,work_performance_score,managing_task_score,manager_qualitative_text,manager_note,attendance_deduction,attitude_score,monthly_total,created_at,updated_at';
+const PROBATION_ATTENDANCE_RECORD_COLUMNS = 'id,probation_review_id,month_no,event_date,event_type,qty,deduction_points,note,entered_by,created_at,updated_at';
+
 function normalizeAttendanceEventRule(eventKey, rawRule, fallbackRule = {}) {
     const fallbackLabel = String(fallbackRule?.label || eventKey || 'Other').trim() || 'Other';
     const candidate = rawRule && typeof rawRule === 'object' && !Array.isArray(rawRule) ? rawRule : {};
@@ -200,6 +205,7 @@ async function fetchProbationReviews() {
     return fetchOptionalCollection({
         label: 'Fetch probation reviews',
         table: 'probation_reviews',
+        selectColumns: PROBATION_REVIEW_COLUMNS,
         stateKey: 'probationReviews',
         eventName: 'data:probationReviews',
         orderBy: 'created_at',
@@ -211,6 +217,7 @@ async function fetchProbationQualitativeItems() {
     return fetchOptionalCollection({
         label: 'Fetch probation qualitative items',
         table: 'probation_qualitative_items',
+        selectColumns: PROBATION_QUALITATIVE_ITEM_COLUMNS,
         stateKey: 'probationQualitativeItems',
         eventName: 'data:probationQualitativeItems',
         orderBy: 'created_at',
@@ -222,6 +229,7 @@ async function fetchProbationMonthlyScores() {
     return fetchOptionalCollection({
         label: 'Fetch probation monthly scores',
         table: 'probation_monthly_scores',
+        selectColumns: PROBATION_MONTHLY_SCORE_COLUMNS,
         stateKey: 'probationMonthlyScores',
         eventName: 'data:probationMonthlyScores',
         orderBy: 'created_at',
@@ -233,6 +241,7 @@ async function fetchProbationAttendanceRecords() {
     return fetchOptionalCollection({
         label: 'Fetch probation attendance records',
         table: 'probation_attendance_records',
+        selectColumns: PROBATION_ATTENDANCE_RECORD_COLUMNS,
         stateKey: 'probationAttendanceRecords',
         eventName: 'data:probationAttendanceRecords',
         orderBy: 'event_date',

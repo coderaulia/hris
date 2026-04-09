@@ -25,21 +25,55 @@ import {
 } from '../../lib/employee-records.js';
 import { reconcileCurrentUserProfile } from '../auth.js';
 
+const EMPLOYEE_COLUMNS = [
+    'employee_id',
+    'name',
+    'position',
+    'seniority',
+    'join_date',
+    'department',
+    'manager_id',
+    'auth_email',
+    'auth_id',
+    'role',
+    'tenure_display',
+    'kpi_targets',
+    'must_change_password',
+    'percentage',
+    'scores',
+    'self_scores',
+    'self_percentage',
+    'self_date',
+    'history',
+    'training_history',
+    'date_created',
+    'date_updated',
+    'date_next',
+    'assessment_updated_by',
+    'assessment_updated_at',
+    'self_assessment_updated_by',
+    'self_assessment_updated_at',
+].join(',');
+const EMPLOYEE_ASSESSMENT_COLUMNS = 'id,employee_id,assessment_type,percentage,assessed_by,assessed_at,source_date';
+const EMPLOYEE_ASSESSMENT_SCORE_COLUMNS = 'assessment_id,competency_name,score,note';
+const EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS = 'employee_id,assessed_on,percentage,seniority,position,created_at';
+const EMPLOYEE_TRAINING_RECORD_COLUMNS = 'employee_id,course,start_date,end_date,provider,status,created_at';
+
 async function fetchEmployees() {
     try {
         const { data: employeeRows } = await execSupabase(
             'Fetch employees',
-            () => supabase.from('employees').select('*'),
+            () => supabase.from('employees').select(EMPLOYEE_COLUMNS),
             { retries: 1 }
         );
 
         let normalizedTables = null;
         try {
             const [assessmentsRes, assessmentScoresRes, assessmentHistoryRes, trainingRes] = await Promise.all([
-                execSupabase('Fetch assessments', () => supabase.from('employee_assessments').select('*'), { retries: 1 }),
-                execSupabase('Fetch assessment scores', () => supabase.from('employee_assessment_scores').select('*'), { retries: 1 }),
-                execSupabase('Fetch assessment history', () => supabase.from('employee_assessment_history').select('*'), { retries: 1 }),
-                execSupabase('Fetch training records', () => supabase.from('employee_training_records').select('*'), { retries: 1 }),
+                execSupabase('Fetch assessments', () => supabase.from('employee_assessments').select(EMPLOYEE_ASSESSMENT_COLUMNS), { retries: 1 }),
+                execSupabase('Fetch assessment scores', () => supabase.from('employee_assessment_scores').select(EMPLOYEE_ASSESSMENT_SCORE_COLUMNS), { retries: 1 }),
+                execSupabase('Fetch assessment history', () => supabase.from('employee_assessment_history').select(EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS), { retries: 1 }),
+                execSupabase('Fetch training records', () => supabase.from('employee_training_records').select(EMPLOYEE_TRAINING_RECORD_COLUMNS), { retries: 1 }),
             ]);
 
             normalizedTables = {
