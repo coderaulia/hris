@@ -2,8 +2,7 @@
 // RECORDS & REPORTS MODULE
 // ==================================================
 
-import { Chart } from 'chart.js/auto';
-import Swal from 'sweetalert2';
+import { getChartCtor } from '../../lib/chartLoader.js';
 import { state, emit, isAdmin, isEmployee, isManager } from '../../lib/store.js';
 import { getAssessmentHistory, getManagerAssessment, getSelfAssessment, getTrainingRecords, setAssessmentHistory, setManagerAssessment, setSelfAssessment, setTrainingRecords } from '../../lib/employee-records.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../../lib/utils.js';
@@ -150,7 +149,7 @@ export function renderRecordsTable(filterKeys = null) {
 }
 
 // ---- OPEN REPORT ----
-export function openReportByVal(id) {
+export async function openReportByVal(id) {
     const rec = state.db[id];
     if (!rec) return;
     const managerAssessment = getManagerAssessment(rec);
@@ -248,11 +247,12 @@ export function openReportByVal(id) {
     if (overlay) overlay.classList.remove('hidden');
 }
 
-function renderComparisonChart(labels, mgrData, selfData) {
+async function renderComparisonChart(labels, mgrData, selfData) {
     const ctx = document.getElementById('competencyChart');
     if (competencyChart) competencyChart.destroy();
     const maxScale = parseInt(state.appSettings?.assessment_scale_max || '10');
 
+    const Chart = await getChartCtor();
     competencyChart = new Chart(ctx, {
         type: 'radar',
         data: {
@@ -269,10 +269,11 @@ function renderComparisonChart(labels, mgrData, selfData) {
     });
 }
 
-function renderHistoryChart(dataPoints) {
+async function renderHistoryChart(dataPoints) {
     const ctx = document.getElementById('historyChart');
     if (!ctx) return;
     if (historyChart) historyChart.destroy();
+    const Chart = await getChartCtor();
     historyChart = new Chart(ctx, {
         type: 'line',
         data: {

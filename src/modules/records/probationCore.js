@@ -2,9 +2,9 @@
 // RECORDS PROBATION & PIP MODULE
 // ==================================================
 
-import Swal from 'sweetalert2';
 import { state, isAdmin, isManager } from '../../lib/store.js';
 import { downloadEdgeExportFile, requestProbationExport } from '../../lib/edge/exports.js';
+import { getSwal } from '../../lib/swal.js';
 import { escapeHTML, escapeInlineArg } from '../../lib/utils.js';
 import { buildProbationDraft, saveProbationReview, saveProbationMonthlyScores, saveProbationAttendanceRecord, savePipPlan, savePipActions, calculateEmployeeWeightedKpiScore, getProbationRuleConfig, getProbationAttendanceEventOptions, suggestProbationAttendanceDeduction, logActivity } from '../data.js';
 import * as notify from '../../lib/notify.js';
@@ -385,6 +385,7 @@ export async function reviewProbation(reviewId) {
         </tr>
     `).join('');
 
+        const Swal = await getSwal();
         const modalResult = await Swal.fire({
         title: 'Probation Review Form',
         width: 1450,

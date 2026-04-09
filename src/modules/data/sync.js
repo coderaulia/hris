@@ -19,6 +19,11 @@ import {
     fetchProbationAttendanceRecords,
 } from './probation.js';
 import { fetchPipPlans, fetchPipActions } from './pip.js';
+import {
+    fetchDashboardSummary,
+    fetchDashboardProbationExpiry,
+    fetchDashboardAssessmentCoverage,
+} from './dashboard.js';
 
 async function syncAll() {
     const tasks = [
@@ -38,6 +43,9 @@ async function syncAll() {
         fetchProbationAttendanceRecords(),
         fetchPipPlans(),
         fetchPipActions(),
+        fetchDashboardSummary(),
+        fetchDashboardProbationExpiry(),
+        fetchDashboardAssessmentCoverage(),
     ];
 
     if (state.currentUser?.role === 'superadmin' || state.currentUser?.role === 'manager') {

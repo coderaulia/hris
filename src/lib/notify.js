@@ -1,5 +1,4 @@
-import Swal from 'sweetalert2';
-import 'sweetalert2/dist/sweetalert2.min.css';
+import { getSwal } from './swal.js';
 
 const defaults = {
     confirmButtonText: 'OK',
@@ -9,34 +8,45 @@ const defaults = {
 };
 
 function fire(options = {}) {
-    return Swal.fire({ ...defaults, ...options });
+    return getSwal().then(Swal => Swal.fire({ ...defaults, ...options }));
 }
 
-const toast = Swal.mixin({
-    toast: true,
-    position: 'top-end',
-    showConfirmButton: false,
-    timer: 2800,
-    timerProgressBar: true,
-    heightAuto: false,
-});
+let toastPromise = null;
+
+async function getToast() {
+    if (!toastPromise) {
+        toastPromise = getSwal().then(Swal => Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2800,
+            timerProgressBar: true,
+            heightAuto: false,
+        }));
+    }
+    return toastPromise;
+}
 
 export async function success(message, title = 'Success') {
+    const toast = await getToast();
     toast.fire({ icon: 'success', title, text: message });
     return true;
 }
 
 export async function info(message, title = 'Information') {
+    const toast = await getToast();
     toast.fire({ icon: 'info', title, text: message });
     return true;
 }
 
 export async function warn(message, title = 'Warning') {
+    const toast = await getToast();
     toast.fire({ icon: 'warning', title, text: message });
     return true;
 }
 
 export async function error(message, title = 'Error') {
+    const toast = await getToast();
     toast.fire({ icon: 'error', title, text: message, timer: 4500 });
     return true;
 }
@@ -70,10 +80,11 @@ export async function input(options = {}) {
         confirmButtonText: options.confirmButtonText || 'Save',
         cancelButtonText: options.cancelButtonText || 'Cancel',
         showLoaderOnConfirm: Boolean(options.showLoaderOnConfirm),
-        preConfirm: value => {
+        preConfirm: async value => {
             if (typeof options.validate === 'function') {
                 const msg = options.validate(value);
                 if (msg) {
+                    const Swal = await getSwal();
                     Swal.showValidationMessage(msg);
                     return false;
                 }
@@ -86,7 +97,8 @@ export async function input(options = {}) {
     return result.value;
 }
 
-export function showLoading(title = 'Please wait...', text = 'Processing request...') {
+export async function showLoading(title = 'Please wait...', text = 'Processing request...') {
+    const Swal = await getSwal();
     Swal.fire({
         title,
         text,
@@ -99,15 +111,16 @@ export function showLoading(title = 'Please wait...', text = 'Processing request
     });
 }
 
-export function hideLoading() {
+export async function hideLoading() {
+    const Swal = await getSwal();
     Swal.close();
 }
 
 export async function withLoading(task, title = 'Please wait...', text = 'Processing request...') {
-    showLoading(title, text);
+    await showLoading(title, text);
     try {
         return await task();
     } finally {
-        hideLoading();
+        await hideLoading();
     }
 }

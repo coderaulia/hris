@@ -18,6 +18,9 @@ export const state = {
     probationAttendanceRecords: [],
     pipPlans: [],
     pipActions: [],
+    dashboardSummary: null,
+    dashboardProbationExpiry: [],
+    dashboardAssessmentCoverage: [],
     activityLogs: [], // Admin/activity logs
     appSettings: {},  // App settings { app_name, company_name, ... }
     reportFilters: {

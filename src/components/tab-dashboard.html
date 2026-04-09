@@ -84,53 +84,104 @@
             </div>
         </div>
 
-        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-5 g-3 mb-4">
+        <div class="row row-cols-1 row-cols-md-2 row-cols-xl-6 g-3 mb-4">
             <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
                         <div class="stat-icon bg-primary-subtle"><i class="bi bi-people-fill text-primary"></i></div>
-                        <small class="text-muted text-uppercase fw-bold">Total Employees (KPI)</small>
-                        <div class="fs-2 fw-bold" id="d-kpi-emp">0</div>
-                        <div class="small text-muted" id="d-kpi-emp-sub">With KPI records: 0</div>
+                        <small class="text-muted text-uppercase fw-bold">Active Employees</small>
+                        <div class="fs-2 fw-bold" id="d-summary-active-employees">0</div>
+                        <div class="small text-muted">Scoped active workforce</div>
                     </div>
                 </div>
             </div>
             <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
-                        <div class="stat-icon bg-info-subtle"><i class="bi bi-bullseye text-info"></i></div>
-                        <small class="text-muted text-uppercase fw-bold">Total KPIs</small>
-                        <div class="fs-2 fw-bold" id="d-kpi-total">0</div>
+                        <div class="stat-icon bg-warning-subtle"><i class="bi bi-hourglass-split text-warning"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">On Probation</small>
+                        <div class="fs-2 fw-bold" id="d-summary-on-probation">0</div>
+                        <div class="small text-muted">Open probation windows</div>
                     </div>
                 </div>
             </div>
             <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
-                        <div class="stat-icon bg-primary-subtle"><i class="bi bi-journal-check text-primary"></i></div>
-                        <small class="text-muted text-uppercase fw-bold">Records</small>
-                        <div class="fs-2 fw-bold" id="d-kpi-records">0</div>
-                        <div class="small text-muted" id="d-kpi-records-sub">Selected month: 0 records</div>
+                        <div class="stat-icon bg-primary-subtle"><i class="bi bi-kanban text-primary"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Active PIPs</small>
+                        <div class="fs-2 fw-bold" id="d-summary-active-pips">0</div>
+                        <div class="small text-muted">Employees under improvement plans</div>
                     </div>
                 </div>
             </div>
             <div class="col">
                 <div class="card stat-card border-0 h-100">
                     <div class="card-body">
-                        <div class="stat-icon bg-success-subtle"><i class="bi bi-graph-up text-success"></i>
+                        <div class="stat-icon bg-info-subtle"><i class="bi bi-clock-history text-info"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">KPI Pending Approval</small>
+                        <div class="fs-2 fw-bold" id="d-summary-kpi-pending-approval">0</div>
+                        <div class="small text-muted">Target changes waiting review</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-danger-subtle"><i class="bi bi-bell-slash text-danger"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Failed Notifications</small>
+                        <div class="fs-2 fw-bold" id="d-summary-failed-notifications">0</div>
+                        <div class="small text-muted">Queue failures needing retry</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card stat-card border-0 h-100">
+                    <div class="card-body">
+                        <div class="stat-icon bg-success-subtle"><i class="bi bi-person-plus text-success"></i></div>
+                        <small class="text-muted text-uppercase fw-bold">Open Hires</small>
+                        <div class="fs-2 fw-bold" id="d-summary-open-hires">0</div>
+                        <div class="small text-muted">Unfilled recruitment pipeline</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row g-4 mb-4">
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold m-0"><i class="bi bi-hourglass-bottom me-1 text-warning"></i>Probation Expiry</h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <ul class="list-group list-group-flush small" id="d-probation-expiry-list">
+                            <li class="list-group-item text-center text-muted fst-italic">No probation deadlines in the next 30 days.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h6 class="fw-bold m-0"><i class="bi bi-clipboard2-pulse me-1 text-primary"></i>Assessment Coverage (Last 90 Days)</h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table align-middle mb-0">
+                                <thead class="table-light small">
+                                    <tr>
+                                        <th class="ps-3">Department</th>
+                                        <th>Coverage</th>
+                                        <th class="text-end">Covered</th>
+                                        <th class="text-end pe-3">Missing</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="d-assessment-coverage-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-3 fst-italic">No assessment coverage data yet.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
-                        <small class="text-muted text-uppercase fw-bold">Avg Achievement</small>
-                        <div class="fs-2 fw-bold" id="d-kpi-avg">0%</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col">
-                <div class="card stat-card border-0 h-100">
-                    <div class="card-body">
-                        <div class="stat-icon bg-warning-subtle"><i class="bi bi-check2-all text-warning"></i>
-                        </div>
-                        <small class="text-muted text-uppercase fw-bold">Met Target</small>
-                        <div class="fs-2 fw-bold" id="d-kpi-met">0</div>
                     </div>
                 </div>
             </div>

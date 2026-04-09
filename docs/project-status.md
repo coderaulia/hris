@@ -29,12 +29,12 @@ Last updated: 2026-04-09
 - Authenticated Edge Function reads now use a caller-scoped client, while service-role access is kept for privileged tasks like auth admin and Storage signing
 - Email notification delivery is still effectively placeholder until outbound email provider secrets are configured
 - Dashboard and probation export buttons now use the edge export flow end-to-end
-- Deploy instructions now live in [docs/supabase-functions-deploy.md](/c:/Users/Administrator/Documents/hris-vanaila/docs/supabase-functions-deploy.md)
+- Deploy instructions now live in [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md)
 - Production rollout depends on deploying the functions in Supabase after secrets are in place
 
 ## Current Gaps
 
 - Manpower planning is still a placeholder
-- README schema/setup section still needs a cleanup pass
+- README and setup docs have been aligned to the current bootstrap and deployment flow
 - Approval notifications still need real email provider setup before live delivery works
-- Large chart/vendor chunks still exist, but the heavy PDF/XLSX browser export path has been removed from the UI flow
+- Large chart and vendor chunks still exist, but the heavier PDF/XLSX export flow has been moved out of the browser UI path

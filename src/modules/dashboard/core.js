@@ -2,14 +2,21 @@
 // DASHBOARD MODULE — Assessment & KPI Summary
 // ==================================================
 
-import { Chart } from 'chart.js/auto';
 import { state } from '../../lib/store.js';
+import { getChartCtor } from '../../lib/chartLoader.js';
 import { downloadEdgeExportFile, requestDepartmentKpiExport, requestEmployeeKpiExport } from '../../lib/edge/exports.js';
 import { getManagerAssessment } from '../../lib/employee-records.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../../lib/utils.js';
 import * as notify from '../../lib/notify.js';
 import { getFilteredEmployeeIds } from '../../lib/reportFilters.js';
-import { calculateEmployeeWeightedKpiScore, getKpiRecordTarget, getKpiDefinitionForPeriod } from '../data.js';
+import {
+    calculateEmployeeWeightedKpiScore,
+    getKpiRecordTarget,
+    getKpiDefinitionForPeriod,
+    fetchDashboardSummary,
+    fetchDashboardProbationExpiry,
+    fetchDashboardAssessmentCoverage,
+} from '../data.js';
 import { DOM_IDS, getScoreBandClass, getKpiStatus } from '../../lib/uiContracts.js';
 
 let chartDistInstance = null;
@@ -25,6 +32,14 @@ let _currentDeptEmpIds = [];
 let _currentDeptRecords = [];
 let _currentDeptMonth = '';
 let _deptKpiTrendChart = null;
+const DASHBOARD_SUMMARY_FALLBACK = Object.freeze({
+    active_employees: 0,
+    on_probation: 0,
+    active_pips: 0,
+    kpi_pending_approval: 0,
+    failed_notifications: 0,
+    open_hires: 0,
+});
 
 function getKpiRecordMeta(record) {
     const def = getKpiDefinitionForPeriod(record?.kpi_id, record?.period) || state.kpiConfig.find(k => k.id === record?.kpi_id);
@@ -40,15 +55,17 @@ function normalizeEmployeeId(value) {
     return String(value ?? '').trim();
 }
 
-export function renderDashboard() {
-    renderAssessmentSummary();
-    renderKpiSummary();
+export async function renderDashboard() {
+    await Promise.all([
+        renderAssessmentSummary(),
+        renderKpiSummary(),
+    ]);
 }
 
 // ==================================================
 // ASSESSMENT SUMMARY
 // ==================================================
-function renderAssessmentSummary() {
+async function renderAssessmentSummary() {
     const { db } = state;
     let keys = getFilteredEmployeeIds();
     const selectedPeriod = state.reportFilters?.period || '';
@@ -136,6 +153,7 @@ function renderAssessmentSummary() {
     const ctxDist = document.getElementById('chartDist');
     if (ctxDist) {
         if (chartDistInstance) chartDistInstance.destroy();
+        const Chart = await getChartCtor();
         chartDistInstance = new Chart(ctxDist, {
             type: 'doughnut',
             data: {
@@ -151,6 +169,7 @@ function renderAssessmentSummary() {
     const ctxStatus = document.getElementById('chartStatus');
     if (ctxStatus) {
         if (chartStatusInstance) chartStatusInstance.destroy();
+        const Chart = await getChartCtor();
         chartStatusInstance = new Chart(ctxStatus, {
             type: 'bar',
             data: {
@@ -172,6 +191,7 @@ function renderAssessmentSummary() {
     const ctxScore = document.getElementById('chartScore');
     if (ctxScore) {
         if (chartScoreInstance) chartScoreInstance.destroy();
+        const Chart = await getChartCtor();
         chartScoreInstance = new Chart(ctxScore, {
             type: 'bar',
             data: {
@@ -186,7 +206,7 @@ function renderAssessmentSummary() {
 // ==================================================
 // KPI SUMMARY
 // ==================================================
-function renderKpiSummary() {
+async function renderKpiSummary() {
     const { kpiRecords, kpiConfig, db } = state;
     const visibleIds = new Set(getFilteredEmployeeIds().map(normalizeEmployeeId));
 
@@ -206,48 +226,14 @@ function renderKpiSummary() {
     const scopedRecords = kpiRecords.filter(r => visibleIds.has(normalizeEmployeeId(r.employee_id)));
     const monthlyRecords = scopedRecords.filter(r => r.period === selectedMonth);
     const quarterlyRecords = scopedRecords.filter(r => qPeriods.includes(r.period));
-    const totalScopedEmployees = visibleIds.size;
-    const employeesWithMonthlyKpi = new Set(monthlyRecords.map(r => normalizeEmployeeId(r.employee_id))).size;
-
-    // KPI Overview Cards (Current Month)
-    const totalKpis = kpiConfig.length;
-    const totalRecords = scopedRecords.length;
-    const monthlyRecordCount = monthlyRecords.length;
-    let totalAchievement = 0;
-    let achievedCount = 0;
-
-    monthlyRecords.forEach(record => {
-        const target = getKpiRecordMeta(record).target;
-        if (target > 0) {
-            const ach = (record.value / target) * 100;
-            totalAchievement += ach;
-            achievedCount++;
-        }
-    });
-
-    const avgAchievement = achievedCount > 0 ? Math.round(totalAchievement / achievedCount) : 0;
-
-    // Count how many meet target
-    let metTarget = 0;
-    monthlyRecords.forEach(record => {
-        const target = getKpiRecordMeta(record).target;
-        if (target > 0 && record.value >= target) metTarget++;
-    });
-
-    const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-
-    setTxt('d-kpi-emp', totalScopedEmployees);
-    const kpiEmpSub = document.getElementById('d-kpi-emp-sub');
-    if (kpiEmpSub) kpiEmpSub.innerText = `With KPI records: ${employeesWithMonthlyKpi}`;
-    setTxt('d-kpi-total', totalKpis);
-    setTxt('d-kpi-records', totalRecords);
-    const kpiRecordsSub = document.getElementById('d-kpi-records-sub');
-    if (kpiRecordsSub) {
-        const monthlyLabel = String(selectedMonth || currentMonth);
-        kpiRecordsSub.innerText = `${monthlyLabel}: ${monthlyRecordCount} record${monthlyRecordCount === 1 ? '' : 's'}`;
-    }
-    setTxt('d-kpi-avg', avgAchievement + '%');
-    setTxt('d-kpi-met', metTarget);
+    const [serverSummary, probationExpiryRows, assessmentCoverageRows] = await Promise.all([
+        fetchDashboardSummary(),
+        fetchDashboardProbationExpiry(),
+        fetchDashboardAssessmentCoverage(),
+    ]);
+    renderDashboardSummaryCards(serverSummary);
+    renderProbationExpiryPanel(probationExpiryRows);
+    renderAssessmentCoveragePanel(assessmentCoverageRows);
 
     // KPI Achievement by Category Chart
     const ctxKpiOverview = document.getElementById('chartKpiOverview');
@@ -268,6 +254,7 @@ function renderKpiSummary() {
         const catLabels = Object.keys(catMap);
         const catData = catLabels.map(c => catMap[c].count > 0 ? Math.round(catMap[c].sum / catMap[c].count) : 0);
 
+        const Chart = await getChartCtor();
         chartKpiOverviewInstance = new Chart(ctxKpiOverview, {
             type: 'bar',
             data: {
@@ -699,7 +686,7 @@ function buildLeadershipAnalyticsSnapshot(selectedMonth) {
     };
 }
 
-function renderLeadershipAnalytics(selectedMonth) {
+async function renderLeadershipAnalytics(selectedMonth) {
     const snapshot = buildLeadershipAnalyticsSnapshot(selectedMonth);
 
     const setText = (id, value) => {
@@ -724,6 +711,7 @@ function renderLeadershipAnalytics(selectedMonth) {
     const trendCanvas = document.getElementById('chartKpiTrend');
     if (trendCanvas) {
         if (chartKpiTrendInstance) chartKpiTrendInstance.destroy();
+        const Chart = await getChartCtor();
         chartKpiTrendInstance = new Chart(trendCanvas, {
             type: 'bar',
             data: {
@@ -972,7 +960,7 @@ function renderDeptKpiCards(records) {
 // ==================================================
 // DEPARTMENT KPI DRILL-DOWN MODAL
 // ==================================================
-export function openDeptKpiModal(dept) {
+export async function openDeptKpiModal(dept) {
     const { db, kpiRecords } = state;
 
     _currentDeptName = dept;
@@ -1012,10 +1000,133 @@ export function openDeptKpiModal(dept) {
     }
 
     // Render table
-    window.__app.renderDeptKpiTable(currentMonthStr, null);
+    await window.__app.renderDeptKpiTable(currentMonthStr, null);
 }
 
-export function renderDeptKpiTable(month, tabBtn) {
+function buildDashboardSummaryFallback() {
+    const scopedEmployeeIds = getFilteredEmployeeIds().map(normalizeEmployeeId);
+    const scopedEmployeeSet = new Set(scopedEmployeeIds);
+    const activeEmployees = scopedEmployeeIds
+        .map(id => state.db[id])
+        .filter(employee => employee && isTrackedEmployee(employee))
+        .length;
+
+    const onProbation = new Set(
+        (state.probationReviews || [])
+            .filter(review => scopedEmployeeSet.has(normalizeEmployeeId(review.employee_id)))
+            .filter(review => {
+                const decision = String(review?.decision || 'pending').trim().toLowerCase();
+                return decision === 'pending' || decision === 'extend';
+            })
+            .map(review => normalizeEmployeeId(review.employee_id))
+    ).size;
+
+    const activePips = (state.pipPlans || [])
+        .filter(plan => scopedEmployeeSet.has(normalizeEmployeeId(plan.employee_id)))
+        .filter(plan => String(plan?.status || '').trim().toLowerCase() === 'active')
+        .length;
+
+    const pendingApprovals = (state.employeeKpiTargetVersions || [])
+        .filter(version => scopedEmployeeSet.has(normalizeEmployeeId(version.employee_id)))
+        .filter(version => String(version?.status || '').trim().toLowerCase() === 'pending')
+        .length;
+
+    return {
+        ...DASHBOARD_SUMMARY_FALLBACK,
+        active_employees: activeEmployees,
+        on_probation: onProbation,
+        active_pips: activePips,
+        kpi_pending_approval: pendingApprovals,
+    };
+}
+
+function renderDashboardSummaryCards(summaryRow) {
+    const summary = summaryRow && typeof summaryRow === 'object'
+        ? { ...DASHBOARD_SUMMARY_FALLBACK, ...summaryRow }
+        : buildDashboardSummaryFallback();
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = formatNumber(Number(value || 0));
+    };
+
+    setText('d-summary-active-employees', summary.active_employees);
+    setText('d-summary-on-probation', summary.on_probation);
+    setText('d-summary-active-pips', summary.active_pips);
+    setText('d-summary-kpi-pending-approval', summary.kpi_pending_approval);
+    setText('d-summary-failed-notifications', summary.failed_notifications);
+    setText('d-summary-open-hires', summary.open_hires);
+}
+
+function renderProbationExpiryPanel(rows = []) {
+    const listEl = document.getElementById('d-probation-expiry-list');
+    if (!listEl) return;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        listEl.innerHTML = '<li class="list-group-item text-center text-muted fst-italic">No probation deadlines in the next 30 days.</li>';
+        return;
+    }
+
+    listEl.innerHTML = rows.map(row => {
+        const daysRemaining = Number(row?.days_remaining || 0);
+        const urgencyClass = daysRemaining <= 7 ? 'text-danger' : daysRemaining <= 14 ? 'text-warning' : 'text-primary';
+        const urgencyLabel = daysRemaining === 0
+            ? 'Due today'
+            : `${formatNumber(daysRemaining)} day${daysRemaining === 1 ? '' : 's'} left`;
+        const deptLabel = row?.department || 'Unassigned';
+        const positionLabel = row?.position || '-';
+        const probationEnd = row?.probation_end_date || '-';
+
+        return `<li class="list-group-item">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+                <div>
+                    <div class="fw-bold">${escapeHTML(row?.name || row?.employee_id || 'Unknown Employee')}</div>
+                    <div class="small text-muted">${escapeHTML(deptLabel)} · ${escapeHTML(positionLabel)}</div>
+                    <div class="small text-muted">Probation end: ${escapeHTML(probationEnd)}</div>
+                </div>
+                <span class="badge bg-light border ${urgencyClass}">${escapeHTML(urgencyLabel)}</span>
+            </div>
+        </li>`;
+    }).join('');
+}
+
+function renderAssessmentCoveragePanel(rows = []) {
+    const bodyEl = document.getElementById('d-assessment-coverage-body');
+    if (!bodyEl) return;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        bodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3 fst-italic">No assessment coverage data yet.</td></tr>';
+        return;
+    }
+
+    bodyEl.innerHTML = rows.map(row => {
+        const coverage = Number(row?.coverage_pct || 0);
+        const activeCount = Number(row?.active_employee_count || 0);
+        const coveredCount = Number(row?.covered_employee_count || 0);
+        const missingCount = Number(row?.missing_employee_count || Math.max(activeCount - coveredCount, 0));
+        const barClass = coverage >= 90 ? 'bg-success' : coverage >= 70 ? 'bg-warning' : 'bg-danger';
+
+        return `<tr>
+            <td class="ps-3">
+                <div class="fw-semibold">${escapeHTML(row?.department || 'Unassigned')}</div>
+                <div class="small text-muted">${formatNumber(activeCount)} active employee${activeCount === 1 ? '' : 's'}</div>
+            </td>
+            <td style="min-width: 220px;">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span>${coverage.toFixed(1)}%</span>
+                    <span class="text-muted">${formatNumber(coveredCount)} covered</span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                    <div class="progress-bar ${barClass}" style="width: ${Math.max(0, Math.min(coverage, 100))}%"></div>
+                </div>
+            </td>
+            <td class="text-end">${formatNumber(coveredCount)}</td>
+            <td class="text-end pe-3">${formatNumber(missingCount)}</td>
+        </tr>`;
+    }).join('');
+}
+
+export async function renderDeptKpiTable(month, tabBtn) {
     if (tabBtn) {
         document.querySelectorAll(`#${DOM_IDS.dashboard.deptModalTabs} .nav-link`).forEach(n => n.classList.remove('active'));
         tabBtn.classList.add('active');
@@ -1155,6 +1266,7 @@ export function renderDeptKpiTable(month, tabBtn) {
 
         const mNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+        const Chart = await getChartCtor();
         _deptKpiTrendChart = new Chart(trendCtx, {
             type: 'bar',
             data: {

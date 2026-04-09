@@ -9,7 +9,7 @@ import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } fr
 import { saveEmployee, deleteEmployee as deleteEmpFromDB, logActivity } from './data.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
-import Swal from 'sweetalert2';
+import { getSwal } from '../lib/swal.js';
 
 function getEmployeeFormOptionData() {
     const { appConfig, appSettings, db } = state;
@@ -342,7 +342,7 @@ export function loadEmployeeForEdit(id) {
     if (!rec) return;
     const formOptions = getEmployeeFormOptionData();
 
-    Swal.fire({
+    getSwal().then(Swal => Swal.fire({
         title: `Edit ${escapeHTML(rec.name)}`,
         width: 760,
         confirmButtonText: 'Save Changes',
@@ -419,7 +419,7 @@ export function loadEmployeeForEdit(id) {
 
             return values;
         },
-    }).then(async result => {
+    })).then(async result => {
         if (!result.isConfirmed || !result.value) return;
 
         const values = result.value;

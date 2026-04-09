@@ -1,221 +1,95 @@
 # HR Performance Suite
 
-A modern and comprehensive Human Resources management system focusing on employee competency assessment and KPI tracking.
+HR Performance Suite is a Vite single-page app for employee assessment, KPI tracking, probation review, and role-based HR operations. The frontend talks directly to Supabase for normal CRUD, while selected privileged flows now run through Supabase Edge Functions.
 
-This system replaces older, disconnected spreadsheets by centralizing authentication, competency evaluations, and key performance indicators into a sleek, real-time dashboard powered by **Supabase (PostgreSQL)**.
+## Stack
 
----
+- Frontend: vanilla JavaScript, Vite, Tailwind, Bootstrap utilities
+- Backend: Supabase Auth, Postgres, RLS
+- Charts: Chart.js
+- Hosting: static hosting or Hostinger Git deployment
+- Server boundaries: Supabase Edge Functions for managed users, auth callbacks, notifications, and exports
 
-## 🚀 Features Highlights
+## Core modules
 
-### **1. Competency Assessment**
-- **Dual Evaluation System:** Employees perform self-assessments, which are then reviewed and finalized by their Managers.
-- **Dynamic Questionnaires:** Questions branch based on the employee's role and configured competencies.
-- **Training Recommendations:** Tracks recommended training for employees who score below the required baseline.
+- Dashboard and department KPI drill-down
+- Employee directory and role-aware access
+- Competency assessment and training records
+- KPI definitions, targets, approvals, and exports
+- Probation and PIP workflows
+- Settings, branding, and org configuration
 
-### **2. Employee KPI Manager**
-- **Monthly/Quarterly KPI Tracking:** Employees can report data on targets ranging from Sales performance to Customer Satisfaction.
-- **Department Drill-Downs:** Managers can view individual and aggregate departmental achievement scores, complete with 6-month trends.
-- **KPI Library:** Admins can create overarching KPI definitions and apply global or personalized targets for every employee.
-- **KPI Governance:** KPI definitions and monthly target overrides support effective-month changes, optional approval workflow, and version history.
-- **Non-Retroactive Scoring:** KPI records store target/name/unit snapshots at submission time so old scores remain stable after KPI updates.
+## Project structure
 
-### **3. Robust Analytics Dashboard**
-- **Actionable Insights:** Tracks overall organizational skill averages, highest/lowest-scoring groups, and KPI top performers continuously.
-- **Data Exporting:** Every table and visualization can be instantly exported to Excel (`.xlsx`) or PDF.
-- **Traceability:** Activity logs track admin-sensitive changes and KPI/assessment edits with actor + timestamp metadata.
-
-### **4. Account & Security**
-- **Password Recovery:** Built-in forgot password flow via Supabase reset email.
-- **First Login Protection:** Temporary credentials can force mandatory password change on first login.
-- **Session Protection:** Idle timeout and re-authentication prompts for sensitive operations.
-
----
-
-## 🏗 Architecture & Stack 
-
-- **Frontend Framework:** Vanilla JavaScript + HTML5 + Bootstrap 5 (Custom CSS)
-- **Bundler:** Vite
-- **Backend & Database:** Supabase (PostgreSQL + Auth)
-- **Charting Engine:** Chart.js
-- **PDF/Excel Exporting:** jspdf + exceljs
-
-### Project Structure
 ```text
-TNA/
-├── index.html               ← Application Entry Point
-├── vite.config.js           ← Vite Bundler Configurations
-├── package.json             ← Project Dependencies
-├── complete-setup.sql       ← Sanitized Supabase bootstrap (schema + RLS, no sample data)
+.
+├── complete-setup.sql
+├── migrations/
+├── docs/
+├── public/
 ├── src/
-│   ├── main.js              ← Core Routing, Event Wirings, and Initializer
-│   ├── lib/
-│   │   ├── supabase.js      ← Supabase SDK Setup & Credentials
-│   │   ├── store.js         ← Native App Reactive Store (Pub/Sub)
-│   │   └── utils.js         ← Global Formatting & Helpers
-│   ├── components/          ← HTML Partial Views (Injected via Vite `?raw`)
-│   ├── modules/             ← JS Feature Controllers (Auth, KPI, Dashboard, Data)
-│   └── styles/              
-│       └── main.css         ← Global Application Stylesheet
+├── supabase/
+│   └── functions/
+└── tests/
 ```
 
----
+## Fresh setup
 
-## ⚙️ Initial Setup Guide
+1. Create a new Supabase project.
+2. Run the SQL files in [docs/fresh-supabase-setup.md](/D:/web/hris/docs/fresh-supabase-setup.md) in order.
+3. Copy [.env.example](/D:/web/hris/.env.example) to `.env`.
+4. Fill in:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_AUTH_REDIRECT_URL` for your local or production URL
+5. Install dependencies with `npm install`.
+6. Start the app with `npm run dev`.
 
-### Phase 1: Supabase Configuration
+## Auth bootstrap
 
-1. Log in to [Supabase](https://supabase.com) and create exactly **one new project**.
-2. Once the project dashboard is ready, navigate to the **SQL Editor** on the left menu.
-3. Open the `complete-setup.sql` file from this project's root folder. Copy **everything** inside that file.
-4. Paste it into your Supabase SQL Editor and click **RUN**. This single script handles the base platform setup:
-   - Generates the database tables.
-   - Applies the required Row-Level Security (RLS) policies.
-   - Inserts only safe default app settings, with no employee, KPI, competency, or training sample data.
-5. Import employees, KPI definitions, and competency configuration separately through the app or your own private migration files.
+The SQL seed prepares employee rows and `auth_email`, but it does not create Supabase Auth users. Create the first login manually in `Supabase -> Authentication -> Users`, using the same email as the employee row. The app links `auth_id` automatically on first successful sign-in.
 
-### Phase 1B: Required Incremental Migrations (Existing Projects)
+Recommended first login:
 
-If your project was already running before sprint updates, run these migration files in order from `/migrations`:
+- `superadmin@demo.local`
 
-1. `20260307_safe_next_steps.sql`
-2. `20260308_probation_monthly_attendance.sql`
-3. `20260308_probation_hr_access_policy.sql`
-4. `20260308_manager_kpi_competency_policy.sql`
-5. `20260308_director_role_scope.sql`
-6. `20260308_kpi_governance.sql`
+## Edge Functions
 
-This enables probation monthly scoring, HR probation access, director scope, and KPI governance (effective month + approvals + version history + snapshot scoring).
+This repo includes these function domains:
 
-### Phase 2: Connecting the Frontend
+- `admin-user-mutations`
+- `auth-callbacks`
+- `approval-notifications`
+- `report-exports`
 
-1. On your Supabase Dashboard, click on **Settings (Gear Icon)** -> **API**.
-2. Keep this tab open. In your local project folder, create a `.env` file (or copy `.env.example`).
-3. Add your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=https://[YOUR_PROJECT_ID].supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR...
-   ```
+Deploy and configure them with [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md).
 
-### Phase 3: Launching Locally
+## Hostinger deployment
 
-You must have **Node.js** installed on your computer.
+The preferred production flow is Hostinger direct Git deployment, not GitHub Actions FTP upload.
 
-1. Open your terminal in the project's root directory:
-   ```bash
-   npm install
-   ```
-2. Start the local development server:
-   ```bash
-   npm run dev
-   ```
-3. The app will launch (typically at `http://localhost:5173`).
-4. Create your first superadmin login in Supabase Auth, then link that email in `employees.auth_email` and role `superadmin`.
+Use [docs/hostinger-github-autodeploy.md](/D:/web/hris/docs/hostinger-github-autodeploy.md) for the current setup. In short:
 
----
+1. Connect the GitHub repo in Hostinger hPanel.
+2. Set the app type to a Vite/static build.
+3. Add frontend env vars in Hostinger:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_AUTH_REDIRECT_URL`
+   - optional monitoring/session values
+4. Make sure Supabase Auth `Site URL` and redirect URLs match the live domain.
 
-## 🌍 Deployment Guide (Hostinger & Similar standard Web Hosts)
+## Security notes
 
-Since this app operates completely as a **Static Frontend Site (SPA)** connecting to Supabase, deploying to shared hosting like Hostinger is remarkably easy. You do **not** need Node.js installed on your Hostinger server.
+- Keep RLS enabled.
+- Keep Data API grants aligned with bootstrap and migrations.
+- Never put `SERVICE_ROLE_KEY` in frontend hosting env.
+- Use unique passwords for seeded demo users before any real rollout.
 
-1. First, inside your local project terminal, create the production build:
-   ```bash
-   npm run build
-   ```
-2. Vite will process and bundle all instructions into a brand new folder named **`dist/`**.
-3. Log into your **Hostinger hPanel**.
-4. Go to the **File Manager** for your specific domain or subdomain (e.g., `hr.yourdomain.com`).
-5. Open the `public_html/` folder.
-6. Upload the **contents** of your local `dist/` folder directly into `public_html/`. Make sure `index.html` sits immediately inside `public_html/`, not inside a sub-folder.
-7. You're done! Visit your domain. 
+## Supporting docs
 
----
-
-## 🤖 Automatic Deploy (GitHub Actions -> Hostinger)
-
-This repository now includes an automatic deploy workflow:
-
-- Workflow file: `.github/workflows/deploy-hostinger.yml`
-- Trigger: push to `main` (and manual trigger from Actions tab)
-- Process: install deps -> build (`dist/`) -> upload to Hostinger via FTPS
-
-### 1) Add GitHub Repository Secrets
-
-Open **GitHub -> Repository -> Settings -> Secrets and variables -> Actions -> New repository secret**.
-
-Add these secrets:
-
-- `HOSTINGER_FTP_HOST` (example: `ftp.yourdomain.com`)
-- `HOSTINGER_FTP_USER`
-- `HOSTINGER_FTP_PASSWORD`
-- `HOSTINGER_FTP_REMOTE_DIR` (example: `/public_html/`)
-- `VITE_SUPABASE_URL` (example: `https://your-project-id.supabase.co`)
-- `VITE_SUPABASE_ANON_KEY` (your Supabase anon public key)
-- `VITE_SESSION_TIMEOUT_MINUTES` (optional, default `30`)
-- `VITE_MONITOR_WEBHOOK_URL` (optional, frontend error webhook endpoint)
-- `VITE_SENTRY_DSN` (optional, if you provide Sentry script/SDK integration)
-- `SITE_BASE_URL` (example: `https://app.yourdomain.com`, used for post-deploy checks)
-- `SITE_HEALTHCHECK_URL` (optional override, example: `https://app.yourdomain.com/healthz.json`)
-- `DEPLOY_NOTIFY_WEBHOOK_URL` (optional webhook for deploy success/failure notifications)
-
-### 2) Push to `main`
-
-Every push to `main` will automatically deploy the latest `dist/` build to your Hostinger folder.
-
-### 3) First-run checks
-
-- Ensure FTP account has write access to your target directory.
-- Ensure `HOSTINGER_FTP_REMOTE_DIR` points to the correct site root (for most cases: `/public_html/`).
-- If your repo default branch is not `main`, change the branch in `.github/workflows/deploy-hostinger.yml`.
-- Ensure `public/healthz.json` is reachable after deploy (`/healthz.json`).
-
-### 4) Backups
-
-Database backups are intentionally not shipped through this public repository. Keep backup/export jobs in a private repository, a private runner, or your database platform tooling so SQL dumps and activity data do not end up in GitHub artifacts.
-
----
-
-## 📘 User Roles & Workflows
-
-### 1. Admins (Super Users)
-- **Capabilities:** Have unrestricted access. Only Admins can tweak the global Competency matrices, establish organization-wide KPI scales, map exact organizational hierarchies (Departments/Roles/Branches), and import/export raw infrastructure configuration JSONs.
-
-### 2. Managers
-- **Capabilities:** Have visibility linked to scoped department/team and can manage KPI for direct reports.
-- **Workflow:**
-   1. Open Assessment tab to review team submissions.
-   2. Finalize managerial assessments.
-   3. Manage KPI definitions/targets for scoped positions and employees.
-   4. Monitor department KPI dashboards and monthly progress.
-
-### 3. HR
-- **Capabilities:** Operational reviewer for probation and KPI governance.
-- **Workflow:**
-   1. Manage probation reviews and attendance-based deductions.
-   2. Approve/reject pending KPI definition or monthly target changes (when approval is enabled).
-   3. Maintain probation scoring policy and pass threshold settings.
-
-### 4. Employees
-- **Capabilities:** Limited view, focusing only on their direct requirements.
-- **Workflow:**
-   1. Logs into their account.
-   2. Promptly clicks 'Initiate Self Assessment' if a review cycle is currently open. They grade themselves across listed competency parameters.
-   3. Clicks 'Submit monthly KPI data' on the Records/Overview page when applicable to pass performance metrics (like total calls or success retention) upward to the Manager.
-
----
-
-## ✨ Support & Security Note
-
-- **SQL Injection/XSS Prevention:** The system utilizes robust frontend sanitization via custom `escapeHTML` formatters natively across all list/render functions preventing DOM injections.
-- **Row Level Security:** Ensure that your Supabase instance doesn't have RLS disabled. The queries are formatted exclusively expecting the native secure SDK flow.
-- **Default Credentials:** No default production admin credential should be documented or shipped. Use unique credentials and force password rotation for temporary accounts.
-
-
-
-
-
-
-
-
-
-
+- [Fresh Supabase setup](/D:/web/hris/docs/fresh-supabase-setup.md)
+- [Supabase functions deploy](/D:/web/hris/docs/supabase-functions-deploy.md)
+- [Hostinger deployment](/D:/web/hris/docs/hostinger-github-autodeploy.md)
+- [Architecture](/D:/web/hris/docs/architecture.md)
+- [Project status](/D:/web/hris/docs/project-status.md)

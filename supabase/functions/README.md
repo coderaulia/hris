@@ -18,7 +18,7 @@ Set these in the Supabase project before deploying:
 
 Full deploy checklist:
 
-- [docs/supabase-functions-deploy.md](/c:/Users/Administrator/Documents/hris-vanaila/docs/supabase-functions-deploy.md)
+- [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md)
 
 ## First deploy targets
 

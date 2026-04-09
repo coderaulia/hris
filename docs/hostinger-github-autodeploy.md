@@ -1,67 +1,52 @@
-# Hostinger GitHub Auto-Deploy
+# Hostinger Git Deployment
 
-This repo now includes a GitHub Actions workflow for static deploys to Hostinger.
+This project is intended to deploy through Hostinger's direct GitHub integration, not through GitHub Actions FTP upload.
 
-Workflow file:
-[.github/workflows/deploy-hostinger.yml](/D:/web/hris/.github/workflows/deploy-hostinger.yml)
+## Recommended setup
 
-## What You Need In GitHub Secrets
+1. Open Hostinger hPanel.
+2. Create or open your site or web app.
+3. Connect the GitHub repository.
+4. Set the project type to a Vite or static frontend build.
+5. Use Node.js 20 unless Hostinger requires a newer supported version.
 
-Add these in `GitHub -> Repository -> Settings -> Secrets and variables -> Actions`.
+## Build settings
 
-Required:
+Use these values in Hostinger:
 
-- `HOSTINGER_FTP_HOST`
-- `HOSTINGER_FTP_USER`
-- `HOSTINGER_FTP_PASSWORD`
-- `HOSTINGER_FTP_REMOTE_DIR`
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output directory: `dist`
+
+If Hostinger asks for framework type, use the Vite or static option. Use `Other` only if you intentionally add a custom Node entry server.
+
+## Environment variables
+
+Add these in Hostinger, not in GitHub secrets:
+
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_AUTH_REDIRECT_URL`
-- `SITE_BASE_URL`
 
 Optional:
 
 - `VITE_SESSION_TIMEOUT_MINUTES`
 - `VITE_MONITOR_WEBHOOK_URL`
 - `VITE_SENTRY_DSN`
-- `SITE_HEALTHCHECK_URL`
-- `DEPLOY_NOTIFY_WEBHOOK_URL`
 
-## Secret Value Examples
+## Supabase Auth URL setup
 
-- `HOSTINGER_FTP_HOST`: `ftp.yourdomain.com`
-- `HOSTINGER_FTP_USER`: your Hostinger FTP username
-- `HOSTINGER_FTP_PASSWORD`: your Hostinger FTP password
-- `HOSTINGER_FTP_REMOTE_DIR`: `/public_html/` or `/domains/app.yourdomain.com/public_html/`
-- `VITE_SUPABASE_URL`: `https://your-project-id.supabase.co`
-- `VITE_SUPABASE_ANON_KEY`: your Supabase anon key
-- `VITE_AUTH_REDIRECT_URL`: `https://app.yourdomain.com`
-- `SITE_BASE_URL`: `https://app.yourdomain.com`
-- `SITE_HEALTHCHECK_URL`: `https://app.yourdomain.com/healthz.json`
+In `Supabase -> Authentication -> URL Configuration`, set:
 
-## Supabase Auth Redirect Setup
+- Site URL: your live Hostinger URL
+- Redirect URLs: include the same live URL, and any local dev URL you still use for password reset or invite flows
 
-In Supabase Authentication URL configuration, add your production site URL:
+`VITE_AUTH_REDIRECT_URL` should match the production URL users are sent back to.
 
-- Site URL: your live app URL, for example `https://app.yourdomain.com`
-- Redirect URLs: also include the same URL if you use password reset or invite flows
+## First deployment checklist
 
-This must match `VITE_AUTH_REDIRECT_URL`.
-
-## Deploy Flow
-
-On every push to `main`, GitHub Actions will:
-
-1. install dependencies
-2. build the Vite app with production env vars
-3. upload `dist/` to Hostinger over FTPS
-4. verify `healthz.json`
-
-## First-Time Checklist
-
-1. Confirm [public/healthz.json](/D:/web/hris/public/healthz.json) is reachable on the final site path.
-2. Confirm FTP user has write access to the target directory.
-3. Confirm your domain already points to Hostinger hosting.
-4. Confirm Supabase Auth URLs include the live domain.
-5. Push a small commit to `main` and watch the Actions tab for the first deploy.
+1. Confirm the domain points to Hostinger.
+2. Confirm the repo branch in Hostinger is the branch you actually deploy from.
+3. Confirm the frontend env vars are saved in Hostinger before the first build.
+4. Confirm [healthz.json](/D:/web/hris/public/healthz.json) is reachable after deploy.
+5. Confirm Supabase Auth URLs include the live domain.

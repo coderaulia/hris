@@ -88,7 +88,7 @@ supabase login
 Then link this local repo to the Supabase project:
 
 ```bash
-supabase link --project-ref ujokielntvbyzyvjayrr
+supabase link --project-ref your-project-ref
 ```
 
 Notes:
@@ -117,7 +117,7 @@ This is the shortest successful deploy sequence for this repo:
 ```bash
 supabase --version
 supabase login
-supabase link --project-ref ujokielntvbyzyvjayrr
+supabase link --project-ref your-project-ref
 supabase functions deploy admin-user-mutations
 supabase functions deploy auth-callbacks
 supabase functions deploy approval-notifications

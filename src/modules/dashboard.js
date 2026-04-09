@@ -1,9 +1,11 @@
 import { renderAssessmentSummary } from './dashboard/assessmentSummary.js';
 import { renderKpiSummary } from './dashboard/kpiSummary.js';
 
-function renderDashboard() {
-    renderAssessmentSummary();
-    renderKpiSummary();
+async function renderDashboard() {
+    await Promise.all([
+        renderAssessmentSummary(),
+        renderKpiSummary(),
+    ]);
 }
 
 export { renderDashboard };
