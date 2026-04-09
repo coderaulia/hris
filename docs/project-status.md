@@ -26,6 +26,7 @@ Last updated: 2026-04-09
   - `report-exports` for server-side KPI/probation binary generation, Storage upload, and signed URL downloads
 - Normal application CRUD is still intended to remain browser-side through direct Supabase SDK calls with RLS enforcement
 - Edge Function secrets now use `URL`, `ANON_KEY`, and `SERVICE_ROLE_KEY`
+- Authenticated Edge Function reads now use a caller-scoped client, while service-role access is kept for privileged tasks like auth admin and Storage signing
 - Email notification delivery is still effectively placeholder until outbound email provider secrets are configured
 - Dashboard and probation export buttons now use the edge export flow end-to-end
 - Deploy instructions now live in [docs/supabase-functions-deploy.md](/c:/Users/Administrator/Documents/hris-vanaila/docs/supabase-functions-deploy.md)
