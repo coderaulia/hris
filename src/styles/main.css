@@ -800,6 +800,7 @@ body,
   padding: 14px 16px;
   color: var(--wei-text);
   font-weight: 700;
+  text-align: left;
 }
 
 .sidebar-group-toggle:hover {
@@ -814,6 +815,9 @@ body,
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .sidebar-group-icon {
@@ -869,6 +873,9 @@ body,
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
 }
 
 .sidebar-link-title {

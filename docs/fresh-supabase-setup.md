@@ -6,24 +6,26 @@ Use this when you are starting with a brand-new Supabase project and want a work
 
 Run these SQL files in Supabase SQL Editor in this exact order:
 
-1. [supabase/00_fresh_employees_base.sql](/D:/web/hris/supabase/00_fresh_employees_base.sql)
-2. [complete-setup.sql](/D:/web/hris/complete-setup.sql)
-3. [migrations/20260307_safe_next_steps.sql](/D:/web/hris/migrations/20260307_safe_next_steps.sql)
-4. [migrations/20260308_probation_monthly_attendance.sql](/D:/web/hris/migrations/20260308_probation_monthly_attendance.sql)
-5. [migrations/20260308_probation_hr_access_policy.sql](/D:/web/hris/migrations/20260308_probation_hr_access_policy.sql)
-6. [migrations/20260308_manager_kpi_competency_policy.sql](/D:/web/hris/migrations/20260308_manager_kpi_competency_policy.sql)
-7. [migrations/20260308_director_role_scope.sql](/D:/web/hris/migrations/20260308_director_role_scope.sql)
-8. [migrations/20260308_kpi_governance.sql](/D:/web/hris/migrations/20260308_kpi_governance.sql)
-9. [migrations/20260309_security_qa_hardening.sql](/D:/web/hris/migrations/20260309_security_qa_hardening.sql)
-10. [supabase/01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+1. [complete-setup.sql](/c:/Users/Administrator/Documents/hris-vanaila/complete-setup.sql)
+2. [migrations/20260307_safe_next_steps.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260307_safe_next_steps.sql)
+3. [migrations/20260308_probation_monthly_attendance.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260308_probation_monthly_attendance.sql)
+4. [migrations/20260308_probation_hr_access_policy.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260308_probation_hr_access_policy.sql)
+5. [migrations/20260308_manager_kpi_competency_policy.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260308_manager_kpi_competency_policy.sql)
+6. [migrations/20260308_director_role_scope.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260308_director_role_scope.sql)
+7. [migrations/20260308_kpi_governance.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260308_kpi_governance.sql)
+8. [migrations/20260309_security_qa_hardening.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260309_security_qa_hardening.sql)
+9. [supabase/01_dummy_seed.sql](/c:/Users/Administrator/Documents/hris-vanaila/supabase/01_dummy_seed.sql)
 
 ## What The Seed Includes
 
 - app settings and org structure
-- 9 employees across `superadmin`, `director`, `hr`, `manager`, and `employee`
+- 9 baseline employees across `superadmin`, `director`, `hr`, `manager`, and `employee`
+- 20 additional dummy employees across IT, Sales, Marketing, Operations, HR, and Finance
 - competency config for 4 employee positions
 - KPI definitions, governed KPI versions, employee KPI target versions, weight profiles, and KPI records
 - assessment snapshots, assessment history, and training records
+- Jan-Mar 2026 KPI target versions and KPI records for the 20 additional dummy employees
+- intentionally empty assessment rows for those 20 additional dummy employees
 - one probation case with monthly scores and attendance deductions
 - one active PIP plan
 - a few activity-log entries
