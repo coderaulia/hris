@@ -13,31 +13,99 @@ import {
     deleteManpowerPlan as deleteManpowerPlanFromDB,
     saveHeadcountRequest,
     updateHeadcountRequestStatus,
+    saveRecruitmentCard,
+    updateRecruitmentStage,
+    deleteRecruitmentCard as deleteRecruitmentCardFromDB,
     logActivity,
 } from './data.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 import { getSwal } from '../lib/swal.js';
 
-function getEmployeeFormOptionData() {
+const RECRUITMENT_STAGES = ['requested', 'sourcing', 'screening', 'interview', 'offer', 'hired', 'closed'];
+
+function parseCsvOptions(value, fallback) {
+    return (value || fallback || '')
+        .split(',')
+        .map(item => item.trim())
+        .filter(Boolean);
+}
+
+function getDepartmentPositionMap() {
     const { appConfig, appSettings, db } = state;
-
     const allPositions = new Set();
-    if (appConfig) Object.keys(appConfig).forEach(pos => allPositions.add(pos));
+    const positionMap = {};
+
+    Object.keys(appConfig || {}).forEach(position => {
+        if (position) allPositions.add(position);
+    });
+
     try {
-        const deptMap = JSON.parse(appSettings.dept_positions || '{}');
-        Object.values(deptMap).forEach(positions => positions.forEach(pos => allPositions.add(pos)));
-    } catch { /* ignore */ }
+        const rawMap = JSON.parse(appSettings.dept_positions || '{}');
+        Object.entries(rawMap).forEach(([department, positions]) => {
+            const scopedPositions = Array.isArray(positions)
+                ? positions.map(position => String(position || '').trim()).filter(Boolean)
+                : [];
+            if (!positionMap[department]) positionMap[department] = new Set();
+            scopedPositions.forEach(position => {
+                positionMap[department].add(position);
+                allPositions.add(position);
+            });
+        });
+    } catch {
+        // Ignore invalid legacy JSON and fall back to roster-derived mapping.
+    }
 
-    const seniorityOptions = (appSettings.levels || 'Junior, Intermediate, Senior, Lead, Manager, Director')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
+    Object.values(db || {}).forEach(rec => {
+        const position = String(rec?.position || '').trim();
+        const department = String(rec?.department || '').trim();
+        if (!position) return;
+        allPositions.add(position);
+        if (!department) return;
+        if (!positionMap[department]) positionMap[department] = new Set();
+        positionMap[department].add(position);
+    });
 
-    const departmentOptions = (appSettings.departments || 'Human Resources, Finance, IT, Operations, Marketing, Sales')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
+    return {
+        allPositions: [...allPositions].sort((a, b) => a.localeCompare(b)),
+        byDepartment: Object.fromEntries(
+            Object.entries(positionMap).map(([department, positions]) => [
+                department,
+                [...positions].sort((a, b) => a.localeCompare(b)),
+            ])
+        ),
+    };
+}
+
+function getScopedPositions(department, selectedValue = '') {
+    const { allPositions, byDepartment } = getDepartmentPositionMap();
+    const normalizedDepartment = String(department || '').trim();
+    const selected = String(selectedValue || '').trim();
+    const scoped = normalizedDepartment && Array.isArray(byDepartment[normalizedDepartment])
+        ? [...byDepartment[normalizedDepartment]]
+        : [...allPositions];
+
+    if (selected && !scoped.includes(selected)) scoped.push(selected);
+    return scoped.sort((a, b) => a.localeCompare(b));
+}
+
+function syncScopedPositionSelect(selectId, department, selectedValue = '', placeholder = '-- Select Position --') {
+    setSelectOptions(selectId, getScopedPositions(department, selectedValue), selectedValue, placeholder);
+}
+
+function getEmployeeFormOptionData() {
+    const { appSettings, db } = state;
+    const { allPositions, byDepartment } = getDepartmentPositionMap();
+
+    const seniorityOptions = parseCsvOptions(
+        appSettings.levels,
+        'Junior, Intermediate, Senior, Lead, Manager, Director'
+    );
+
+    const departmentOptions = parseCsvOptions(
+        appSettings.departments,
+        'Human Resources, Finance, IT, Operations, Marketing, Sales'
+    );
 
     const managerOptions = Object.keys(db)
         .sort((a, b) => (db[a].name || '').localeCompare(db[b].name || ''))
@@ -46,7 +114,8 @@ function getEmployeeFormOptionData() {
         .map(rec => ({ id: rec.id, label: `${rec.name} (${rec.position})` }));
 
     return {
-        positions: [...allPositions].sort(),
+        positions: allPositions,
+        positionsByDepartment: byDepartment,
         seniorityOptions,
         departmentOptions,
         managerOptions,
@@ -172,31 +241,40 @@ export function renderEmployeeManager() {
     const { db } = state;
     const formOptions = getEmployeeFormOptionData();
 
-    // 1. Position Dropdown — pull from both competency config and dept→positions mapping
+    // 1. Position Dropdown — scope options to the selected department
     const posSelect = document.getElementById('emp-position');
     if (!posSelect) return;
     const currentPosVal = posSelect.value;
+    const currentDeptVal = document.getElementById('emp-department')?.value || '';
     posSelect.innerHTML = '<option value="">-- Select Position --</option>';
-
-    formOptions.positions.forEach(pos => {
-        posSelect.innerHTML += `<option value="${escapeHTML(pos)}">${escapeHTML(pos)}</option>`;
-    });
-    if (currentPosVal && document.getElementById('emp-edit-mode').value === 'true') posSelect.value = currentPosVal;
+    syncScopedPositionSelect('emp-position', currentDeptVal, currentPosVal, '-- Select Position --');
 
     // 1b. Levels & Departments
-    const loadDropdown = (selId, settingKey, defStr, prevVal) => {
+    const loadDropdown = (selId, opts, prevVal, placeholder = '-- Select --') => {
         const sel = document.getElementById(selId);
         if (!sel) return;
-        const opts = settingKey === 'levels' ? formOptions.seniorityOptions : formOptions.departmentOptions;
-        sel.innerHTML = `<option value="">-- Select --</option>`;
+        sel.innerHTML = `<option value="">${escapeHTML(placeholder)}</option>`;
         opts.forEach(opt => {
             sel.innerHTML += `<option value="${escapeHTML(opt)}">${escapeHTML(opt)}</option>`;
         });
         if (prevVal) sel.value = prevVal;
     };
 
-    loadDropdown('emp-seniority', 'levels', 'Junior, Intermediate, Senior, Lead, Manager, Director', document.getElementById('emp-seniority')?.value);
-    loadDropdown('emp-department', 'departments', 'Human Resources, Finance, IT, Operations, Marketing, Sales', document.getElementById('emp-department')?.value);
+    loadDropdown('emp-seniority', formOptions.seniorityOptions, document.getElementById('emp-seniority')?.value);
+    loadDropdown('emp-department', formOptions.departmentOptions, currentDeptVal);
+    syncScopedPositionSelect(
+        'emp-position',
+        document.getElementById('emp-department')?.value || '',
+        currentPosVal,
+        '-- Select Position --'
+    );
+
+    const deptSelect = document.getElementById('emp-department');
+    if (deptSelect) {
+        deptSelect.onchange = () => {
+            syncScopedPositionSelect('emp-position', deptSelect.value, '', '-- Select Position --');
+        };
+    }
 
     // 2. Manager Dropdown
     const mgrSelect = document.getElementById('emp-manager-id');
@@ -401,6 +479,21 @@ export function loadEmployeeForEdit(id) {
                 </div>
             </div>
         `,
+        didOpen: () => {
+            const deptSelect = document.getElementById('swal-emp-department');
+            const posSelect = document.getElementById('swal-emp-position');
+            syncScopedPositionSelect(
+                'swal-emp-position',
+                deptSelect?.value || rec.department || '',
+                rec.position || '',
+                '-- Select Position --'
+            );
+            if (deptSelect && posSelect) {
+                deptSelect.onchange = () => {
+                    syncScopedPositionSelect('swal-emp-position', deptSelect.value, '', '-- Select Position --');
+                };
+            }
+        },
         preConfirm: async () => {
             const values = {
                 id: rec.id,
@@ -443,26 +536,22 @@ export function loadEmployeeForEdit(id) {
 }
 
 function getManpowerOptionData() {
-    const { appConfig, appSettings, db } = state;
-    const positions = new Set();
+    const { appSettings } = state;
+    const { allPositions, byDepartment } = getDepartmentPositionMap();
 
-    Object.keys(appConfig || {}).forEach(pos => positions.add(pos));
-    Object.values(db || {}).forEach(rec => {
-        if (rec?.position) positions.add(rec.position);
-    });
+    const departmentOptions = parseCsvOptions(
+        appSettings.departments,
+        'Human Resources, Finance, IT, Operations, Marketing, Sales'
+    );
 
-    const departmentOptions = (appSettings.departments || 'Human Resources, Finance, IT, Operations, Marketing, Sales')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
-
-    const seniorityOptions = (appSettings.levels || 'Junior, Intermediate, Senior, Lead, Manager, Director')
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean);
+    const seniorityOptions = parseCsvOptions(
+        appSettings.levels,
+        'Junior, Intermediate, Senior, Lead, Manager, Director'
+    );
 
     return {
-        positions: [...positions].sort((a, b) => a.localeCompare(b)),
+        positions: allPositions,
+        positionsByDepartment: byDepartment,
         departments: departmentOptions,
         seniorities: seniorityOptions,
     };
@@ -483,6 +572,56 @@ function canManageManpowerPlans() {
 
 function canAccessManpowerPlanning() {
     return ['superadmin', 'hr', 'manager'].includes(String(state.currentUser?.role || '').toLowerCase());
+}
+
+function canManageRecruitmentBoard() {
+    return ['superadmin', 'hr'].includes(String(state.currentUser?.role || '').toLowerCase());
+}
+
+function getRecruitmentOwnerOptions() {
+    return Object.values(state.db || {})
+        .filter(rec => ['superadmin', 'hr', 'manager', 'director'].includes(String(rec?.role || '').toLowerCase()))
+        .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')))
+        .map(rec => ({ id: rec.id, label: `${rec.name} (${rec.position || rec.role})` }));
+}
+
+function getRequestRemainingOpenings(request) {
+    const requestedCount = Number(request?.requested_count || 0);
+    const hiredCount = Number(request?.hired_total || 0);
+    return Math.max(requestedCount - hiredCount, 0);
+}
+
+function getRecruitmentRequestOptions() {
+    return (state.headcountRequests || [])
+        .filter(request => String(request.approval_status || '').toLowerCase() === 'approved')
+        .sort((a, b) => String(a.target_hire_date || '9999-12-31').localeCompare(String(b.target_hire_date || '9999-12-31')))
+        .map(request => ({
+            id: request.id,
+            label: `${request.request_code || 'Pending Code'} · ${request.department} · ${request.position} (${getRequestRemainingOpenings(request)} open)`,
+        }));
+}
+
+function getStageBadgeClass(stage) {
+    const normalized = String(stage || '').toLowerCase();
+    if (normalized === 'hired') return 'bg-success-subtle text-success border';
+    if (normalized === 'offer') return 'bg-primary-subtle text-primary border';
+    if (normalized === 'closed') return 'bg-secondary-subtle text-secondary border';
+    if (normalized === 'requested') return 'bg-light text-muted border';
+    return 'bg-warning-subtle text-warning border';
+}
+
+function getRecruitmentUrgency(card) {
+    const overdueDays = Number(card?.overdue_days || 0);
+    const targetDate = card?.target_hire_date ? new Date(card.target_hire_date) : null;
+    const stageAge = Number(card?.stage_age_days || 0);
+    if (overdueDays > 0) return { label: `Overdue ${overdueDays}d`, className: 'text-danger' };
+    if (targetDate && !Number.isNaN(targetDate.getTime())) {
+        const daysLeft = Math.ceil((targetDate.getTime() - Date.now()) / 86400000);
+        if (daysLeft >= 0 && daysLeft <= 7) return { label: 'Due Soon', className: 'text-warning' };
+    }
+    if (String(card?.priority || '').toLowerCase() === 'urgent') return { label: 'Urgent Request', className: 'text-danger' };
+    if (stageAge >= 10) return { label: `In Stage ${stageAge}d`, className: 'text-muted' };
+    return { label: 'On Track', className: 'text-success' };
 }
 
 function canEditHeadcountRequest(request) {
@@ -543,8 +682,15 @@ export function resetManpowerPlanForm() {
 
     const options = getManpowerOptionData();
     setSelectOptions('mp-department', options.departments, '', '-- Select Department --');
-    setSelectOptions('mp-position', options.positions, '', '-- Select Position --');
+    syncScopedPositionSelect('mp-position', '', '', '-- Select Position --');
     setSelectOptions('mp-seniority', options.seniorities, '', '-- Select Seniority --');
+
+    const departmentSelect = document.getElementById('mp-department');
+    if (departmentSelect) {
+        departmentSelect.onchange = () => {
+            syncScopedPositionSelect('mp-position', departmentSelect.value, '', '-- Select Position --');
+        };
+    }
 }
 
 export function renderManpowerPlanning() {
@@ -564,7 +710,12 @@ export function renderManpowerPlanning() {
     } else {
         const options = getManpowerOptionData();
         setSelectOptions('mp-department', options.departments, document.getElementById('mp-department')?.value || '', '-- Select Department --');
-        setSelectOptions('mp-position', options.positions, document.getElementById('mp-position')?.value || '', '-- Select Position --');
+        syncScopedPositionSelect(
+            'mp-position',
+            document.getElementById('mp-department')?.value || '',
+            document.getElementById('mp-position')?.value || '',
+            '-- Select Position --'
+        );
         setSelectOptions('mp-seniority', options.seniorities, document.getElementById('mp-seniority')?.value || '', '-- Select Seniority --');
     }
 
@@ -572,6 +723,22 @@ export function renderManpowerPlanning() {
     const approvedHeadcount = plans.reduce((sum, row) => sum + Number(row.approved_headcount || 0), 0);
     const filledHeadcount = plans.reduce((sum, row) => sum + Number(row.filled_headcount || 0), 0);
     const gapHeadcount = plans.reduce((sum, row) => sum + Number(row.gap_headcount || 0), 0);
+    const requests = Array.isArray(state.headcountRequests) ? state.headcountRequests : [];
+    const pipeline = Array.isArray(state.recruitmentPipeline) ? state.recruitmentPipeline : [];
+    const openApprovedRequests = requests.filter(request =>
+        String(request.approval_status || '').toLowerCase() === 'approved'
+        && getRequestRemainingOpenings(request) > 0
+    ).length;
+    const activePipelineCount = pipeline.filter(card =>
+        !['hired', 'closed'].includes(String(card.stage || '').toLowerCase())
+    ).length;
+    const hiresCompleted = pipeline.filter(card => String(card.stage || '').toLowerCase() === 'hired').length;
+    const overdueTargets = requests.filter(request => {
+        if (String(request.approval_status || '').toLowerCase() !== 'approved') return false;
+        if (getRequestRemainingOpenings(request) <= 0 || !request.target_hire_date) return false;
+        const target = new Date(request.target_hire_date);
+        return !Number.isNaN(target.getTime()) && target < new Date(new Date().toDateString());
+    }).length;
 
     const setText = (id, value) => {
         const el = document.getElementById(id);
@@ -582,6 +749,10 @@ export function renderManpowerPlanning() {
     setText('mp-approved-headcount', approvedHeadcount);
     setText('mp-filled-headcount', filledHeadcount);
     setText('mp-gap-headcount', gapHeadcount);
+    setText('mp-funnel-open-requests', openApprovedRequests);
+    setText('mp-funnel-active-pipeline', activePipelineCount);
+    setText('mp-funnel-hires-completed', hiresCompleted);
+    setText('mp-funnel-overdue-targets', overdueTargets);
 
     if (metaEl) {
         metaEl.innerText = totalPlans > 0
@@ -594,6 +765,8 @@ export function renderManpowerPlanning() {
     tbody.innerHTML = '';
     if (totalPlans === 0) {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4 fst-italic">No manpower plans yet.</td></tr>';
+        renderHeadcountRequests();
+        renderRecruitmentBoard();
         return;
     }
 
@@ -641,6 +814,7 @@ export function renderManpowerPlanning() {
         });
 
     renderHeadcountRequests();
+    renderRecruitmentBoard();
 }
 
 function readHeadcountRequestForm() {
@@ -669,14 +843,14 @@ function syncHeadcountFormFromPlan() {
     };
 
     setValue('mpr-department', plan.department || '');
-    setValue('mpr-position', plan.position || '');
+    syncScopedPositionSelect('mpr-position', plan.department || '', plan.position || '', '-- Select Position --');
     setValue('mpr-seniority', plan.seniority || '');
 }
 
 function populateHeadcountRequestFormOptions(selected = {}) {
     const options = getManpowerOptionData();
     setSelectOptions('mpr-department', options.departments, selected.department || '', '-- Select Department --');
-    setSelectOptions('mpr-position', options.positions, selected.position || '', '-- Select Position --');
+    syncScopedPositionSelect('mpr-position', selected.department || '', selected.position || '', '-- Select Position --');
     setSelectOptions('mpr-seniority', options.seniorities, selected.seniority || '', '-- Select Seniority --');
 
     const planSelect = document.getElementById('mpr-plan-id');
@@ -690,6 +864,13 @@ function populateHeadcountRequestFormOptions(selected = {}) {
         planSelect.innerHTML = plans
             .map(plan => `<option value="${escapeHTML(plan.id)}" ${selectedPlanId === plan.id ? 'selected' : ''}>${escapeHTML(plan.label)}</option>`)
             .join('');
+    }
+
+    const departmentSelect = document.getElementById('mpr-department');
+    if (departmentSelect) {
+        departmentSelect.onchange = () => {
+            syncScopedPositionSelect('mpr-position', departmentSelect.value, '', '-- Select Position --');
+        };
     }
 }
 
@@ -712,6 +893,300 @@ export function resetHeadcountRequestForm() {
     if (role === 'manager') {
         setValue('mpr-department', state.currentUser?.department || '');
     }
+}
+
+function readRecruitmentCardForm() {
+    return {
+        id: document.getElementById('mpc-edit-id')?.value?.trim() || '',
+        request_id: document.getElementById('mpc-request-id')?.value || '',
+        candidate_name: document.getElementById('mpc-candidate-name')?.value?.trim() || '',
+        stage: document.getElementById('mpc-stage')?.value || 'requested',
+        source: document.getElementById('mpc-source')?.value?.trim() || '',
+        owner_id: document.getElementById('mpc-owner-id')?.value || '',
+        expected_start_date: document.getElementById('mpc-expected-start-date')?.value || null,
+        offer_status: document.getElementById('mpc-offer-status')?.value?.trim() || '',
+        notes: document.getElementById('mpc-notes')?.value?.trim() || '',
+    };
+}
+
+function populateRecruitmentFormOptions(selected = {}) {
+    const requestSelect = document.getElementById('mpc-request-id');
+    if (requestSelect) {
+        const selectedRequestId = selected.request_id || '';
+        const options = [{ id: '', label: 'Select approved request' }].concat(getRecruitmentRequestOptions());
+        requestSelect.innerHTML = options
+            .map(option => `<option value="${escapeHTML(option.id)}" ${selectedRequestId === option.id ? 'selected' : ''}>${escapeHTML(option.label)}</option>`)
+            .join('');
+    }
+
+    setSelectOptions('mpc-owner-id', getRecruitmentOwnerOptions(), selected.owner_id || '', '-- Select Owner --');
+
+    const boardFilter = document.getElementById('mp-board-request-filter');
+    if (boardFilter) {
+        const selectedFilter = boardFilter.value || '';
+        const filters = [{ id: '', label: 'All Approved Requests' }].concat(getRecruitmentRequestOptions());
+        boardFilter.innerHTML = filters
+            .map(option => `<option value="${escapeHTML(option.id)}" ${selectedFilter === option.id ? 'selected' : ''}>${escapeHTML(option.label)}</option>`)
+            .join('');
+    }
+}
+
+export function resetRecruitmentCardForm() {
+    const setValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value ?? '';
+    };
+
+    setValue('mpc-edit-id', '');
+    setValue('mpc-candidate-name', '');
+    setValue('mpc-stage', 'requested');
+    setValue('mpc-source', '');
+    setValue('mpc-owner-id', '');
+    setValue('mpc-expected-start-date', '');
+    setValue('mpc-offer-status', '');
+    setValue('mpc-notes', '');
+    populateRecruitmentFormOptions();
+    document.getElementById('mpc-cancel-btn')?.classList.add('hidden');
+}
+
+export function loadRecruitmentCardForEdit(id) {
+    const card = (state.recruitmentPipeline || []).find(row => row.id === id);
+    if (!card || !canManageRecruitmentBoard()) return;
+
+    populateRecruitmentFormOptions(card);
+    const setValue = (fieldId, value) => {
+        const el = document.getElementById(fieldId);
+        if (el) el.value = value ?? '';
+    };
+
+    setValue('mpc-edit-id', card.id);
+    setValue('mpc-candidate-name', card.candidate_name || '');
+    setValue('mpc-stage', card.stage || 'requested');
+    setValue('mpc-source', card.source || '');
+    setValue('mpc-owner-id', card.owner_id || '');
+    setValue('mpc-expected-start-date', card.expected_start_date || '');
+    setValue('mpc-offer-status', card.offer_status || '');
+    setValue('mpc-notes', card.notes || '');
+    document.getElementById('mpc-cancel-btn')?.classList.remove('hidden');
+    document.getElementById('mpc-request-id')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+export async function saveRecruitmentCardData() {
+    if (!canManageRecruitmentBoard()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const values = readRecruitmentCardForm();
+    if (!values.request_id || !values.candidate_name) {
+        await notify.warn('Approved request and candidate name are required.');
+        return;
+    }
+
+    const existing = values.id
+        ? (state.recruitmentPipeline || []).find(row => row.id === values.id)
+        : null;
+
+    const payload = {
+        id: existing?.id || undefined,
+        request_id: values.request_id,
+        candidate_name: values.candidate_name,
+        stage: values.stage,
+        source: values.source,
+        owner_id: values.owner_id || null,
+        expected_start_date: values.expected_start_date || null,
+        offer_status: values.offer_status,
+        notes: values.notes,
+        stage_updated_at: existing && existing.stage === values.stage
+            ? existing.stage_updated_at
+            : new Date().toISOString(),
+    };
+
+    await notify.withLoading(async () => {
+        await saveRecruitmentCard(payload);
+    }, existing ? 'Updating Recruitment Card' : 'Saving Recruitment Card', 'Writing recruitment workflow...');
+
+    await logActivity({
+        action: existing ? 'recruitment_card.update' : 'recruitment_card.create',
+        entityType: 'recruitment_pipeline',
+        entityId: existing?.id || payload.request_id,
+        details: {
+            request_id: payload.request_id,
+            candidate_name: payload.candidate_name,
+            stage: payload.stage,
+            owner_id: payload.owner_id || '',
+        },
+    });
+
+    resetRecruitmentCardForm();
+    renderRecruitmentBoard();
+    renderHeadcountRequests();
+    await notify.success(existing ? 'Recruitment card updated.' : 'Recruitment card saved.');
+}
+
+export async function moveRecruitmentCard(id, direction) {
+    if (!canManageRecruitmentBoard()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const card = (state.recruitmentPipeline || []).find(row => row.id === id);
+    if (!card) return;
+    const currentIndex = RECRUITMENT_STAGES.indexOf(String(card.stage || '').toLowerCase());
+    if (currentIndex === -1) return;
+    const nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    const nextStage = RECRUITMENT_STAGES[nextIndex];
+    if (!nextStage) return;
+
+    await notify.withLoading(async () => {
+        await updateRecruitmentStage(id, nextStage);
+    }, 'Moving Recruitment Card', 'Updating board stage...');
+
+    await logActivity({
+        action: 'recruitment_card.move',
+        entityType: 'recruitment_pipeline',
+        entityId: id,
+        details: {
+            candidate_name: card.candidate_name || '',
+            from_stage: card.stage,
+            to_stage: nextStage,
+        },
+    });
+
+    renderRecruitmentBoard();
+    renderHeadcountRequests();
+}
+
+export async function deleteRecruitmentCard(id) {
+    if (!canManageRecruitmentBoard()) {
+        await notify.error('Access Denied.');
+        return;
+    }
+
+    const card = (state.recruitmentPipeline || []).find(row => row.id === id);
+    if (!card) return;
+    const confirmed = await notify.confirm(`Delete recruitment card for ${card.candidate_name || card.request_code || id}?`, {
+        confirmButtonText: 'Delete',
+    });
+    if (!confirmed) return;
+
+    await notify.withLoading(async () => {
+        await deleteRecruitmentCardFromDB(id);
+    }, 'Deleting Recruitment Card', 'Removing recruitment record...');
+
+    await logActivity({
+        action: 'recruitment_card.delete',
+        entityType: 'recruitment_pipeline',
+        entityId: id,
+        details: {
+            candidate_name: card.candidate_name || '',
+            stage: card.stage || '',
+            request_code: card.request_code || '',
+        },
+    });
+
+    resetRecruitmentCardForm();
+    renderRecruitmentBoard();
+    renderHeadcountRequests();
+    await notify.success('Recruitment card deleted.');
+}
+
+export function renderRecruitmentBoard() {
+    const board = document.getElementById('recruitment-board-columns');
+    if (!board) return;
+
+    const canManage = canManageRecruitmentBoard();
+    document.getElementById('mp-recruitment-card')?.classList.toggle('hidden', !canManage);
+    populateRecruitmentFormOptions({
+        request_id: document.getElementById('mpc-request-id')?.value || '',
+        owner_id: document.getElementById('mpc-owner-id')?.value || '',
+    });
+
+    const selectedRequestId = document.getElementById('mp-board-request-filter')?.value || '';
+    const requestMap = new Map((state.headcountRequests || []).map(request => [request.id, request]));
+    const cards = (state.recruitmentPipeline || [])
+        .map(card => {
+            const linkedRequest = requestMap.get(card.request_id) || {};
+            const owner = state.db[card.owner_id] || {};
+            return {
+                ...linkedRequest,
+                ...card,
+                request_code: card.request_code || linkedRequest.request_code || '',
+                department: card.department || linkedRequest.department || '',
+                position: card.position || linkedRequest.position || '',
+                priority: card.priority || linkedRequest.priority || 'normal',
+                target_hire_date: card.target_hire_date || linkedRequest.target_hire_date || null,
+                remaining_openings: card.remaining_openings ?? getRequestRemainingOpenings(linkedRequest),
+                owner_name: card.owner_name || owner.name || '',
+            };
+        })
+        .filter(card => !selectedRequestId || card.request_id === selectedRequestId)
+        .sort((a, b) => {
+            const overdueCompare = Number(b.overdue_days || 0) - Number(a.overdue_days || 0);
+            if (overdueCompare !== 0) return overdueCompare;
+            const priorityOrder = { urgent: 3, high: 2, normal: 1, low: 0 };
+            const priorityCompare = (priorityOrder[String(b.priority || 'normal').toLowerCase()] || 0)
+                - (priorityOrder[String(a.priority || 'normal').toLowerCase()] || 0);
+            if (priorityCompare !== 0) return priorityCompare;
+            return Number(b.stage_age_days || 0) - Number(a.stage_age_days || 0);
+        });
+
+    document.getElementById('mp-recruitment-empty-state')?.classList.toggle('hidden', cards.length > 0);
+    board.innerHTML = '';
+    if (cards.length === 0) return;
+
+    RECRUITMENT_STAGES.forEach(stage => {
+        const stageCards = cards.filter(card => String(card.stage || '').toLowerCase() === stage);
+        const prettyStage = stage.charAt(0).toUpperCase() + stage.slice(1);
+        const col = document.createElement('div');
+        col.className = 'col';
+        col.innerHTML = `
+            <div class="border rounded-4 h-100 p-3" style="background: rgba(248,250,252,0.8); min-height: 260px;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="small text-uppercase fw-bold text-muted">${escapeHTML(prettyStage)}</div>
+                        <div class="small text-muted">${stageCards.length} card(s)</div>
+                    </div>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    ${stageCards.length === 0 ? '<div class="small text-muted fst-italic">No cards in this stage.</div>' : stageCards.map(card => {
+                        const urgency = getRecruitmentUrgency(card);
+                        const currentIndex = RECRUITMENT_STAGES.indexOf(stage);
+                        const canMovePrev = canManage && currentIndex > 0;
+                        const canMoveNext = canManage && currentIndex < RECRUITMENT_STAGES.length - 1;
+                        const remainingOpenings = Number(card.remaining_openings || 0);
+                        return `
+                            <div class="border rounded-4 p-3 bg-white shadow-sm">
+                                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                                    <div>
+                                        <div class="fw-semibold">${escapeHTML(card.candidate_name || 'Unnamed Candidate')}</div>
+                                        <div class="small text-muted">${escapeHTML(card.request_code || '-')} · ${escapeHTML(card.department || '-')} · ${escapeHTML(card.position || '-')}</div>
+                                    </div>
+                                    <span class="badge ${getStageBadgeClass(card.stage)}">${escapeHTML(card.stage || stage)}</span>
+                                </div>
+                                <div class="small ${urgency.className} fw-semibold mb-2">${escapeHTML(urgency.label)}</div>
+                                <div class="small text-muted mb-1">Owner: ${escapeHTML(card.owner_name || card.owner_id || '-')}</div>
+                                <div class="small text-muted mb-1">Target hire: ${escapeHTML(card.target_hire_date || '-')}</div>
+                                <div class="small text-muted mb-2">Remaining openings: ${escapeHTML(String(remainingOpenings))}</div>
+                                ${card.notes ? `<div class="small text-muted mb-3">${escapeHTML(card.notes)}</div>` : ''}
+                                <div class="d-flex justify-content-between align-items-center gap-2">
+                                    <div class="btn-group btn-group-sm">
+                                        ${canMovePrev ? `<button class="btn btn-outline-secondary" onclick="window.__app.moveRecruitmentCard('${escapeInlineArg(card.id)}', 'prev')" title="Move backward"><i class="bi bi-arrow-left"></i></button>` : ''}
+                                        ${canMoveNext ? `<button class="btn btn-outline-secondary" onclick="window.__app.moveRecruitmentCard('${escapeInlineArg(card.id)}', 'next')" title="Move forward"><i class="bi bi-arrow-right"></i></button>` : ''}
+                                    </div>
+                                    ${canManage ? `<div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="window.__app.loadRecruitmentCardForEdit('${escapeInlineArg(card.id)}')" title="Edit recruitment card"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-outline-danger" onclick="window.__app.deleteRecruitmentCard('${escapeInlineArg(card.id)}')" title="Delete recruitment card"><i class="bi bi-trash"></i></button>
+                                    </div>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+        board.appendChild(col);
+    });
 }
 
 export function renderHeadcountRequests() {
@@ -748,7 +1223,7 @@ export function renderHeadcountRequests() {
 
     tbody.innerHTML = '';
     if (visibleRequests.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td></tr>';
         return;
     }
 
@@ -773,6 +1248,16 @@ export function renderHeadcountRequests() {
         const planLabel = request.plan_period
             ? `${request.plan_period} · ${request.department} · ${request.position}`
             : `${request.department} · ${request.position}`;
+        const remainingOpenings = getRequestRemainingOpenings(request);
+        const progressLabel = request.requested_count
+            ? `${request.hired_total || 0} hired / ${request.requested_count} requested`
+            : 'No target';
+        const progressTone = remainingOpenings > 0
+            ? (Number(request.pipeline_total || 0) > 0 ? 'text-warning' : 'text-danger')
+            : 'text-success';
+        const progressNote = remainingOpenings > 0
+            ? (Number(request.pipeline_total || 0) > 0 ? `${remainingOpenings} opening(s) still open` : 'Not started')
+            : 'Request fully covered';
 
         tbody.innerHTML += `
             <tr>
@@ -784,6 +1269,10 @@ export function renderHeadcountRequests() {
                 <td>
                     <div class="small fw-semibold">${escapeHTML(request.plan_period || '-')}</div>
                     <div class="small text-muted">${escapeHTML(request.seniority || '-')}</div>
+                </td>
+                <td>
+                    <div class="small fw-semibold ${progressTone}">${escapeHTML(progressLabel)}</div>
+                    <div class="small text-muted">${escapeHTML(progressNote)}</div>
                 </td>
                 <td><span class="small fw-bold ${priorityClass}">${escapeHTML(priority)}</span></td>
                 <td>
@@ -982,7 +1471,7 @@ export function loadManpowerPlanForEdit(id) {
 
     const options = getManpowerOptionData();
     setSelectOptions('mp-department', options.departments, plan.department || '', '-- Select Department --');
-    setSelectOptions('mp-position', options.positions, plan.position || '', '-- Select Position --');
+    syncScopedPositionSelect('mp-position', plan.department || '', plan.position || '', '-- Select Position --');
     setSelectOptions('mp-seniority', options.seniorities, plan.seniority || '', '-- Select Seniority --');
 
     const setValue = (id, value) => {
@@ -1106,6 +1595,7 @@ export function resetEmployeeForm() {
     document.getElementById('emp-seniority').value = '';
     const deptEl = document.getElementById('emp-department');
     if (deptEl) deptEl.value = '';
+    syncScopedPositionSelect('emp-position', '', '', '-- Select Position --');
     document.getElementById('emp-edit-mode').value = 'false';
     document.getElementById('emp-cancel-btn').classList.add('hidden');
     const emailEl = document.getElementById('emp-auth-email');

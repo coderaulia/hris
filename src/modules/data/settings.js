@@ -12,7 +12,7 @@ async function fetchSettings() {
     try {
         const { data } = await execSupabase(
             'Fetch settings',
-            () => supabase.from('app_settings').select('*'),
+            () => supabase.from('app_settings').select('key,value'),
             { retries: 1 }
         );
 

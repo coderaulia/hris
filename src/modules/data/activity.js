@@ -6,7 +6,7 @@ async function fetchActivityLogs(limit = 100) {
             'Load activity log',
             () => supabase
                 .from('admin_activity_log')
-                .select('*')
+                .select('id,actor_employee_id,action,details,created_at')
                 .order('created_at', { ascending: false })
                 .limit(limit),
             { retries: 1 }

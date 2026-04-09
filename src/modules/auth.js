@@ -9,6 +9,7 @@ import * as notify from '../lib/notify.js';
 
 const PROFILE_RESOLUTION_RETRY_MS = 250;
 const PROFILE_RESOLUTION_MAX_ATTEMPTS = 3;
+const AUTH_PROFILE_COLUMNS = 'employee_id,name,role,position,department,seniority,must_change_password,auth_id,auth_email';
 
 function getHashParams() {
     const hash = String(window.location.hash || '').replace(/^#/, '');
@@ -34,7 +35,7 @@ async function findProfileByAuthUser(user) {
 
     const { data: byAuthId } = await supabase
         .from('employees')
-        .select('*')
+        .select(AUTH_PROFILE_COLUMNS)
         .eq('auth_id', user.id)
         .maybeSingle();
 
@@ -46,7 +47,7 @@ async function findProfileByAuthUser(user) {
 
         const { data: byEmail } = await supabase
             .from('employees')
-            .select('*')
+            .select(AUTH_PROFILE_COLUMNS)
             .ilike('auth_email', normalizedEmail)
             .maybeSingle();
 

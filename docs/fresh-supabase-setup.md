@@ -17,8 +17,9 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 9. [20260408_data_api_grants.sql](/D:/web/hris/migrations/20260408_data_api_grants.sql)
 10. [20260409_manpower_planning_phase1.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase1.sql)
 11. [20260409_manpower_planning_phase2.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase2.sql)
-12. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
-13. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+12. [20260409_manpower_planning_phase3.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase3.sql)
+13. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
+14. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
 
 ## What The Seed Includes
 

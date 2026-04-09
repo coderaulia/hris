@@ -6,6 +6,7 @@ import {
     execSupabase,
     fetchOptionalCollection,
     isMissingRelationError,
+    generateUuid,
 } from './runtime.js';
 
 async function fetchManpowerPlans() {
@@ -82,14 +83,31 @@ async function fetchHeadcountRequests() {
 }
 
 async function fetchRecruitmentPipeline() {
-    return fetchOptionalCollection({
-        label: 'Fetch recruitment pipeline',
-        table: 'recruitment_pipeline',
-        stateKey: 'recruitmentPipeline',
-        eventName: 'data:recruitmentPipeline',
-        orderBy: 'stage_updated_at',
-        ascending: false,
-    });
+    try {
+        const { data } = await execSupabase(
+            'Fetch recruitment pipeline',
+            () => supabase
+                .from('recruitment_pipeline_overview')
+                .select('*')
+                .order('stage_updated_at', { ascending: false }),
+            { retries: 1 }
+        );
+        state.recruitmentPipeline = data || [];
+        emit('data:recruitmentPipeline', state.recruitmentPipeline);
+        return state.recruitmentPipeline;
+    } catch (error) {
+        if (!isMissingRelationError(error)) {
+            debugError('Fetch recruitment pipeline error:', error);
+        }
+        return fetchOptionalCollection({
+            label: 'Fetch recruitment pipeline (fallback)',
+            table: 'recruitment_pipeline',
+            stateKey: 'recruitmentPipeline',
+            eventName: 'data:recruitmentPipeline',
+            orderBy: 'stage_updated_at',
+            ascending: false,
+        });
+    }
 }
 
 async function saveHeadcountRequest(request) {
@@ -127,6 +145,74 @@ async function updateHeadcountRequestStatus(id, {
     return fetchHeadcountRequests();
 }
 
+async function saveRecruitmentCard(card) {
+    const payload = {
+        id: card?.id || generateUuid(),
+        request_id: card?.request_id || null,
+        candidate_name: card?.candidate_name || '',
+        stage: card?.stage || 'requested',
+        source: card?.source || '',
+        owner_id: card?.owner_id || null,
+        stage_updated_at: card?.stage_updated_at || new Date().toISOString(),
+        offer_status: card?.offer_status || '',
+        expected_start_date: card?.expected_start_date || null,
+        notes: card?.notes || '',
+    };
+
+    await execSupabase(
+        `Save recruitment card "${payload.candidate_name || payload.id}"`,
+        () => supabase
+            .from('recruitment_pipeline')
+            .upsert(payload)
+            .select('*')
+            .single(),
+        { interactiveRetry: true, retries: 1 }
+    );
+
+    await Promise.all([
+        fetchRecruitmentPipeline(),
+        fetchHeadcountRequests(),
+    ]);
+    return state.recruitmentPipeline;
+}
+
+async function updateRecruitmentStage(id, stage) {
+    await execSupabase(
+        `Update recruitment stage "${id}"`,
+        () => supabase
+            .from('recruitment_pipeline')
+            .update({
+                stage,
+                stage_updated_at: new Date().toISOString(),
+            })
+            .eq('id', id),
+        { interactiveRetry: true, retries: 1 }
+    );
+
+    await Promise.all([
+        fetchRecruitmentPipeline(),
+        fetchHeadcountRequests(),
+    ]);
+    return state.recruitmentPipeline;
+}
+
+async function deleteRecruitmentCard(id) {
+    await execSupabase(
+        `Delete recruitment card "${id}"`,
+        () => supabase
+            .from('recruitment_pipeline')
+            .delete()
+            .eq('id', id),
+        { interactiveRetry: true, retries: 1 }
+    );
+
+    await Promise.all([
+        fetchRecruitmentPipeline(),
+        fetchHeadcountRequests(),
+    ]);
+    return state.recruitmentPipeline;
+}
+
 export {
     fetchManpowerPlans,
     saveManpowerPlan,
@@ -135,4 +221,7 @@ export {
     fetchRecruitmentPipeline,
     saveHeadcountRequest,
     updateHeadcountRequestStatus,
+    saveRecruitmentCard,
+    updateRecruitmentStage,
+    deleteRecruitmentCard,
 };

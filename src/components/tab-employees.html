@@ -87,6 +87,45 @@
                     </div>
                 </div>
 
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Approved Open Requests</div>
+                                <div class="fs-3 fw-bold" id="mp-funnel-open-requests">0</div>
+                                <div class="small text-muted">Approved requests still needing hires</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Active Candidates</div>
+                                <div class="fs-3 fw-bold" id="mp-funnel-active-pipeline">0</div>
+                                <div class="small text-muted">Cards currently moving through recruitment</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Hires Completed</div>
+                                <div class="fs-3 fw-bold" id="mp-funnel-hires-completed">0</div>
+                                <div class="small text-muted">Recruitment cards already marked hired</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body">
+                                <div class="small text-uppercase fw-bold text-muted mb-1">Overdue Targets</div>
+                                <div class="fs-3 fw-bold" id="mp-funnel-overdue-targets">0</div>
+                                <div class="small text-muted">Open requests past their target hire date</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="row g-4">
                     <div class="col-xl-4">
                         <div id="mp-plan-setup-card" class="card shadow-sm border-0 h-100">
@@ -282,6 +321,7 @@
                                             <tr>
                                                 <th class="ps-3">Request</th>
                                                 <th>Plan</th>
+                                                <th>Progress</th>
                                                 <th>Priority</th>
                                                 <th>Status</th>
                                                 <th>Owner</th>
@@ -291,11 +331,100 @@
                                         </thead>
                                         <tbody id="headcount-request-body">
                                             <tr>
-                                                <td colspan="7" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td>
+                                                <td colspan="8" class="text-center text-muted py-4 fst-italic">No headcount requests yet.</td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-xl-4">
+                        <div id="mp-recruitment-card" class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="fw-bold m-0">Recruitment Card Setup</h6>
+                                    <div class="small text-muted">Turn approved requests into candidate cards and move them through hiring stages.</div>
+                                </div>
+                                <span class="sidebar-link-badge">Phase 3</span>
+                            </div>
+                            <div class="card-body">
+                                <input type="hidden" id="mpc-edit-id">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Approved Request</label>
+                                        <select id="mpc-request-id" class="form-select"></select>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Candidate Name</label>
+                                        <input id="mpc-candidate-name" type="text" class="form-control" placeholder="Candidate or placeholder profile name">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Stage</label>
+                                        <select id="mpc-stage" class="form-select">
+                                            <option value="requested">Requested</option>
+                                            <option value="sourcing">Sourcing</option>
+                                            <option value="screening">Screening</option>
+                                            <option value="interview">Interview</option>
+                                            <option value="offer">Offer</option>
+                                            <option value="hired">Hired</option>
+                                            <option value="closed">Closed</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Source</label>
+                                        <input id="mpc-source" type="text" class="form-control" placeholder="LinkedIn, referral, agency...">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Owner</label>
+                                        <select id="mpc-owner-id" class="form-select"></select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Expected Start</label>
+                                        <input id="mpc-expected-start-date" type="date" class="form-control">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold text-muted">Offer Status</label>
+                                        <input id="mpc-offer-status" type="text" class="form-control" placeholder="Draft, sent, accepted...">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label small fw-bold text-muted">Notes</label>
+                                        <textarea id="mpc-notes" rows="4" class="form-control" placeholder="Interview notes, blockers, or next steps..."></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
+                                <button id="mpc-cancel-btn" class="btn btn-outline-secondary hidden" type="button" onclick="window.__app.resetRecruitmentCardForm()">Cancel</button>
+                                <button class="btn btn-primary" type="button" onclick="window.__app.saveRecruitmentCardData()">
+                                    <i class="bi bi-kanban me-1"></i>Save Recruitment Card
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-xl-8">
+                        <div class="card shadow-sm border-0 h-100">
+                            <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <div>
+                                    <h6 class="fw-bold m-0">Recruitment Board</h6>
+                                    <div class="small text-muted">Track each candidate against approved demand, urgency, and the current hiring bottleneck.</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <select id="mp-board-request-filter" class="form-select form-select-sm" style="min-width: 220px;" onchange="window.__app.renderRecruitmentBoard()">
+                                        <option value="">All Approved Requests</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="mp-recruitment-empty-state" class="border rounded-4 p-4 text-center hidden" style="background: linear-gradient(135deg, rgba(20,184,166,0.05), rgba(14,165,233,0.05));">
+                                    <div class="fs-2 mb-2"><i class="bi bi-kanban"></i></div>
+                                    <h5 class="fw-bold mb-2">No recruitment cards yet</h5>
+                                    <p class="text-muted mb-0">Approved requests can now become active recruitment cards. Create the first card to start tracking sourcing and interview progress.</p>
+                                </div>
+                                <div id="recruitment-board-columns" class="row row-cols-1 row-cols-md-2 row-cols-xxl-4 g-3"></div>
                             </div>
                         </div>
                     </div>

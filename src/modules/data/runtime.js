@@ -284,13 +284,14 @@ function average(values = []) {
 async function fetchOptionalCollection({
     label,
     table,
+    selectColumns = 'id',
     stateKey,
     eventName,
     orderBy = 'created_at',
     ascending = false,
 }) {
     try {
-        const query = supabase.from(table).select('*').order(orderBy, { ascending });
+        const query = supabase.from(table).select(selectColumns).order(orderBy, { ascending });
         const { data } = await execSupabase(label, () => query, { retries: 1 });
         state[stateKey] = data || [];
         emit(eventName, state[stateKey]);

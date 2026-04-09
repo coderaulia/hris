@@ -4,7 +4,7 @@ async function fetchConfig() {
     try {
         const { data } = await execSupabase(
             'Fetch competency config',
-            () => supabase.from('competency_config').select('*'),
+            () => supabase.from('competency_config').select('position_name,competencies'),
             { retries: 1 }
         );
 

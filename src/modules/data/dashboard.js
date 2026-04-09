@@ -15,12 +15,15 @@ const DEFAULT_DASHBOARD_SUMMARY = Object.freeze({
     failed_notifications: 0,
     open_hires: 0,
 });
+const DASHBOARD_SUMMARY_COLUMNS = 'active_employees,on_probation,active_pips,kpi_pending_approval,failed_notifications,open_hires';
+const DASHBOARD_PROBATION_EXPIRY_COLUMNS = 'employee_id,name,department,position,probation_end_date,days_remaining';
+const DASHBOARD_ASSESSMENT_COVERAGE_COLUMNS = 'department,active_employee_count,covered_employee_count,missing_employee_count,coverage_pct';
 
 async function fetchDashboardSummary() {
     try {
         const { data } = await execSupabase(
             'Fetch dashboard summary',
-            () => supabase.from('dashboard_summary').select('*').maybeSingle(),
+            () => supabase.from('dashboard_summary').select(DASHBOARD_SUMMARY_COLUMNS).maybeSingle(),
             { retries: 1 }
         );
         state.dashboardSummary = {
@@ -45,7 +48,7 @@ async function fetchDashboardProbationExpiry(limit = 8) {
             'Fetch dashboard probation expiry',
             () => supabase
                 .from('dashboard_probation_expiry')
-                .select('*')
+                .select(DASHBOARD_PROBATION_EXPIRY_COLUMNS)
                 .limit(limit),
             { retries: 1 }
         );
@@ -68,7 +71,7 @@ async function fetchDashboardAssessmentCoverage() {
             'Fetch dashboard assessment coverage',
             () => supabase
                 .from('dashboard_assessment_coverage')
-                .select('*')
+                .select(DASHBOARD_ASSESSMENT_COVERAGE_COLUMNS)
                 .order('coverage_pct', { ascending: true })
                 .order('department', { ascending: true }),
             { retries: 1 }

@@ -35,6 +35,7 @@ Last updated: 2026-04-09
 ## Current Gaps
 
 - Manpower planning Phase 2 is implemented with baseline planning records, request intake, approval states, and pipeline-ready request tracking
+- Manpower planning Phase 3A is now implemented with a recruitment-card workflow, kanban-style board, request progress rollups, and funnel summary cards in the manpower workspace
 - README and setup docs have been aligned to the current bootstrap and deployment flow
 - Approval notifications still need real email provider setup before live delivery works
 - Large chart and vendor chunks still exist, but the heavier PDF/XLSX export flow has been moved out of the browser UI path

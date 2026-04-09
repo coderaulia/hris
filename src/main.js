@@ -223,6 +223,7 @@ const {
 	renderEmployeeManager,
 	renderManpowerPlanning,
 	renderHeadcountRequests,
+	renderRecruitmentBoard,
 	saveManpowerPlanData,
 	loadManpowerPlanForEdit,
 	resetManpowerPlanForm,
@@ -234,6 +235,11 @@ const {
 	approveHeadcountRequest,
 	rejectHeadcountRequest,
 	cancelHeadcountRequest,
+	resetRecruitmentCardForm,
+	loadRecruitmentCardForEdit,
+	saveRecruitmentCardData,
+	moveRecruitmentCard,
+	deleteRecruitmentCard,
 	saveEmployeeData,
 	loadEmployeeForEdit,
 	resetEmployeeForm,
@@ -244,6 +250,7 @@ const {
 } = createFeatureActions("employees", [
 	"renderManpowerPlanning",
 	"renderHeadcountRequests",
+	"renderRecruitmentBoard",
 	"saveManpowerPlanData",
 	"loadManpowerPlanForEdit",
 	"resetManpowerPlanForm",
@@ -255,6 +262,11 @@ const {
 	"approveHeadcountRequest",
 	"rejectHeadcountRequest",
 	"cancelHeadcountRequest",
+	"resetRecruitmentCardForm",
+	"loadRecruitmentCardForEdit",
+	"saveRecruitmentCardData",
+	"moveRecruitmentCard",
+	"deleteRecruitmentCard",
 	"renderEmployeeManager",
 	"saveEmployeeData",
 	"loadEmployeeForEdit",
@@ -653,6 +665,7 @@ window.__app = {
 	// Employees
 	renderManpowerPlanning,
 	renderHeadcountRequests,
+	renderRecruitmentBoard,
 	saveManpowerPlanData,
 	loadManpowerPlanForEdit,
 	resetManpowerPlanForm,
@@ -664,6 +677,11 @@ window.__app = {
 	approveHeadcountRequest,
 	rejectHeadcountRequest,
 	cancelHeadcountRequest,
+	resetRecruitmentCardForm,
+	loadRecruitmentCardForEdit,
+	saveRecruitmentCardData,
+	moveRecruitmentCard,
+	deleteRecruitmentCard,
 	renderEmployeeManager,
 	saveEmployeeData,
 	loadEmployeeForEdit,
@@ -1010,7 +1028,8 @@ function renderReportFilterOptions() {
 	if (!card || !deptSel || !mgrSel || !periodInput) return;
 
 	const { currentUser, db, reportFilters } = state;
-	if (!currentUser || currentUser.role === "employee") {
+	const activeTab = document.querySelector(".content-section.active")?.id;
+	if (!currentUser || currentUser.role === "employee" || activeTab !== "tab-dashboard") {
 		card.classList.add("hidden");
 		return;
 	}
