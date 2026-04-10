@@ -330,6 +330,12 @@ const {
 const {
 	renderSettings,
 	saveAppSettings,
+	resetProbationAttendanceRulesTemplate,
+	addProbationAttendanceRuleEvent,
+	removeProbationAttendanceRuleEvent,
+	changeProbationAttendanceRuleMode,
+	addProbationAttendanceRuleTier,
+	removeProbationAttendanceRuleTier,
 	editUserRole,
 	setupUserLogin,
 	saveOrgConfig,
@@ -341,6 +347,12 @@ const {
 } = createFeatureActions("settings", [
 	"renderSettings",
 	"saveAppSettings",
+	"resetProbationAttendanceRulesTemplate",
+	"addProbationAttendanceRuleEvent",
+	"removeProbationAttendanceRuleEvent",
+	"changeProbationAttendanceRuleMode",
+	"addProbationAttendanceRuleTier",
+	"removeProbationAttendanceRuleTier",
 	"editUserRole",
 	"setupUserLogin",
 	"saveOrgConfig",
@@ -741,6 +753,12 @@ window.__app = {
 	// Settings
 	renderSettings,
 	saveAppSettings,
+	resetProbationAttendanceRulesTemplate,
+	addProbationAttendanceRuleEvent,
+	removeProbationAttendanceRuleEvent,
+	changeProbationAttendanceRuleMode,
+	addProbationAttendanceRuleTier,
+	removeProbationAttendanceRuleTier,
 	editUserRole,
 	setupUserLogin,
 	saveOrgConfig,
@@ -801,6 +819,7 @@ async function switchTab(tabId, options = {}) {
 
 	const target = document.getElementById(tabId);
 	if (target) target.classList.add("active");
+	renderReportFilterOptions();
 
 	const tabMapping = {
 		"tab-dashboard": "nav-dashboard",
