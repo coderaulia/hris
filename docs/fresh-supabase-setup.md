@@ -1,25 +1,38 @@
 # Fresh Supabase Setup
 
-Use this guide for a brand-new Supabase project when you want a working demo environment for the HR app.
+Use this guide for a brand-new Supabase project when you want a clean working demo environment for the HR app.
+
+## Fresh Install Rule
+
+For a brand-new project:
+
+1. start with [complete-setup.sql](/D:/web/hris/complete-setup.sql)
+2. then run only the active migrations below
+3. finish with [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+
+Do not use files inside [migrations/archive](/D:/web/hris/migrations/archive) for a normal fresh install.
 
 ## Run Order
 
 Run these SQL files in Supabase SQL Editor in this exact order:
 
 1. [complete-setup.sql](/D:/web/hris/complete-setup.sql)
-2. [20260307_safe_next_steps.sql](/D:/web/hris/migrations/20260307_safe_next_steps.sql)
-3. [20260308_probation_monthly_attendance.sql](/D:/web/hris/migrations/20260308_probation_monthly_attendance.sql)
-4. [20260308_probation_hr_access_policy.sql](/D:/web/hris/migrations/20260308_probation_hr_access_policy.sql)
-5. [20260308_manager_kpi_competency_policy.sql](/D:/web/hris/migrations/20260308_manager_kpi_competency_policy.sql)
-6. [20260308_director_role_scope.sql](/D:/web/hris/migrations/20260308_director_role_scope.sql)
-7. [20260308_kpi_governance.sql](/D:/web/hris/migrations/20260308_kpi_governance.sql)
-8. [20260309_security_qa_hardening.sql](/D:/web/hris/migrations/20260309_security_qa_hardening.sql)
-9. [20260408_data_api_grants.sql](/D:/web/hris/migrations/20260408_data_api_grants.sql)
-10. [20260409_manpower_planning_phase1.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase1.sql)
-11. [20260409_manpower_planning_phase2.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase2.sql)
-12. [20260409_manpower_planning_phase3.sql](/D:/web/hris/migrations/20260409_manpower_planning_phase3.sql)
-13. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
-14. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+2. [20260307_performance_foundation.sql](/D:/web/hris/migrations/20260307_performance_foundation.sql)
+3. [20260308_probation_workflow.sql](/D:/web/hris/migrations/20260308_probation_workflow.sql)
+4. [20260308_role_scope_access.sql](/D:/web/hris/migrations/20260308_role_scope_access.sql)
+5. [20260308_kpi_governance.sql](/D:/web/hris/migrations/20260308_kpi_governance.sql)
+6. [20260309_security_qa_hardening.sql](/D:/web/hris/migrations/20260309_security_qa_hardening.sql)
+7. [20260408_data_api_grants.sql](/D:/web/hris/migrations/20260408_data_api_grants.sql)
+8. [20260409_drop_legacy_employee_assessment_columns.sql](/D:/web/hris/migrations/20260409_drop_legacy_employee_assessment_columns.sql)
+9. [20260409_manpower_planning.sql](/D:/web/hris/migrations/20260409_manpower_planning.sql)
+10. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
+11. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+
+## Migration Notes
+
+- The main [migrations](/D:/web/hris/migrations) folder now contains only the active upgrade chain.
+- Older split migrations and one-off repair/bootstrap helpers were moved to [migrations/archive](/D:/web/hris/migrations/archive).
+- `20260409_drop_legacy_employee_assessment_columns.sql` stays in the fresh path because the frontend now expects assessment and training data from normalized tables, not the old mirror columns on `employees`.
 
 ## What The Seed Includes
 
