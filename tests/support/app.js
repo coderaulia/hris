@@ -21,6 +21,10 @@ export const credentials = {
         email: process.env.TEST_EMPLOYEE_EMAIL || 'raka.frontend@demo.local',
         password: process.env.TEST_EMPLOYEE_PASSWORD || 'Employee123!',
     },
+    stressEmployee: {
+        email: process.env.TEST_STRESS_EMPLOYEE_EMAIL || 'qa.stress.average.employee@demo.local',
+        password: process.env.TEST_STRESS_EMPLOYEE_PASSWORD || 'Employee123!',
+    },
     otherEmployee: {
         email: process.env.TEST_OTHER_EMPLOYEE_EMAIL || 'bima.sales@demo.local',
         password: process.env.TEST_OTHER_EMPLOYEE_PASSWORD || 'Employee123!',

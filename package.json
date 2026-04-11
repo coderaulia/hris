@@ -13,7 +13,11 @@
 		"qa:rls-audit": "node scripts/qa/rls-policy-audit.mjs",
 		"qa:migrations": "node scripts/qa/migration-safety-check.mjs",
 		"qa:negative": "node scripts/qa/rls-negative-path.mjs",
+		"qa:stress:seed": "node scripts/qa/stress-seed.mjs",
+		"qa:stress:seed:average": "node scripts/qa/stress-seed.mjs --profile average --employees 120",
+		"qa:stress:seed:busy": "node scripts/qa/stress-seed.mjs --profile busy --employees 220",
 		"qa:e2e": "playwright test",
+		"qa:e2e:stress": "playwright test tests/stress-workload.spec.js",
 		"qa:e2e:ui": "playwright test --ui",
 		"qa:hardening": "npm run qa:schema-discipline && npm run qa:migrations && npm run qa:rls-audit && npm run qa:bootstrap-grants"
 	},

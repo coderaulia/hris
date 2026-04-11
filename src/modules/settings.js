@@ -11,6 +11,8 @@ import { saveSetting, fetchActivityLogs, logActivity, getDefaultProbationAttenda
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
+let probationAttendanceRulesDraft = null;
+
 // ---- RENDER SETTINGS PAGE ----
 function canAccessSettings() {
     return isAdmin() || state.currentUser?.role === 'manager' || state.currentUser?.role === 'hr';
@@ -44,24 +46,225 @@ export async function renderSettings() {
         await renderActivityLog();
     }
 }
+
+function getDefaultProbationAttendanceRulesObject() {
+    return JSON.parse(getDefaultProbationAttendanceRulesJson());
+}
+
+function sanitizeProbationRuleKey(value, fallback = 'other') {
+    const normalized = String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return normalized || fallback;
+}
+
+function normalizeProbationTierRows(rows = []) {
+    const dedup = {};
+    rows.forEach((row) => {
+        const minQty = Math.max(0, Number(row?.min_qty || 0));
+        const points = Math.max(0, Number(row?.points || 0));
+        dedup[minQty] = points;
+    });
+
+    const normalized = Object.entries(dedup)
+        .map(([min_qty, points]) => ({ min_qty: Number(min_qty), points: Number(points) }))
+        .sort((a, b) => b.min_qty - a.min_qty);
+
+    return normalized.length > 0 ? normalized : [{ min_qty: 1, points: 1 }];
+}
+
+function normalizeProbationAttendanceRulesDraft(rawRules = {}) {
+    const defaults = getDefaultProbationAttendanceRulesObject();
+    const candidate = rawRules && typeof rawRules === 'object' && !Array.isArray(rawRules) ? rawRules : defaults;
+    const rawEvents = candidate.events && typeof candidate.events === 'object' && !Array.isArray(candidate.events)
+        ? candidate.events
+        : defaults.events;
+
+    const events = Object.entries(rawEvents).map(([key, rule], index) => {
+        const safeKey = sanitizeProbationRuleKey(key, `event_${index + 1}`);
+        const mode = String(rule?.mode || '').trim().toLowerCase() === 'tiered' || Array.isArray(rule?.tiers)
+            ? 'tiered'
+            : 'per_qty';
+
+        return {
+            key: safeKey,
+            label: String(rule?.label || safeKey).trim() || safeKey,
+            mode,
+            per_qty: Math.max(0, Number(rule?.per_qty || 0)),
+            max_points: Math.max(0, Number(rule?.max_points || 0)),
+            tiers: normalizeProbationTierRows(rule?.tiers || []),
+        };
+    });
+
+    return {
+        monthly_cap: Math.max(0, Number(candidate.monthly_cap ?? defaults.monthly_cap ?? 20)),
+        events: events.length > 0
+            ? events
+            : Object.entries(defaults.events).map(([key, rule], index) => ({
+                key: sanitizeProbationRuleKey(key, `event_${index + 1}`),
+                label: String(rule?.label || key).trim() || key,
+                mode: String(rule?.mode || '').trim().toLowerCase() === 'tiered' ? 'tiered' : 'per_qty',
+                per_qty: Math.max(0, Number(rule?.per_qty || 0)),
+                max_points: Math.max(0, Number(rule?.max_points || 0)),
+                tiers: normalizeProbationTierRows(rule?.tiers || []),
+            })),
+    };
+}
+
+function serializeProbationAttendanceRulesDraft(draft = probationAttendanceRulesDraft) {
+    const normalized = normalizeProbationAttendanceRulesDraft(draft);
+    const events = {};
+
+    normalized.events.forEach((event, index) => {
+        const key = sanitizeProbationRuleKey(event.key, `event_${index + 1}`);
+        const rule = {
+            label: String(event.label || key).trim() || key,
+            mode: event.mode === 'tiered' ? 'tiered' : 'per_qty',
+        };
+
+        if (rule.mode === 'tiered') {
+            rule.tiers = normalizeProbationTierRows(event.tiers || []);
+        } else {
+            rule.per_qty = Math.max(0, Number(event.per_qty || 0));
+            rule.max_points = Math.max(0, Number(event.max_points || 0));
+        }
+
+        events[key] = rule;
+    });
+
+    return {
+        monthly_cap: Math.max(0, Number(normalized.monthly_cap || 0)),
+        events,
+    };
+}
+
+function readProbationAttendanceRulesFromState() {
+    try {
+        const parsed = JSON.parse(state.appSettings?.probation_attendance_rules_json || '{}');
+        return normalizeProbationAttendanceRulesDraft(parsed);
+    } catch {
+        return normalizeProbationAttendanceRulesDraft(getDefaultProbationAttendanceRulesObject());
+    }
+}
+
+function getProbationAttendanceRulesEditorStateFromDom() {
+    const monthlyCapInput = document.getElementById('probation-attendance-monthly-cap');
+    const cards = Array.from(document.querySelectorAll('.probation-attendance-event-card'));
+    if (!monthlyCapInput || cards.length === 0) {
+        return probationAttendanceRulesDraft || readProbationAttendanceRulesFromState();
+    }
+
+    return normalizeProbationAttendanceRulesDraft({
+        monthly_cap: monthlyCapInput.value,
+        events: Object.fromEntries(cards.map((card, index) => {
+            const key = card.querySelector('.probation-rule-key')?.value || `event_${index + 1}`;
+            const mode = card.querySelector('.probation-rule-mode')?.value || 'per_qty';
+            const tiers = Array.from(card.querySelectorAll('.probation-rule-tier-row')).map((row) => ({
+                min_qty: row.querySelector('.probation-rule-tier-min')?.value || 0,
+                points: row.querySelector('.probation-rule-tier-points')?.value || 0,
+            }));
+
+            return [key, {
+                label: card.querySelector('.probation-rule-label')?.value || key,
+                mode,
+                per_qty: card.querySelector('.probation-rule-per-qty')?.value || 0,
+                max_points: card.querySelector('.probation-rule-max-points')?.value || 0,
+                tiers,
+            }];
+        })),
+    });
+}
+
+function renderProbationAttendanceRulesEditor() {
+    const mount = document.getElementById('probation-attendance-rules-editor');
+    const hiddenInput = document.getElementById('setting-probation_attendance_rules_json');
+    if (!mount || !hiddenInput) return;
+
+    const draft = normalizeProbationAttendanceRulesDraft(probationAttendanceRulesDraft || readProbationAttendanceRulesFromState());
+    probationAttendanceRulesDraft = draft;
+    hiddenInput.value = JSON.stringify(serializeProbationAttendanceRulesDraft(draft), null, 2);
+
+    mount.innerHTML = draft.events.map((event, index) => {
+        const isTiered = event.mode === 'tiered';
+        const tiersHtml = normalizeProbationTierRows(event.tiers || []).map((tier, tierIndex) => `
+            <div class="row g-2 align-items-end probation-rule-tier-row mb-2">
+                <div class="col-sm-5">
+                    <label class="form-label small text-muted mb-1">Minimum Qty</label>
+                    <input type="number" min="0" step="1" class="form-control form-control-sm probation-rule-tier-min" value="${escapeHTML(String(tier.min_qty))}">
+                </div>
+                <div class="col-sm-5">
+                    <label class="form-label small text-muted mb-1">Deduction Points</label>
+                    <input type="number" min="0" step="0.1" class="form-control form-control-sm probation-rule-tier-points" value="${escapeHTML(String(tier.points))}">
+                </div>
+                <div class="col-sm-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="window.__app.removeProbationAttendanceRuleTier(${index}, ${tierIndex})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+        return `
+            <div class="card border probation-attendance-event-card mb-3">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <div class="fw-semibold small">Attendance Event Rule</div>
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="window.__app.removeProbationAttendanceRuleEvent(${index})">
+                        <i class="bi bi-x-lg me-1"></i> Remove
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Event Key</label>
+                            <input type="text" class="form-control form-control-sm probation-rule-key" value="${escapeHTML(event.key)}" placeholder="e.g. late_in">
+                            <div class="form-text">Internal key used when HR logs the event.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Display Label</label>
+                            <input type="text" class="form-control form-control-sm probation-rule-label" value="${escapeHTML(event.label)}" placeholder="e.g. Late Clock In">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Deduction Type</label>
+                            <select class="form-select form-select-sm probation-rule-mode" onchange="window.__app.changeProbationAttendanceRuleMode(${index}, this.value)">
+                                <option value="per_qty" ${!isTiered ? 'selected' : ''}>Per occurrence</option>
+                                <option value="tiered" ${isTiered ? 'selected' : ''}>Tiered thresholds</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 ${isTiered ? 'd-none' : ''}">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Points Per Occurrence</label>
+                                <input type="number" min="0" step="0.1" class="form-control form-control-sm probation-rule-per-qty" value="${escapeHTML(String(event.per_qty || 0))}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">Maximum Points For This Event</label>
+                                <input type="number" min="0" step="0.1" class="form-control form-control-sm probation-rule-max-points" value="${escapeHTML(String(event.max_points || 0))}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 ${isTiered ? '' : 'd-none'}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="small fw-bold text-muted">Threshold Rules</div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.__app.addProbationAttendanceRuleTier(${index})">
+                                <i class="bi bi-plus-circle me-1"></i> Add Tier
+                            </button>
+                        </div>
+                        <div class="small text-muted mb-2">Higher minimum quantity should carry the bigger deduction.</div>
+                        ${tiersHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
 // ---- APP SETTINGS ----
 function renderAppSettings() {
     const { appSettings } = state;
-    const attendanceTemplate = getDefaultProbationAttendanceRulesJson();
-    const attendancePlaceholder = `{
-  "monthly_cap": 20,
-  "events": {
-    "late_in": {
-      "label": "Late Clock In",
-      "mode": "tiered",
-      "tiers": [
-        { "min_qty": 15, "points": 5 },
-        { "min_qty": 9, "points": 3 },
-        { "min_qty": 3, "points": 1 }
-      ]
-    }
-  }
-}`;
     const fields = [
         { key: 'app_name', label: 'Application Name', placeholder: 'e.g. HR Performance Suite' },
         { key: 'company_name', label: 'Company Name', placeholder: 'e.g. Your Company' },
@@ -73,69 +276,119 @@ function renderAppSettings() {
         { key: 'probation_weight_work', label: 'Probation Work Weight', placeholder: '50' },
         { key: 'probation_weight_managing', label: 'Probation Managing Weight', placeholder: '30' },
         { key: 'probation_weight_attitude', label: 'Probation Attitude Weight', placeholder: '20' },
-        {
-            key: 'probation_attendance_rules_json',
-            label: 'Probation Attendance Deduction Rules',
-            placeholder: attendancePlaceholder,
-            defaultValue: attendanceTemplate,
-            helper: 'Use readable JSON. "monthly_cap" limits total monthly deduction. Each event needs a label plus either "mode: per_qty" with "per_qty" and "max_points", or "mode: tiered" with a "tiers" list.',
-            example: 'Example events: "late_in", "missed_clock_out", "absent", "event_absent", "discipline", "other".',
-        },
     ];
 
     const container = document.getElementById('settings-app-fields');
     if (!container) return;
     container.innerHTML = '';
+    probationAttendanceRulesDraft = readProbationAttendanceRulesFromState();
 
     fields.forEach(f => {
-        const value = appSettings[f.key] || f.defaultValue || '';
-        const isJsonField = f.key === 'probation_attendance_rules_json';
-        const control = isJsonField
-            ? `<textarea class="form-control font-monospace small" id="setting-${f.key}" rows="14" spellcheck="false" placeholder="${escapeHTML(f.placeholder)}">${escapeHTML(value)}</textarea>`
-            : `<input type="text" class="form-control" id="setting-${f.key}" value="${escapeHTML(value)}" placeholder="${f.placeholder}">`;
-        const helper = f.helper
-            ? `<div class="form-text">${escapeHTML(f.helper)}</div>${f.example ? `<div class="form-text text-primary-emphasis">${escapeHTML(f.example)}</div>` : ''}`
-            : '';
-        const actions = isJsonField
-            ? `<div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.__app.resetProbationAttendanceRulesTemplate()">
-                    <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Template
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.__app.formatProbationAttendanceRulesJSON()">
-                    <i class="bi bi-braces-asterisk me-1"></i> Format JSON
-                </button>
-            </div>`
-            : '';
+        const value = appSettings[f.key] || '';
 
         container.innerHTML += `
-      <div class="${isJsonField ? 'col-12' : 'col-md-6'} mb-3">
+      <div class="col-md-6 mb-3">
         <label class="form-label small fw-bold text-muted">${f.label}</label>
-        ${control}
-        ${helper}
-        ${actions}
+        <input type="text" class="form-control" id="setting-${f.key}" value="${escapeHTML(value)}" placeholder="${f.placeholder}">
       </div>`;
     });
+
+    container.innerHTML += `
+      <div class="col-12 mb-3">
+        <div class="card border">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <div>
+                    <div class="fw-bold">Probation Attendance Deduction Rules</div>
+                    <div class="small text-muted">Configure each attendance event with a friendly form instead of editing JSON directly.</div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.__app.resetProbationAttendanceRulesTemplate()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Default Rules
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="window.__app.addProbationAttendanceRuleEvent()">
+                        <i class="bi bi-plus-circle me-1"></i> Add Event Rule
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted">Maximum Monthly Deduction</label>
+                        <input type="number" min="0" step="0.1" class="form-control" id="probation-attendance-monthly-cap" value="${escapeHTML(String(probationAttendanceRulesDraft.monthly_cap || 0))}">
+                        <div class="form-text">Total deduction points in one probation month cannot exceed this cap.</div>
+                    </div>
+                </div>
+                <div id="probation-attendance-rules-editor"></div>
+                <input type="hidden" id="setting-probation_attendance_rules_json" value="">
+            </div>
+        </div>
+      </div>`;
+
+    renderProbationAttendanceRulesEditor();
 }
 
 export function resetProbationAttendanceRulesTemplate() {
-    const el = document.getElementById('setting-probation_attendance_rules_json');
-    if (!el) return;
-    el.value = getDefaultProbationAttendanceRulesJson();
+    probationAttendanceRulesDraft = normalizeProbationAttendanceRulesDraft(getDefaultProbationAttendanceRulesObject());
+    renderProbationAttendanceRulesEditor();
 }
 
-export async function formatProbationAttendanceRulesJSON() {
-    const el = document.getElementById('setting-probation_attendance_rules_json');
-    if (!el) return;
+export function addProbationAttendanceRuleEvent() {
+    const draft = getProbationAttendanceRulesEditorStateFromDom();
+    draft.events.push({
+        key: `custom_rule_${draft.events.length + 1}`,
+        label: `Custom Rule ${draft.events.length + 1}`,
+        mode: 'per_qty',
+        per_qty: 1,
+        max_points: Math.max(1, Number(draft.monthly_cap || 20)),
+        tiers: [{ min_qty: 1, points: 1 }],
+    });
+    probationAttendanceRulesDraft = draft;
+    renderProbationAttendanceRulesEditor();
+}
 
-    try {
-        const parsed = JSON.parse(el.value || '{}');
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error('Probation attendance rules must be a valid JSON object.');
-        }
-        el.value = JSON.stringify(parsed, null, 2);
-    } catch (err) {
-        await notify.error('Invalid probation attendance rules JSON: ' + err.message);
+export function removeProbationAttendanceRuleEvent(index) {
+    const draft = getProbationAttendanceRulesEditorStateFromDom();
+    draft.events = draft.events.filter((_, itemIndex) => itemIndex !== Number(index));
+    if (draft.events.length === 0) {
+        draft.events = normalizeProbationAttendanceRulesDraft(getDefaultProbationAttendanceRulesObject()).events.slice(0, 1);
     }
+    probationAttendanceRulesDraft = draft;
+    renderProbationAttendanceRulesEditor();
+}
+
+export function changeProbationAttendanceRuleMode(index, mode) {
+    const draft = getProbationAttendanceRulesEditorStateFromDom();
+    const item = draft.events[Number(index)];
+    if (!item) return;
+    item.mode = String(mode || 'per_qty') === 'tiered' ? 'tiered' : 'per_qty';
+    if (item.mode === 'tiered') {
+        item.tiers = normalizeProbationTierRows(item.tiers || []);
+    } else {
+        item.per_qty = Math.max(0, Number(item.per_qty || 1));
+        item.max_points = Math.max(0, Number(item.max_points || draft.monthly_cap || 0));
+    }
+    probationAttendanceRulesDraft = draft;
+    renderProbationAttendanceRulesEditor();
+}
+
+export function addProbationAttendanceRuleTier(index) {
+    const draft = getProbationAttendanceRulesEditorStateFromDom();
+    const item = draft.events[Number(index)];
+    if (!item) return;
+    item.tiers = normalizeProbationTierRows([...(item.tiers || []), { min_qty: 1, points: 1 }]);
+    probationAttendanceRulesDraft = draft;
+    renderProbationAttendanceRulesEditor();
+}
+
+export function removeProbationAttendanceRuleTier(index, tierIndex) {
+    const draft = getProbationAttendanceRulesEditorStateFromDom();
+    const item = draft.events[Number(index)];
+    if (!item) return;
+    item.tiers = normalizeProbationTierRows(
+        (item.tiers || []).filter((_, currentTierIndex) => currentTierIndex !== Number(tierIndex)),
+    );
+    probationAttendanceRulesDraft = draft;
+    renderProbationAttendanceRulesEditor();
 }
 
 export async function saveAppSettings() {
@@ -157,12 +410,21 @@ export async function saveAppSettings() {
                     }
                 }
                 if (key === 'probation_attendance_rules_json' && newVal) {
+                    probationAttendanceRulesDraft = getProbationAttendanceRulesEditorStateFromDom();
+                    const seenKeys = new Set();
+                    probationAttendanceRulesDraft.events.forEach((event, index) => {
+                        const safeKey = sanitizeProbationRuleKey(event.key, `event_${index + 1}`);
+                        if (seenKeys.has(safeKey)) {
+                            throw new Error(`Duplicate probation attendance event key: "${safeKey}".`);
+                        }
+                        seenKeys.add(safeKey);
+                    });
+                    newVal = JSON.stringify(serializeProbationAttendanceRulesDraft(probationAttendanceRulesDraft), null, 2);
+                    el.value = newVal;
                     const parsed = JSON.parse(newVal);
                     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
                         throw new Error('Probation attendance rules must be a valid JSON object.');
                     }
-                    newVal = JSON.stringify(parsed, null, 2);
-                    el.value = newVal;
                 }
                 const prevVal = state.appSettings[key] || '';
                 if (newVal !== prevVal) {
