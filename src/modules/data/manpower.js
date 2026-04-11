@@ -155,7 +155,7 @@ async function updateHeadcountRequestStatus(id, {
 
 async function saveRecruitmentCard(card) {
     if (state.recruitmentPipelineAvailable === false) {
-        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
     }
 
     const payload = {
@@ -190,7 +190,7 @@ async function saveRecruitmentCard(card) {
 
 async function updateRecruitmentStage(id, stage) {
     if (state.recruitmentPipelineAvailable === false) {
-        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
     }
 
     await execSupabase(
@@ -214,7 +214,7 @@ async function updateRecruitmentStage(id, stage) {
 
 async function deleteRecruitmentCard(id) {
     if (state.recruitmentPipelineAvailable === false) {
-        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning_phase3.sql first.');
+        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
     }
 
     await execSupabase(

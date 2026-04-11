@@ -1108,7 +1108,7 @@ export function renderRecruitmentBoard() {
             <div class="col-12">
                 <div class="border rounded-4 p-4 text-center bg-light">
                     <div class="small text-uppercase fw-bold text-muted mb-2">Recruitment Board Unavailable</div>
-                    <div class="text-muted">Run migration <span class="font-monospace">20260409_manpower_planning_phase3.sql</span> in Supabase, then reload the app.</div>
+                    <div class="text-muted">Run migration <span class="font-monospace">20260409_manpower_planning.sql</span> in Supabase, then reload the app.</div>
                 </div>
             </div>
         `;

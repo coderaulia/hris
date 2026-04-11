@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
 import { createClient } from '@supabase/supabase-js';
+import { getCanonicalBootstrapSqlFiles } from '../support/canonical-migration-chain.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,14 +18,7 @@ if (!serviceRoleKey) {
     process.exit(1);
 }
 
-const sqlFiles = [
-    path.join(repoRoot, 'complete-setup.sql'),
-    ...fs.readdirSync(path.join(repoRoot, 'migrations'))
-        .filter(name => name.endsWith('.sql'))
-        .sort()
-        .map(name => path.join(repoRoot, 'migrations', name)),
-    path.join(repoRoot, 'supabase', '01_dummy_seed.sql'),
-];
+const sqlFiles = getCanonicalBootstrapSqlFiles(repoRoot);
 
 const authUsers = [
     { email: 'superadmin@demo.local', password: 'Superadmin123!' },

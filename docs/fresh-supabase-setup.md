@@ -33,6 +33,7 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 - The main [migrations](/D:/web/hris/migrations) folder now contains only the active upgrade chain.
 - Older split migrations and one-off repair/bootstrap helpers were moved to [migrations/archive](/D:/web/hris/migrations/archive).
 - `20260409_drop_legacy_employee_assessment_columns.sql` stays in the fresh path because the frontend now expects assessment and training data from normalized tables, not the old mirror columns on `employees`.
+- Local bootstrap and QA audit scripts now use this same canonical chain directly, so the documented order and automation are locked together.
 
 ## What The Seed Includes
 

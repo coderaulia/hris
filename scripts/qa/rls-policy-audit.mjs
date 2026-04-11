@@ -1,23 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getCanonicalSchemaSqlFiles } from '../support/canonical-migration-chain.mjs';
 
 const root = process.cwd();
 const migrationDir = path.join(root, 'migrations');
 const baseSetup = path.join(root, 'complete-setup.sql');
 
 function readSqlFilesInOrder() {
-    const files = [];
-    if (fs.existsSync(baseSetup)) {
-        files.push(baseSetup);
-    }
-    if (fs.existsSync(migrationDir)) {
-        const migrationFiles = fs.readdirSync(migrationDir)
-            .filter(name => name.endsWith('.sql'))
-            .sort((a, b) => a.localeCompare(b))
-            .map(name => path.join(migrationDir, name));
-        files.push(...migrationFiles);
-    }
-    return files;
+    return getCanonicalSchemaSqlFiles(root);
 }
 
 function normalizeSpace(text = '') {

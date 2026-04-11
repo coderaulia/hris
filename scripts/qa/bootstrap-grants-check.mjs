@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { getCanonicalSchemaSqlFiles } from '../support/canonical-migration-chain.mjs';
 
 const root = process.cwd();
 const migrationDir = path.join(root, 'migrations');
@@ -8,18 +9,17 @@ const sourceRoots = [
     path.join(root, 'src', 'modules'),
     path.join(root, 'src', 'lib'),
 ];
+const READ_ONLY_FRONTEND_RELATIONS = new Set([
+    'dashboard_summary',
+    'dashboard_probation_expiry',
+    'dashboard_assessment_coverage',
+    'manpower_plan_overview',
+    'headcount_request_overview',
+    'recruitment_pipeline_overview',
+]);
 
 function readSqlFilesInOrder() {
-    const files = [];
-    if (fs.existsSync(baseSetup)) files.push(baseSetup);
-    if (fs.existsSync(migrationDir)) {
-        const migrationFiles = fs.readdirSync(migrationDir)
-            .filter(name => name.endsWith('.sql'))
-            .sort((a, b) => a.localeCompare(b))
-            .map(name => path.join(migrationDir, name));
-        files.push(...migrationFiles);
-    }
-    return files;
+    return getCanonicalSchemaSqlFiles(root);
 }
 
 function walkFiles(dirPath) {
@@ -189,7 +189,9 @@ function runAudit() {
     }
 
     for (const table of tables) {
-        const requiredOps = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
+        const requiredOps = READ_ONLY_FRONTEND_RELATIONS.has(table)
+            ? new Set(['SELECT'])
+            : new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']);
         for (const privilege of requiredOps) {
             if (!hasPrivilege(tablePrivileges, 'authenticated', table, privilege)) {
                 failures.push(`Missing authenticated ${privilege} grant on public.${table}`);
