@@ -17,6 +17,8 @@ npm run e2e:bootstrap:local
 npm run qa:e2e
 ```
 
+Playwright loads repo `.env` automatically via `playwright.config.js`, so local runs can use the same environment file as the app.
+
 ## Stress QA
 
 Use the dedicated stress seed to simulate larger manager, HR, and employee workloads.
