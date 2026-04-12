@@ -9,6 +9,8 @@ import { escapeHTML, escapeInlineArg, getInputValue, getDepartment, safeCSV } fr
 import {
     saveEmployee,
     deleteEmployee as deleteEmpFromDB,
+} from './data/employees.js';
+import {
     saveManpowerPlan,
     deleteManpowerPlan as deleteManpowerPlanFromDB,
     saveHeadcountRequest,
@@ -16,8 +18,8 @@ import {
     saveRecruitmentCard,
     updateRecruitmentStage,
     deleteRecruitmentCard as deleteRecruitmentCardFromDB,
-    logActivity,
-} from './data.js';
+} from './data/manpower.js';
+import { logActivity } from './data/activity.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 import { getSwal } from '../lib/swal.js';

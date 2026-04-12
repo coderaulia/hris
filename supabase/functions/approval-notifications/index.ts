@@ -17,6 +17,20 @@ type Recipient = {
   name: string;
 };
 
+type DeliveryPayload = {
+  to: string[];
+  subject: string;
+  text: string;
+  html: string;
+};
+
+type DeliveryResult = {
+  delivered: boolean;
+  dry_run: boolean;
+  provider: string;
+  provider_response?: string | null;
+};
+
 function jsonResponse(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), {
     status,
@@ -77,22 +91,48 @@ async function sendEmail({
   subject,
   text,
   html,
-}: {
-  to: string[];
-  subject: string;
-  text: string;
-  html: string;
-}) {
+}: DeliveryPayload): Promise<DeliveryResult> {
+  const provider = getOptionalEnv("EMAIL_PROVIDER", "generic").toLowerCase();
   const emailApiUrl = getOptionalEnv("EMAIL_API_URL");
   const emailApiKey = getOptionalEnv("EMAIL_API_KEY");
   const emailFrom = getOptionalEnv("EMAIL_FROM");
   const emailReplyTo = getOptionalEnv("EMAIL_REPLY_TO");
 
-  if (!emailApiUrl || !emailApiKey || !emailFrom) {
+  if (!emailApiKey || !emailFrom || (provider === "generic" && !emailApiUrl)) {
     return {
       delivered: false,
       dry_run: true,
       provider: "unconfigured",
+    };
+  }
+
+  if (provider === "resend") {
+    const response = await fetch(emailApiUrl || "https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${emailApiKey}`,
+      },
+      body: JSON.stringify({
+        from: emailFrom,
+        to,
+        reply_to: emailReplyTo || undefined,
+        subject,
+        text,
+        html,
+      }),
+    });
+
+    const bodyText = await response.text();
+    if (!response.ok) {
+      throw new Error(`Email provider error (${response.status}): ${bodyText}`);
+    }
+
+    return {
+      delivered: true,
+      dry_run: false,
+      provider: "resend",
+      provider_response: bodyText || null,
     };
   }
 
@@ -120,7 +160,7 @@ async function sendEmail({
   return {
     delivered: true,
     dry_run: false,
-    provider: emailApiUrl,
+    provider: provider || emailApiUrl,
     provider_response: bodyText || null,
   };
 }
@@ -375,8 +415,14 @@ serve(async (req) => {
     });
   }
 
+  let context:
+    | Awaited<ReturnType<typeof authorizeRequest>>
+    | null = null;
+  let notificationMeta: Record<string, unknown> | null = null;
+  let recipientEmails: string[] = [];
+
   try {
-    const context = await authorizeRequest(req);
+    context = await authorizeRequest(req);
     const dataClient = context.dataClient;
     const logClient = context.logClient;
 
@@ -401,15 +447,42 @@ serve(async (req) => {
         });
     }
 
-    const recipients = notification.recipients.map((item: Recipient) => item.email);
-    if (recipients.length === 0) {
+    recipientEmails = notification.recipients.map((item: Recipient) => item.email);
+    notificationMeta = {
+      entity_id: notification.entity_id,
+      notification_type: notification.notification_type,
+      meta: notification.meta,
+      subject: notification.subject,
+    };
+
+    if (recipientEmails.length === 0) {
+      await logNotification(logClient, {
+        actor_employee_id: context.actor.employee_id,
+        actor_role: context.actor.role,
+        entity_id: notification.entity_id,
+        action_source: context.mode,
+        notification_type: notification.notification_type,
+        recipients: [],
+        delivered: false,
+        dry_run: true,
+        skipped: true,
+        reason: "no_recipients",
+        meta: notification.meta,
+      });
+
       return jsonResponse(200, {
         ok: true,
         data: {
           delivered: false,
           skipped: true,
           reason: "no_recipients",
-          notification,
+          notification: {
+            entity_id: notification.entity_id,
+            notification_type: notification.notification_type,
+            recipients: notification.recipients,
+            subject: notification.subject,
+            meta: notification.meta,
+          },
         },
       });
     }
@@ -417,7 +490,7 @@ serve(async (req) => {
     const delivery = payload.dry_run
       ? { delivered: false, dry_run: true, provider: "manual_dry_run" }
       : await sendEmail({
-          to: recipients,
+          to: recipientEmails,
           subject: notification.subject,
           text: notification.text,
           html: notification.html,
@@ -429,7 +502,7 @@ serve(async (req) => {
       entity_id: notification.entity_id,
       action_source: context.mode,
       notification_type: notification.notification_type,
-      recipients,
+      recipients: recipientEmails,
       delivered: delivery.delivered,
       dry_run: delivery.dry_run,
       provider: delivery.provider,
@@ -440,12 +513,28 @@ serve(async (req) => {
       ok: true,
       data: {
         ...delivery,
-        recipients,
+        recipients: recipientEmails,
         subject: notification.subject,
         notification_type: notification.notification_type,
       },
     });
   } catch (error) {
+    if (context?.logClient) {
+      await logNotification(context.logClient, {
+        actor_employee_id: context.actor.employee_id,
+        actor_role: context.actor.role,
+        entity_id: notificationMeta?.entity_id || null,
+        action_source: context.mode,
+        notification_type: notificationMeta?.notification_type || String(payload?.action || "unknown"),
+        recipients: recipientEmails,
+        delivered: false,
+        dry_run: false,
+        provider: getOptionalEnv("EMAIL_PROVIDER", "generic").toLowerCase() || "generic",
+        error_message: error instanceof Error ? error.message : String(error),
+        meta: notificationMeta?.meta || null,
+      });
+    }
+
     return jsonResponse(/access denied/i.test(String(error)) ? 403 : 500, {
       ok: false,
       error: {

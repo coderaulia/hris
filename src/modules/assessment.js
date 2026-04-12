@@ -5,7 +5,8 @@
 import { state, emit, isEmployee } from '../lib/store.js';
 import { getAssessmentHistory, getManagerAssessment, getSelfAssessment, hydrateEmployeeRecord, setAssessmentHistory, setManagerAssessment, setSelfAssessment } from '../lib/employee-records.js';
 import { escapeHTML, getDepartment } from '../lib/utils.js';
-import { saveEmployee, logActivity } from './data.js';
+import { saveEmployee } from './data/employees.js';
+import { logActivity } from './data/activity.js';
 import * as notify from '../lib/notify.js';
 import { getDirectorOperationalScopeIds } from '../lib/reportFilters.js';
 

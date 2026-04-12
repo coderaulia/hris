@@ -4,7 +4,24 @@
 
 import { state, emit } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, formatPeriod, formatNumber, debugError, formatDateTime } from '../lib/utils.js';
-import { saveKpiDefinition, submitKpiDefinitionVersion, decideKpiDefinitionVersion, deleteKpiDefinition, saveKpiRecord, deleteKpiRecord, fetchKpiRecords, submitEmployeeKpiTargetVersions, decideEmployeeKpiTargetVersion, logActivity, saveSetting, getEmployeeKpiTarget, getKpiRecordTarget, getKpiDefinitionForPeriod, } from './data.js';
+import {
+    saveKpiDefinition,
+    submitKpiDefinitionVersion,
+    decideKpiDefinitionVersion,
+    deleteKpiDefinition,
+    saveKpiRecord,
+    deleteKpiRecord,
+    fetchKpiRecords,
+    submitEmployeeKpiTargetVersions,
+    decideEmployeeKpiTargetVersion,
+} from './data/kpi.js';
+import { logActivity } from './data/activity.js';
+import { saveSetting } from './data/settings.js';
+import {
+    getEmployeeKpiTarget,
+    getKpiRecordTarget,
+    getKpiDefinitionForPeriod,
+} from './data/targets.js';
 import * as notify from '../lib/notify.js';
 import { getFilteredEmployeeIds, getDirectorOperationalScopeIds } from '../lib/reportFilters.js';
 import { requireRecentAuth } from './auth.js';
@@ -1327,4 +1344,3 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
-

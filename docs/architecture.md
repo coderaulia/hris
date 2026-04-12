@@ -20,7 +20,7 @@ Browser (Vite SPA)
 |-- Supabase Edge Functions
 |   |-- auth-callbacks       <- callback normalization and profile resolution
 |   |-- admin-user-mutations <- privileged user creation and role mutation
-|   |-- approval-notifications <- placeholder/provider-ready notification dispatch
+|   |-- approval-notifications <- notification dispatch with dry-run fallback and provider-backed delivery
 |   `-- report-exports       <- binary PDF/XLSX generation + Storage signed URLs
 `-- /healthz.json            <- static health check (no server needed)
 ```

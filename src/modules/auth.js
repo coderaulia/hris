@@ -267,11 +267,14 @@ export async function updatePassword(newPassword, options = {}) {
         state.currentUser.reauthenticated_at = Date.now();
         if (options.clearMustChange) {
             state.currentUser.must_change_password = false;
-            const { saveEmployee } = await import('./data.js');
             const rec = state.db[state.currentUser.id];
             if (rec) {
                 rec.must_change_password = false;
-                await saveEmployee(rec);
+                const { error: profileError } = await supabase
+                    .from('employees')
+                    .update({ must_change_password: false })
+                    .eq('employee_id', rec.id);
+                if (profileError) throw profileError;
             }
         }
         persistCurrentUser();

@@ -5,7 +5,8 @@
 
 import { state, emit, isAdmin, isManager } from '../lib/store.js';
 import { escapeHTML, escapeInlineArg, debugError } from '../lib/utils.js';
-import { saveConfig, deleteConfig, logActivity } from './data.js';
+import { saveConfig, deleteConfig } from './data/config.js';
+import { logActivity } from './data/activity.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 

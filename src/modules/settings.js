@@ -7,7 +7,9 @@ import { state, isAdmin } from '../lib/store.js';
 import { applyBranding } from '../lib/branding.js';
 import { createManagedUser, updateManagedEmployeeRole } from '../lib/edge/admin.js';
 import { escapeHTML, escapeInlineArg, formatDateTime } from '../lib/utils.js';
-import { saveSetting, fetchActivityLogs, logActivity, getDefaultProbationAttendanceRulesJson } from './data.js';
+import { saveSetting } from './data/settings.js';
+import { fetchActivityLogs, logActivity } from './data/activity.js';
+import { getDefaultProbationAttendanceRulesJson } from './data/probation.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 

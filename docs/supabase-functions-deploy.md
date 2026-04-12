@@ -22,6 +22,7 @@ Add these in Supabase Dashboard:
 
 Optional later, when email delivery is ready:
 
+- `EMAIL_PROVIDER`
 - `EMAIL_API_URL`
 - `EMAIL_API_KEY`
 - `EMAIL_FROM`
@@ -49,11 +50,18 @@ supabase secrets set REPORT_EXPORT_WEBHOOK_SECRET="replace-with-a-long-random-se
 Add these later when email is configured:
 
 ```bash
+supabase secrets set EMAIL_PROVIDER="generic"
 supabase secrets set EMAIL_API_URL="https://your-email-provider.example/send"
 supabase secrets set EMAIL_API_KEY="your-email-api-key"
 supabase secrets set EMAIL_FROM="noreply@example.com"
 supabase secrets set EMAIL_REPLY_TO="hr@example.com"
 ```
+
+Provider notes:
+
+- `EMAIL_PROVIDER=generic` keeps the current JSON POST behavior using `EMAIL_API_URL`
+- `EMAIL_PROVIDER=resend` uses Resend's email API and defaults `EMAIL_API_URL` to `https://api.resend.com/emails` when omitted
+- both modes still use `EMAIL_API_KEY`, `EMAIL_FROM`, and optional `EMAIL_REPLY_TO`
 
 ## First-time CLI setup on Windows
 
@@ -128,7 +136,7 @@ supabase functions deploy report-exports
 
 - `admin-user-mutations`: privileged managed-user creation and role mutation
 - `auth-callbacks`: callback normalization and post-login role/profile resolution
-- `approval-notifications`: placeholder-ready notification routing and provider hook integration
+- `approval-notifications`: notification routing with generic or Resend-backed email delivery
 - `report-exports`: server-side KPI/probation PDF and XLSX generation with Storage signed URLs
 
 ## Storage requirement for exports
@@ -160,7 +168,7 @@ After deploy, verify:
 3. Role change from Settings still works.
 4. Dashboard KPI PDF/XLSX export downloads successfully.
 5. Probation PDF/XLSX export downloads successfully.
-6. Approval notifications return dry-run or unconfigured behavior without failing the app.
+6. Approval notifications return dry-run behavior when unconfigured, and successful deliveries/failures are logged in `admin_activity_log`.
 
 ## Local file reminder
 

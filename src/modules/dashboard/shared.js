@@ -1,5 +1,5 @@
 import { state } from '../../lib/store.js';
-import { getKpiDefinitionForPeriod, getKpiRecordTarget } from '../data.js';
+import { getKpiDefinitionForPeriod, getKpiRecordTarget } from '../data/targets.js';
 
 function normalizeEmployeeId(value) {
     return String(value ?? '').trim();

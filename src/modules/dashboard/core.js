@@ -7,12 +7,12 @@ import { getChartCtor } from '../../lib/chartLoader.js';
 import { getManagerAssessment } from '../../lib/employee-records.js';
 import { getDepartment, formatPeriod, escapeHTML, escapeInlineArg, formatNumber, toPeriodKey } from '../../lib/utils.js';
 import { getFilteredEmployeeIds } from '../../lib/reportFilters.js';
+import { calculateEmployeeWeightedKpiScore } from '../data/kpi.js';
 import {
-    calculateEmployeeWeightedKpiScore,
     fetchDashboardSummary,
     fetchDashboardProbationExpiry,
     fetchDashboardAssessmentCoverage,
-} from '../data.js';
+} from '../data/dashboard.js';
 import { getScoreBandClass } from '../../lib/uiContracts.js';
 import { getKpiRecordMeta, normalizeEmployeeId } from './shared.js';
 

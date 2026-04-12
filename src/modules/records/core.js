@@ -6,7 +6,8 @@ import { getChartCtor } from '../../lib/chartLoader.js';
 import { state, emit, isAdmin, isEmployee, isManager } from '../../lib/store.js';
 import { getAssessmentHistory, getManagerAssessment, getSelfAssessment, getTrainingRecords, setAssessmentHistory, setManagerAssessment, setSelfAssessment, setTrainingRecords } from '../../lib/employee-records.js';
 import { escapeHTML, escapeInlineArg, getDisplayDate, toPeriodKey, formatPeriod, formatNumber } from '../../lib/utils.js';
-import { saveEmployee, logActivity } from '../data.js';
+import { saveEmployee } from '../data/employees.js';
+import { logActivity } from '../data/activity.js';
 import { requireRecentAuth } from '../auth.js';
 import { startAssessment, renderPendingList, initiateSelfAssessment as _initSelfAssess } from '../assessment.js';
 import * as notify from '../../lib/notify.js';
@@ -564,4 +565,3 @@ export async function editRecordSafe(id) {
 export function initiateSelfAssessment(id) {
     _initSelfAssess(id);
 }
-

@@ -41,7 +41,8 @@ import {
 	promptChangePassword,
 	enforcePasswordPolicyOnLogin,
 } from "./modules/auth.js";
-import { syncAll, fetchSettings } from "./modules/data.js";
+import { syncAll } from "./modules/data/sync.js";
+import { fetchSettings } from "./modules/data/settings.js";
 import { applyBranding } from "./lib/branding.js";
 import { debugError, escapeHTML } from "./lib/utils.js";
 import { getSupabaseEnvValidation } from "./lib/supabase.js";
