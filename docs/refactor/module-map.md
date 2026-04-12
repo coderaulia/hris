@@ -19,9 +19,11 @@
 - Feature entry points:
   - `src/modules/dashboard/assessmentSummary.js`: assessment cards + charts
   - `src/modules/dashboard/kpiSummary.js`: KPI summary + leaderboard + department cards
-  - `src/modules/dashboard/deptModal.js`: department drill-down modal and filtering
+  - `src/modules/dashboard/deptModal.js`: department drill-down modal, trend chart, and filtering
   - `src/modules/dashboard/deptExport.js`: department/employee KPI export (Excel/PDF)
   - `src/modules/dashboard/charts.js`: shared chart-class/status helper bridge
+  - `src/modules/dashboard/shared.js`: shared KPI record metadata + employee-id normalization
+  - `src/modules/dashboard/deptContext.js`: department modal/export state shared across dashboard slices
 
 ## Shared UI Contracts
 
@@ -45,5 +47,6 @@
 ## Next Internal Refactor Step
 
 - Move feature logic out of `records/core.js` into the corresponding `records/*` files incrementally.
-- Move feature logic out of `dashboard/core.js` into `dashboard/*` files incrementally.
+- Continue moving feature logic out of `dashboard/core.js` into `dashboard/*` files incrementally.
+- Department modal/export logic now lives in `dashboard/deptModal.js` and `dashboard/deptExport.js`; the next dashboard candidate is `renderKpiSummary` and related leadership analytics.
 - Keep facades stable so existing app wiring remains unchanged.
