@@ -1,4 +1,5 @@
 import { state, emit } from './runtime.js';
+import { getEnabledModuleSet } from '../../config/app-modules.js';
 import { fetchActivityLogs } from './activity.js';
 import { fetchSettings } from './settings.js';
 import { fetchEmployees } from './employees.js';
@@ -42,32 +43,39 @@ function getRoleSyncFlags(role) {
     };
 }
 
-async function syncAll() {
+async function syncAll(options = {}) {
     const role = state.currentUser?.role || 'employee';
     const flags = getRoleSyncFlags(role);
+    const enabledModules = options.enabledModules || getEnabledModuleSet();
+    const hasModule = (moduleId) => enabledModules.has(moduleId);
+    const hasAnyModule = (...moduleIds) => moduleIds.some((moduleId) => enabledModules.has(moduleId));
+
     const tasks = [
         fetchSettings(),
         fetchEmployees(),
-        fetchConfig(),
         fetchKpiRecords(),
-        fetchPipPlans(),
-        fetchPipActions(),
     ];
 
-    if (flags.includeKpiGovernance) {
-        tasks.push(
-            fetchKpiDefinitions(),
-            fetchKpiDefinitionVersions(),
-            fetchEmployeeKpiTargetVersions(),
-            fetchKpiWeightProfiles(),
-            fetchKpiWeightItems(),
-            fetchEmployeePerformanceScores(),
-        );
-    } else {
-        tasks.push(fetchKpiDefinitions());
+    if (hasAnyModule('assessment', 'tna')) {
+        tasks.push(fetchConfig());
     }
 
-    if (flags.includeProbation) {
+    if (hasModule('kpi')) {
+        if (flags.includeKpiGovernance) {
+            tasks.push(
+                fetchKpiDefinitions(),
+                fetchKpiDefinitionVersions(),
+                fetchEmployeeKpiTargetVersions(),
+                fetchKpiWeightProfiles(),
+                fetchKpiWeightItems(),
+                fetchEmployeePerformanceScores(),
+            );
+        } else {
+            tasks.push(fetchKpiDefinitions());
+        }
+    }
+
+    if (hasModule('probation') && flags.includeProbation) {
         tasks.push(
             fetchProbationReviews(),
             fetchProbationQualitativeItems(),
@@ -76,20 +84,32 @@ async function syncAll() {
         );
     }
 
-    if (flags.includeManpower) {
+    if (hasModule('pip')) {
         tasks.push(
-            fetchManpowerPlans(),
-            fetchHeadcountRequests(),
-            fetchRecruitmentPipeline(),
+            fetchPipPlans(),
+            fetchPipActions(),
         );
     }
 
-    if (flags.includeDashboardReads) {
+    if (hasModule('manpower') && flags.includeManpower) {
         tasks.push(
-            fetchDashboardSummary(),
-            fetchDashboardProbationExpiry(),
-            fetchDashboardAssessmentCoverage(),
+            fetchManpowerPlans(),
+            fetchHeadcountRequests(),
         );
+    }
+
+    if (hasModule('recruitment') && flags.includeManpower) {
+        tasks.push(fetchRecruitmentPipeline());
+    }
+
+    if (hasModule('dashboard') && flags.includeDashboardReads) {
+        tasks.push(fetchDashboardSummary());
+        if (hasModule('probation') && flags.includeProbation) {
+            tasks.push(fetchDashboardProbationExpiry());
+        }
+        if (hasAnyModule('assessment', 'tna')) {
+            tasks.push(fetchDashboardAssessmentCoverage());
+        }
     }
 
     if (flags.includeActivity) {

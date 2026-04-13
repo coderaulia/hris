@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window", "deno.ns"]
+  },
+  "nodeModulesDir": "auto",
+  "fmt": {
+    "semiColons": true,
+    "singleQuote": false
+  }
+}
