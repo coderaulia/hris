@@ -7,7 +7,7 @@
             <p class="employee-directory-copy mb-0">Prepare employee letters and payroll documents from one centralized workspace with live preview.</p>
         </div>
         <div class="employee-directory-actions">
-            <span class="sidebar-link-badge">Phase 1</span>
+            <span class="sidebar-link-badge">Phase 3</span>
         </div>
     </div>
 
@@ -37,12 +37,18 @@
                         </select>
                     </div>
 
+                    <div id="doc-template-hint" class="small text-muted mb-3">
+                        Choose a document type to load template details.
+                    </div>
+
                     <div class="border rounded-3 p-3 bg-light mb-3">
                         <div class="small fw-bold text-muted text-uppercase mb-2">Dynamic Inputs</div>
                         <div id="doc-dynamic-fields" class="vstack gap-3">
                             <div class="small text-muted">Choose a document type to load template fields.</div>
                         </div>
                     </div>
+
+                    <div id="doc-validation-feedback" class="small text-muted"></div>
                 </div>
                 <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
                     <button id="doc-reset-btn" class="btn btn-outline-secondary" type="button">

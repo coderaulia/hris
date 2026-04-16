@@ -2,6 +2,13 @@
 
 This plan continues development based on `hr-document-plan.md`, adapted to the current codebase architecture (`src/main.js` lazy feature loaders, role-aware sidebar groups, and browser-first Supabase access pattern).
 
+## Execution Status (Updated 2026-04-16)
+
+- [x] Phase 1: Workspace shell + navigation
+- [x] Phase 2: Dynamic form + live preview module
+- [x] Phase 3: PDF generation engine
+- [x] Phase 4: Guardrails, activity logging, and smoke QA
+
 ## Goal
 
 Ship a production-ready **HR Documents** workspace where `hr` and `superadmin` can generate:
@@ -19,10 +26,11 @@ Each document should support:
 
 ## Current Baseline
 
-- No dedicated document module exists yet (`src/modules/documents.js` not present).
-- `jspdf` and `jspdf-autotable` are already installed and available in `package.json`.
-- Navigation and tab rendering are centralized in `src/main.js` with lazy feature loading.
-- Branding values are already sourced from `state.appSettings` via `src/lib/branding.js`.
+- Dedicated module is implemented in `src/modules/documents.js`.
+- PDF engine is implemented in `src/lib/pdfTemplates.js` using `jspdf` + `jspdf-autotable`.
+- Navigation is wired in `src/main.js` with role-aware access and lazy loading.
+- Branding is sourced from `state.appSettings` and applied to preview/PDF letterhead.
+- Smoke QA exists in `tests/hr-documents.spec.js`.
 
 ## Delivery Scope (This Iteration)
 

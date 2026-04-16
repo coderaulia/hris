@@ -488,7 +488,7 @@ const NAVIGATION_GROUPS = [
 				id: "nav-documents-workspace",
 				label: "HR Documents",
 				description: "Generate letters, contracts, and payslips",
-				badge: "Phase 1",
+				badge: "Phase 3",
 				roles: ["superadmin", "hr"],
 				tabId: "tab-documents",
 				navId: "nav-documents",

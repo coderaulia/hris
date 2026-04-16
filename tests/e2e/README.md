@@ -6,6 +6,7 @@ Current regression specs:
 
 - `tests/auth.spec.js`
 - `tests/assessment.spec.js`
+- `tests/hr-documents.spec.js`
 - `tests/kpi-approval.spec.js`
 - `tests/probation.spec.js`
 - `tests/stress-workload.spec.js`

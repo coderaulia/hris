@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-04-09
+Last updated: 2026-04-16
 
 ## High-Level Diagram
 
@@ -22,6 +22,7 @@ Browser (Vite SPA)
 |   |-- admin-user-mutations <- privileged user creation and role mutation
 |   |-- approval-notifications <- notification dispatch with dry-run fallback and provider-backed delivery
 |   `-- report-exports       <- binary PDF/XLSX generation + Storage signed URLs
+|-- Client PDF Engine        <- `jspdf` + `jspdf-autotable` templates for HR document exports
 `-- /healthz.json            <- static health check (no server needed)
 ```
 
@@ -64,7 +65,7 @@ manager
   `-- can access: team-scoped KPI, assessment, probation, and reporting data
 
 hr
-  `-- can access: broad employee, KPI, assessment, probation, and PIP operations
+  `-- can access: broad employee, KPI, assessment, probation/PIP, and HR document operations
 
 director
   `-- can access: director-scoped dashboard and operational reporting paths
@@ -84,7 +85,7 @@ superadmin
 7. Add Edge Function secrets: `URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`, and the function-specific secrets.
 8. Deploy Edge Functions.
 9. Deploy the static build to Hostinger.
-10. Verify login, profile resolution, role assignment, and export downloads.
+10. Verify login, profile resolution, role assignment, dashboard/probation export downloads, and HR document PDF generation.
 
 ## Module Boundaries
 
@@ -97,6 +98,7 @@ superadmin
 | Training | `employee_training_records` | Per-employee training log |
 | KPI | `kpi_definitions`, `kpi_definition_versions`, `employee_kpi_target_versions`, `kpi_records` | Governance and monthly performance |
 | Probation / PIP | `probation_reviews`, `probation_monthly_scores`, `probation_attendance_records`, `pip_plans`, `pip_actions` | Performance follow-up and compliance flow |
+| HR Documents | `employees`, `app_settings`, `admin_activity_log`, `src/lib/pdfTemplates.js` | Client-side dynamic document generation with activity logging |
 | Dashboard | Cross-module read models | Aggregated summaries and export entry points |
 | Edge Functions | Mixed | Callback handling, privileged mutations, notifications, exports |
 
@@ -109,5 +111,7 @@ Edge Functions are used only where the browser is the wrong boundary:
 - privileged auth / role mutation
 - notification dispatch
 - heavy export generation and Storage delivery
+
+HR documents intentionally remain client-side exports in this iteration (no server render/archive flow yet).
 
 The app is not moving toward a general backend CRUD proxy.

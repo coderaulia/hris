@@ -1,13 +1,13 @@
 # Project Status
 
-Last updated: 2026-04-09
+Last updated: 2026-04-16
 
 ## Current State
 
 - Frontend: Vite SPA with vanilla JS, Tailwind-enhanced custom UI, and Bootstrap utilities
 - Backend: Supabase Auth + Postgres + RLS, plus implemented Supabase Edge Functions for privileged, callback, notification, and export boundaries
 - Navigation: sidebar-driven app shell with role-aware menu groups
-- Core modules: dashboard, employees, assessment, records, settings, KPI governance, probation/PIP, manpower planning with request workflow
+- Core modules: dashboard, employees (manpower planning, requests, recruitment board, directory), assessment, records, settings, KPI governance, probation/PIP, and HR Documents workspace
 - Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
 - Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
 
@@ -29,13 +29,25 @@ Last updated: 2026-04-09
 - Authenticated Edge Function reads now use a caller-scoped client, while service-role access is kept for privileged tasks like auth admin and Storage signing
 - Approval notifications now support configured provider delivery, with dry-run fallback when email secrets are absent
 - Dashboard and probation export buttons now use the edge export flow end-to-end
-- Deploy instructions now live in [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md)
+- Deploy instructions now live in `docs/supabase-functions-deploy.md`
 - Production rollout depends on deploying the functions in Supabase after secrets are in place
+
+## HR Documents Status
+
+- Phase 1 through Phase 4 from `implementation_plan.md` are implemented
+- New module `src/modules/documents.js` provides:
+  - role-gated HR Documents workspace (`hr` and `superadmin`)
+  - dynamic template forms with live preview
+  - runtime access guardrails + validation feedback
+- PDF engine `src/lib/pdfTemplates.js` now generates:
+  - offer letter, employment contract, payslip, warning letter, termination letter
+  - standardized filename output and multi-page-safe body rendering
+- Generation events are written to `admin_activity_log` with action `document.generate`
+- Smoke E2E coverage is available in `tests/hr-documents.spec.js`
 
 ## Current Gaps
 
-- Manpower planning Phase 2 is implemented with baseline planning records, request intake, approval states, and pipeline-ready request tracking
-- Manpower planning Phase 3A is now implemented with a recruitment-card workflow, kanban-style board, request progress rollups, and funnel summary cards in the manpower workspace
-- README and setup docs have been aligned to the current bootstrap and deployment flow
-- Approval notifications still require production provider secrets before live delivery works, but the edge path now supports configured delivery directly
-- Large chart and vendor chunks still exist, but the heavier PDF/XLSX export flow has been moved out of the browser UI path
+- HR documents are generated client-side only (no persistent document archive table yet)
+- E-signature workflow is not implemented yet
+- Approval notifications still require production provider secrets before live delivery works
+- Large chart and vendor chunks still exist, although heavy KPI/probation exports are offloaded to edge functions
