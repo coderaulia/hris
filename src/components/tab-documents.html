@@ -1,0 +1,74 @@
+<!-- ==================== TAB: HR DOCUMENTS ==================== -->
+<div id="tab-documents" class="content-section">
+    <div class="employee-directory-toolbar mb-3">
+        <div class="employee-directory-intro">
+            <div class="topbar-kicker">HR Toolkit</div>
+            <h3 class="employee-directory-title">HR Documents Workspace</h3>
+            <p class="employee-directory-copy mb-0">Prepare employee letters and payroll documents from one centralized workspace with live preview.</p>
+        </div>
+        <div class="employee-directory-actions">
+            <span class="sidebar-link-badge">Phase 1</span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-xl-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0"><i class="bi bi-sliders me-1"></i>Document Setup</h6>
+                    <div class="small text-muted mt-1">Select an employee and document type to begin.</div>
+                </div>
+                <div class="card-body">
+                    <div id="doc-access-denied" class="alert alert-warning hidden mb-3">
+                        You do not have permission to use this workspace.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Employee</label>
+                        <select id="doc-employee-select" class="form-select">
+                            <option value="">-- Select Employee --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Document Type</label>
+                        <select id="doc-type-select" class="form-select">
+                            <option value="">-- Select Document Type --</option>
+                        </select>
+                    </div>
+
+                    <div class="border rounded-3 p-3 bg-light mb-3">
+                        <div class="small fw-bold text-muted text-uppercase mb-2">Dynamic Inputs</div>
+                        <div id="doc-dynamic-fields" class="vstack gap-3">
+                            <div class="small text-muted">Choose a document type to load template fields.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top d-flex gap-2 justify-content-end">
+                    <button id="doc-reset-btn" class="btn btn-outline-secondary" type="button">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                    </button>
+                    <button id="doc-download-btn" class="btn btn-primary" type="button">
+                        <i class="bi bi-download me-1"></i>Download PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h6 class="fw-bold m-0"><i class="bi bi-file-earmark-text me-1"></i>Live Preview</h6>
+                    <div class="small text-muted mt-1">A4-style preview updates as you complete the form.</div>
+                </div>
+                <div class="card-body documents-preview-wrap">
+                    <div id="doc-preview" class="documents-preview-sheet">
+                        <div class="documents-preview-empty">
+                            Select employee and document type to start preview.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

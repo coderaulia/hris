@@ -11,6 +11,7 @@ import dashboardHTML from "./components/tab-dashboard.html?raw";
 import employeesHTML from "./components/tab-employees.html?raw";
 import assessmentHTML from "./components/tab-assessment.html?raw";
 import recordsHTML from "./components/tab-records.html?raw";
+import documentsHTML from "./components/tab-documents.html?raw";
 import settingsHTML from "./components/tab-settings.html?raw";
 import overlaysHTML from "./components/overlays.html?raw";
 
@@ -21,6 +22,7 @@ document.getElementById("component-dashboard").innerHTML = dashboardHTML;
 document.getElementById("component-employees").innerHTML = employeesHTML;
 document.getElementById("component-assessment").innerHTML = assessmentHTML;
 document.getElementById("component-records").innerHTML = recordsHTML;
+document.getElementById("component-documents").innerHTML = documentsHTML;
 document.getElementById("component-settings").innerHTML = settingsHTML;
 document.getElementById("component-overlays").innerHTML = overlaysHTML;
 
@@ -67,6 +69,7 @@ const FEATURE_LOADERS = {
 	admin: () => import("./modules/admin.js"),
 	employees: () => import("./modules/employees.js"),
 	kpi: () => import("./modules/kpi.js"),
+	documents: () => import("./modules/documents.js"),
 	settings: () => import("./modules/settings.js"),
 };
 
@@ -364,6 +367,12 @@ const {
 	"importOrgConfigJSON",
 ]);
 
+const { renderDocumentsWorkspace, resetDocumentsWorkspace } =
+	createFeatureActions("documents", [
+		"renderDocumentsWorkspace",
+		"resetDocumentsWorkspace",
+	]);
+
 const NAVIGATION_GROUPS = [
 	{
 		id: "nav-group-dashboard",
@@ -465,6 +474,28 @@ const NAVIGATION_GROUPS = [
 				contentDescription:
 					"Create or update employee records with role, department, manager, and access data.",
 				activate: () => switchTab("tab-employees", { employeesView: "employees-add" }),
+			},
+		],
+	},
+	{
+		id: "nav-group-documents",
+		label: "HR Tools",
+		icon: "bi-file-earmark-text",
+		roles: ["superadmin", "hr"],
+		endpoints: ["employees", "app_settings"],
+		children: [
+			{
+				id: "nav-documents-workspace",
+				label: "HR Documents",
+				description: "Generate letters, contracts, and payslips",
+				badge: "Phase 1",
+				roles: ["superadmin", "hr"],
+				tabId: "tab-documents",
+				navId: "nav-documents",
+				contentTitle: "HR Documents",
+				contentDescription:
+					"Generate standardized HR documents from employee data with live preview.",
+				activate: () => switchTab("tab-documents"),
 			},
 		],
 	},
@@ -717,6 +748,10 @@ window.__app = {
 	importEmployeeCSV,
 	clearEmployeeDirectoryFilters,
 
+	// Documents
+	renderDocumentsWorkspace,
+	resetDocumentsWorkspace,
+
 	// Dashboard
 	renderDashboard,
 	openDeptKpiModal,
@@ -827,6 +862,7 @@ async function switchTab(tabId, options = {}) {
 		"tab-employees": "nav-employees",
 		"tab-assessment": "nav-assessment",
 		"tab-records": "nav-records",
+		"tab-documents": "nav-documents",
 		"tab-settings": "nav-settings",
 	};
 
@@ -860,6 +896,9 @@ async function switchTab(tabId, options = {}) {
 		const settingsView = options.settingsView || getActiveSettingsViewId();
 		await renderSettings();
 		await toggleSettingsView(settingsView);
+	}
+	if (tabId === "tab-documents") {
+		await renderDocumentsWorkspace();
 	}
 }
 
@@ -1336,6 +1375,7 @@ async function showApp() {
 		superadmin: [
 			"nav-dashboard",
 			"nav-employees",
+			"nav-documents",
 			"nav-assessment",
 			"nav-records",
 			"nav-settings",
@@ -1346,7 +1386,7 @@ async function showApp() {
 			"nav-records",
 			"nav-settings",
 		],
-		hr: ["nav-dashboard", "nav-records", "nav-settings"],
+		hr: ["nav-dashboard", "nav-documents", "nav-records", "nav-settings"],
 		director: ["nav-dashboard", "nav-assessment", "nav-records"],
 		employee: ["nav-records"],
 	};
