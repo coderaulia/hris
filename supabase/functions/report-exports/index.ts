@@ -1,5 +1,10 @@
+/// <reference lib="deno.window" />
+/// <reference lib="deno.ns" />
+// @ts-ignore -- resolved by the Deno runtime / VS Code Deno extension
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+// @ts-ignore -- resolved by the Deno runtime / VS Code Deno extension
 import * as XLSX from "npm:xlsx";
+// @ts-ignore -- resolved by the Deno runtime / VS Code Deno extension
 import { PDFDocument, StandardFonts, rgb } from "npm:pdf-lib";
 import { createServiceClient, requireActor } from "../_shared/auth.ts";
 import { corsHeaders, withCorsHeaders } from "../_shared/cors.ts";
@@ -13,11 +18,25 @@ type Payload = {
   review_id?: string;
 };
 
+type EmployeeRow = {
+  employee_id: string;
+  name?: string | null;
+  position?: string | null;
+  department?: string | null;
+  manager_id?: string | null;
+  role?: string | null;
+};
+
+type KpiRecordRow = Record<string, unknown>;
+type ProbationReviewRow = Record<string, unknown>;
+type ProbationMonthlyScoreRow = Record<string, unknown>;
+type ProbationAttendanceRow = Record<string, unknown>;
+
 type ExportContext = {
   mode: string;
   admin: ReturnType<typeof createServiceClient>;
   dataClient: ReturnType<typeof createServiceClient>;
-  actor: { employee_id: string; role: string; name?: string };
+  actor: { employee_id: string; role: string; name?: string | null };
 };
 
 function jsonResponse(status: number, body: Record<string, unknown>) {
@@ -73,7 +92,7 @@ async function authorizeExport(req: Request): Promise<ExportContext> {
   return { mode: "authenticated", admin, dataClient: actorClient, actor };
 }
 
-async function fetchEmployees(admin: ReturnType<typeof createServiceClient>) {
+async function fetchEmployees(admin: ReturnType<typeof createServiceClient>): Promise<EmployeeRow[]> {
   const { data, error } = await admin
     .from("employees")
     .select("employee_id, name, position, department, manager_id, role");
@@ -82,7 +101,7 @@ async function fetchEmployees(admin: ReturnType<typeof createServiceClient>) {
   return data || [];
 }
 
-async function fetchKpiRecords(admin: ReturnType<typeof createServiceClient>, period: string) {
+async function fetchKpiRecords(admin: ReturnType<typeof createServiceClient>, period: string): Promise<KpiRecordRow[]> {
   const { data, error } = await admin
     .from("kpi_records")
     .select("id, employee_id, kpi_id, period, value, notes, target_snapshot, kpi_name_snapshot, kpi_unit_snapshot, kpi_category_snapshot")
@@ -92,7 +111,7 @@ async function fetchKpiRecords(admin: ReturnType<typeof createServiceClient>, pe
   return data || [];
 }
 
-async function fetchProbationReview(admin: ReturnType<typeof createServiceClient>, reviewId: string) {
+async function fetchProbationReview(admin: ReturnType<typeof createServiceClient>, reviewId: string): Promise<ProbationReviewRow> {
   const { data, error } = await admin
     .from("probation_reviews")
     .select("id, employee_id, review_period_start, review_period_end, quantitative_score, qualitative_score, final_score, decision, manager_notes, reviewed_by, reviewed_at")
@@ -104,7 +123,7 @@ async function fetchProbationReview(admin: ReturnType<typeof createServiceClient
   return data;
 }
 
-async function fetchProbationMonthlyScores(admin: ReturnType<typeof createServiceClient>, reviewId: string) {
+async function fetchProbationMonthlyScores(admin: ReturnType<typeof createServiceClient>, reviewId: string): Promise<ProbationMonthlyScoreRow[]> {
   const { data, error } = await admin
     .from("probation_monthly_scores")
     .select("month_no, period_start, period_end, work_performance_score, managing_task_score, manager_qualitative_text, manager_note, attendance_deduction, attitude_score, monthly_total")
@@ -115,7 +134,7 @@ async function fetchProbationMonthlyScores(admin: ReturnType<typeof createServic
   return data || [];
 }
 
-async function fetchProbationAttendance(admin: ReturnType<typeof createServiceClient>, reviewId: string) {
+async function fetchProbationAttendance(admin: ReturnType<typeof createServiceClient>, reviewId: string): Promise<ProbationAttendanceRow[]> {
   const { data, error } = await admin
     .from("probation_attendance_records")
     .select("month_no, event_date, event_type, qty, deduction_points, note")
@@ -454,7 +473,7 @@ async function buildEmployeeExport(admin: ReturnType<typeof createServiceClient>
     rows: buildDepartmentRows({
       employees,
       records,
-      department: String(employees.find((row) => String(row.employee_id) === employeeId)?.department || ""),
+      department: String(employees.find((row: EmployeeRow) => String(row.employee_id) === employeeId)?.department || ""),
     }),
     employeeId,
   });
@@ -471,11 +490,11 @@ async function buildProbationExport(admin: ReturnType<typeof createServiceClient
     fetchProbationMonthlyScores(admin, reviewId),
     fetchProbationAttendance(admin, reviewId),
   ]);
-  const employee = employees.find((row) => String(row.employee_id) === String(review.employee_id)) || { employee_id: review.employee_id, name: review.employee_id, position: "-", department: "-" };
+  const employee = employees.find((row: EmployeeRow) => String(row.employee_id) === String(review.employee_id)) || { employee_id: review.employee_id, name: review.employee_id, position: "-", department: "-" };
   return { employee, review, monthlyScores, attendance };
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

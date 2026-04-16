@@ -10,6 +10,7 @@ import { escapeHTML, escapeInlineArg, formatDateTime } from '../lib/utils.js';
 import { saveSetting } from './data/settings.js';
 import { fetchActivityLogs, logActivity } from './data/activity.js';
 import { getDefaultProbationAttendanceRulesJson } from './data/probation.js';
+import { isAnyModuleEnabled, isModuleEnabled } from '../config/app-modules.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 
@@ -27,7 +28,8 @@ function applySettingsRoleVisibility() {
         return;
     }
 
-    const managerAllowed = new Set(['set-competencies', 'set-kpi']);
+    const managerAllowed = new Set(['set-kpi']);
+    if (isAnyModuleEnabled(['assessment', 'tna'])) managerAllowed.add('set-competencies');
 
     allPanels.forEach(id => {
         const panel = document.getElementById(id);
@@ -272,13 +274,25 @@ function renderAppSettings() {
         { key: 'company_name', label: 'Company Name', placeholder: 'e.g. Your Company' },
         { key: 'company_short', label: 'Company Short Name', placeholder: 'e.g. YC' },
         { key: 'department_label', label: 'Department Label', placeholder: 'e.g. Human Resources Department' },
-        { key: 'assessment_scale_max', label: 'Assessment Scale Max', placeholder: '10' },
-        { key: 'assessment_threshold', label: 'Training Threshold (score below this triggers recommendation)', placeholder: '7' },
-        { key: 'probation_pass_threshold', label: 'Probation Pass Threshold (minimum final score)', placeholder: '75' },
-        { key: 'probation_weight_work', label: 'Probation Work Weight', placeholder: '50' },
-        { key: 'probation_weight_managing', label: 'Probation Managing Weight', placeholder: '30' },
-        { key: 'probation_weight_attitude', label: 'Probation Attitude Weight', placeholder: '20' },
-    ];
+        isAnyModuleEnabled(['assessment', 'tna'])
+            ? { key: 'assessment_scale_max', label: 'Assessment Scale Max', placeholder: '10' }
+            : null,
+        isAnyModuleEnabled(['assessment', 'tna'])
+            ? { key: 'assessment_threshold', label: 'Training Threshold (score below this triggers recommendation)', placeholder: '7' }
+            : null,
+        isModuleEnabled('probation')
+            ? { key: 'probation_pass_threshold', label: 'Probation Pass Threshold (minimum final score)', placeholder: '75' }
+            : null,
+        isModuleEnabled('probation')
+            ? { key: 'probation_weight_work', label: 'Probation Work Weight', placeholder: '50' }
+            : null,
+        isModuleEnabled('probation')
+            ? { key: 'probation_weight_managing', label: 'Probation Managing Weight', placeholder: '30' }
+            : null,
+        isModuleEnabled('probation')
+            ? { key: 'probation_weight_attitude', label: 'Probation Attitude Weight', placeholder: '20' }
+            : null,
+    ].filter(Boolean);
 
     const container = document.getElementById('settings-app-fields');
     if (!container) return;
@@ -295,7 +309,8 @@ function renderAppSettings() {
       </div>`;
     });
 
-    container.innerHTML += `
+    if (isModuleEnabled('probation')) {
+        container.innerHTML += `
       <div class="col-12 mb-3">
         <div class="card border">
             <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -325,6 +340,7 @@ function renderAppSettings() {
             </div>
         </div>
       </div>`;
+    }
 
     renderProbationAttendanceRulesEditor();
 }
@@ -395,7 +411,24 @@ export function removeProbationAttendanceRuleTier(index, tierIndex) {
 
 export async function saveAppSettings() {
     if (!(await requireRecentAuth('saving application settings'))) return;
-    const fields = ['app_name', 'company_name', 'company_short', 'department_label', 'assessment_scale_max', 'assessment_threshold', 'probation_pass_threshold', 'probation_weight_work', 'probation_weight_managing', 'probation_weight_attitude', 'probation_attendance_rules_json'];
+    const fields = [
+        'app_name',
+        'company_name',
+        'company_short',
+        'department_label',
+        ...(isAnyModuleEnabled(['assessment', 'tna'])
+            ? ['assessment_scale_max', 'assessment_threshold']
+            : []),
+        ...(isModuleEnabled('probation')
+            ? [
+                'probation_pass_threshold',
+                'probation_weight_work',
+                'probation_weight_managing',
+                'probation_weight_attitude',
+                'probation_attendance_rules_json',
+            ]
+            : []),
+    ];
     const changed = {};
 
     try {

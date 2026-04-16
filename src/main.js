@@ -50,6 +50,16 @@ import { debugError, escapeHTML } from "./lib/utils.js";
 import { getSupabaseEnvValidation } from "./lib/supabase.js";
 import { renderBootErrorScreen } from "./lib/env.js";
 import { getRoleScopedEmployeeIds } from "./lib/reportFilters.js";
+import {
+	ACTIVE_MODULE_CONFIG,
+	areAllModulesEnabled,
+	isAnyModuleEnabled,
+	isModuleEnabled,
+} from "./config/app-modules.js";
+import {
+	getAllowedNavigationGroups,
+	getNavigationItem,
+} from "./config/module-navigation.js";
 import * as notify from "./lib/notify.js";
 import { initMonitoring } from "./lib/monitoring.js";
 
@@ -372,286 +382,56 @@ const { renderDocumentsWorkspace, resetDocumentsWorkspace } =
 		"renderDocumentsWorkspace",
 		"resetDocumentsWorkspace",
 	]);
+function parseModuleListAttr(value = "") {
+	return String(value || "")
+		.split(",")
+		.map((item) => item.trim())
+		.filter(Boolean);
+}
 
-const NAVIGATION_GROUPS = [
-	{
-		id: "nav-group-dashboard",
-		label: "Dashboard",
-		icon: "bi-speedometer2",
-		roles: ["superadmin", "manager", "hr", "director"],
-		endpoints: [],
-		children: [
-			{
-				id: "nav-dashboard-overview",
-				label: "KPI Dashboard",
-				description: "KPI overview and performance analytics",
-				badge: "Live",
-				endpoints: [
-					"kpi_records",
-					"employee_performance_scores",
-					"employee_kpi_target_versions",
-				],
-				tabId: "tab-dashboard",
-				navId: "nav-dashboard",
-				contentTitle: "Dashboard",
-				contentDescription:
-					"Track company performance, workforce activity, and HR operations in one place.",
-				activate: () => switchTab("tab-dashboard", { dashboardView: "dashboard-kpi" }),
-			},
-			{
-				id: "nav-dashboard-assessment",
-				label: "Assessment Summary",
-				description: "Assessment and TNA summary only",
-				endpoints: [
-					"employee_assessments",
-					"employee_assessment_scores",
-					"employee_assessment_history",
-					"employee_training_records",
-					"competency_config",
-				],
-				tabId: "tab-dashboard",
-				navId: "nav-dashboard",
-				contentTitle: "Assessment & TNA Summary",
-				contentDescription:
-					"Review competency coverage, training needs, score distribution, and assessment performance by department.",
-				activate: () => switchTab("tab-dashboard", { dashboardView: "dashboard-assessment" }),
-			},
-		],
-	},
-	{
-		id: "nav-group-employees",
-		label: "Employees",
-		icon: "bi-people-fill",
-		roles: ["superadmin", "hr", "manager"],
-		endpoints: ["employees", "employee_training_records"],
-		children: [
-			{
-				id: "nav-employees",
-				label: "Manpower Planning",
-				description: "Headcount planning and approval workflow",
-				badge: "HR",
-				roles: ["superadmin", "hr", "manager"],
-				tabId: "tab-employees",
-				navId: "nav-employees",
-				contentTitle: "Manpower Planning",
-				contentDescription:
-					"Plan staffing needs, submit headcount requests, and review workforce gaps by department.",
-				activate: () => switchTab("tab-employees", { employeesView: "employees-planning" }),
-			},
-			{
-				id: "nav-employees-recruitment",
-				label: "Recruitment Board",
-				description: "Candidate pipeline and hiring execution",
-				badge: "Phase 3",
-				roles: ["superadmin", "hr", "manager"],
-				tabId: "tab-employees",
-				navId: "nav-employees",
-				contentTitle: "Recruitment Board",
-				contentDescription:
-					"Manage approved demand as active recruitment cards and track candidate progress by hiring stage.",
-				activate: () => switchTab("tab-employees", { employeesView: "employees-recruitment" }),
-			},
-			{
-				id: "nav-employees-directory",
-				label: "Staff Directory",
-				description: "Browse and export employee records",
-				roles: ["superadmin"],
-				tabId: "tab-employees",
-				navId: "nav-employees",
-				contentTitle: "Staff Directory",
-				contentDescription:
-					"Review the active employee roster, export lists, and manage imported records.",
-				activate: () => switchTab("tab-employees", { employeesView: "employees-directory" }),
-			},
-			{
-				id: "nav-employees-add",
-				label: "Add New Employee",
-				description: "New employee insertion form",
-				roles: ["superadmin"],
-				tabId: "tab-employees",
-				navId: "nav-employees",
-				contentTitle: "Add New Employee",
-				contentDescription:
-					"Create or update employee records with role, department, manager, and access data.",
-				activate: () => switchTab("tab-employees", { employeesView: "employees-add" }),
-			},
-		],
-	},
-	{
-		id: "nav-group-documents",
-		label: "HR Tools",
-		icon: "bi-file-earmark-text",
-		roles: ["superadmin", "hr"],
-		endpoints: ["employees", "app_settings"],
-		children: [
-			{
-				id: "nav-documents-workspace",
-				label: "HR Documents",
-				description: "Generate letters, contracts, and payslips",
-				badge: "Phase 3",
-				roles: ["superadmin", "hr"],
-				tabId: "tab-documents",
-				navId: "nav-documents",
-				contentTitle: "HR Documents",
-				contentDescription:
-					"Generate standardized HR documents from employee data with live preview.",
-				activate: () => switchTab("tab-documents"),
-			},
-		],
-	},
-	{
-		id: "nav-group-assessment",
-		label: "Assessment & KPI",
-		icon: "bi-clipboard-check",
-		roles: ["superadmin", "manager", "director"],
-		endpoints: [
-			"employee_assessments",
-			"employee_assessment_scores",
-			"employee_assessment_history",
-			"competency_config",
-			"kpi_definitions",
-			"kpi_definition_versions",
-			"employee_kpi_target_versions",
-			"kpi_weight_profiles",
-			"kpi_weight_items",
-			"kpi_records",
-			"employee_performance_scores",
-		],
-		children: [
-			{
-				id: "nav-assessment-pending",
-				label: "Assessment Queue",
-				description: "Pending reviews and submissions",
-				badge: "Core",
-				tabId: "tab-assessment",
-				navId: "nav-assessment",
-				contentTitle: "Assessment Workflow",
-				contentDescription:
-					"Run employee assessments, review submissions, and capture KPI updates from one workspace.",
-				activate: () => switchTab("tab-assessment"),
-			},
-			{
-				id: "nav-assessment-kpi",
-				label: "KPI Input",
-				description: "Targets, definitions, and governance",
-				tabId: "tab-settings",
-				navId: "nav-settings",
-				contentTitle: "KPI Management",
-				contentDescription:
-					"Maintain KPI definitions, employee targets, weighting, and approval workflows.",
-				activate: () => switchTab("tab-settings", { settingsView: "set-kpi" }),
-			},
-		],
-	},
-	{
-		id: "nav-group-records",
-		label: "Records",
-		icon: "bi-journal-richtext",
-		roles: ["superadmin", "manager", "hr", "director", "employee"],
-		endpoints: [
-			"probation_reviews",
-			"probation_qualitative_items",
-			"probation_monthly_scores",
-			"probation_attendance_records",
-			"pip_plans",
-			"pip_actions",
-		],
-		children: [
-			{
-				id: "nav-records-assessment",
-				label: "Assessment Records",
-				description: "Historical performance snapshots",
-				badge: "View",
-				tabId: "tab-records",
-				navId: "nav-records",
-				contentTitle: "Assessment Records",
-				contentDescription:
-					"Search employee assessment outcomes, reports, training notes, and review history.",
-				activate: () => switchTab("tab-records", { recordsView: "records-assessment" }),
-			},
-			{
-				id: "nav-records-kpi",
-				label: "KPI Records",
-				description: "Monthly progress and achievement",
-				tabId: "tab-records",
-				navId: "nav-records",
-				contentTitle: "KPI Records",
-				contentDescription:
-					"Inspect KPI history, target attainment, and employee performance trends over time.",
-				activate: () => switchTab("tab-records", { recordsView: "records-kpi" }),
-			},
-			{
-				id: "nav-records-probation",
-				label: "Probation & PIP",
-				description: "Reviews, attendance, and plans",
-				tabId: "tab-records",
-				navId: "nav-records",
-				contentTitle: "Probation & PIP",
-				contentDescription:
-					"Manage probation reviews, attendance entries, and performance improvement plans.",
-				activate: () => switchTab("tab-records", { recordsView: "records-probation" }),
-			},
-		],
-	},
-	{
-		id: "nav-group-settings",
-		label: "Settings",
-		icon: "bi-sliders",
-		roles: ["superadmin", "manager", "hr"],
-		endpoints: ["app_settings", "admin_activity_log"],
-		children: [
-			{
-				id: "nav-settings-branding",
-				label: "Branding & Layout",
-				description: "App text, theme, and appearance",
-				badge: "Admin",
-				roles: ["superadmin", "hr"],
-				tabId: "tab-settings",
-				navId: "nav-settings",
-				contentTitle: "Application Settings",
-				contentDescription:
-					"Configure branding, organization structure, user permissions, and system setup.",
-				activate: () => switchTab("tab-settings", { settingsView: "set-general" }),
-			},
-			{
-				id: "nav-settings-users",
-				label: "Users & Roles",
-				description: "Access control and activity logs",
-				roles: ["superadmin", "hr"],
-				tabId: "tab-settings",
-				navId: "nav-settings",
-				contentTitle: "Users & Roles",
-				contentDescription:
-					"Manage login access, role assignments, and recent admin activity.",
-				activate: () => switchTab("tab-settings", { settingsView: "set-users" }),
-			},
-			{
-				id: "nav-settings-competencies",
-				label: "Competencies",
-				description: "Position skill matrices",
-				roles: ["superadmin", "manager", "hr"],
-				tabId: "tab-settings",
-				navId: "nav-settings",
-				contentTitle: "Competency Setup",
-				contentDescription:
-					"Maintain competencies, organizational role maps, and benchmark requirements.",
-				activate: () => switchTab("tab-settings", { settingsView: "set-competencies" }),
-			},
-			{
-				id: "nav-settings-org",
-				label: "Organization Map",
-				description: "Departments and positions",
-				roles: ["superadmin", "hr"],
-				tabId: "tab-settings",
-				navId: "nav-settings",
-				contentTitle: "Organization Map",
-				contentDescription:
-					"Organize departments, positions, and reporting relationships across the company.",
-				activate: () => switchTab("tab-settings", { settingsView: "set-org" }),
-			},
-		],
-	},
-];
+function isModuleSurfaceEnabled(element) {
+	if (!element) return false;
+	const requiredModules = parseModuleListAttr(element.dataset.moduleAll);
+	const anyModules = parseModuleListAttr(element.dataset.moduleAnyof);
+	const requiredOk =
+		requiredModules.length === 0 || areAllModulesEnabled(requiredModules);
+	const anyOk = anyModules.length === 0 || isAnyModuleEnabled(anyModules);
+	return requiredOk && anyOk;
+}
+
+function applyModuleSurfaceVisibility() {
+	document
+		.querySelectorAll("[data-module-all], [data-module-anyof]")
+		.forEach((element) => {
+			element.classList.toggle("d-none", !isModuleSurfaceEnabled(element));
+		});
+
+	const recordsPills = document.getElementById("recordsPills");
+	if (recordsPills) {
+		const visibleButtons = Array.from(
+			recordsPills.querySelectorAll("[data-target]"),
+		).filter((button) => !button.classList.contains("d-none"));
+		recordsPills.classList.toggle("d-none", visibleButtons.length <= 1);
+	}
+}
+
+function isViewAvailable(viewId) {
+	const el = document.getElementById(viewId);
+	return Boolean(el) && !el.classList.contains("d-none");
+}
+
+function resolveAccessibleView(viewIds, preferredViewId, fallbackViewId = "") {
+	const candidates = [
+		preferredViewId,
+		fallbackViewId,
+		...viewIds,
+	].filter(Boolean);
+	return (
+		candidates.find((viewId) => isViewAvailable(viewId)) ||
+		viewIds.find((viewId) => isViewAvailable(viewId)) ||
+		""
+	);
+}
 
 // ---- Expose functions to onclick handlers ----
 window.__app = {
@@ -812,20 +592,44 @@ function doLogout() {
 	signOut();
 }
 
+function getActiveDashboardViewId() {
+	const viewIds = ["dashboard-assessment", "dashboard-kpi"];
+	const currentView = viewIds.find((id) => {
+		const el = document.getElementById(id);
+		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
+	});
+	return resolveAccessibleView(viewIds, currentView, "dashboard-kpi");
+}
+
 function getActiveRecordsViewId() {
-	return (
-		["records-assessment", "records-kpi", "records-probation"].find((id) => {
-			const el = document.getElementById(id);
-			return el && !el.classList.contains("hidden");
-		}) || "records-assessment"
-	);
+	const viewIds = ["records-assessment", "records-kpi", "records-probation"];
+	const currentView = viewIds.find((id) => {
+		const el = document.getElementById(id);
+		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
+	});
+	const fallbackView = isAnyModuleEnabled(["assessment", "tna"])
+		? "records-assessment"
+		: "records-kpi";
+	return resolveAccessibleView(viewIds, currentView, fallbackView);
 }
 
 function getActiveEmployeesViewId() {
-	return (
-		document.querySelector(".employee-subview:not(.hidden)")?.id ||
-		"employees-planning"
-	);
+	const viewIds = [
+		"employees-planning",
+		"employees-recruitment",
+		"employees-directory",
+		"employees-add",
+	];
+	const fallbackView = areAllModulesEnabled(["manpower"])
+		? "employees-planning"
+		: areAllModulesEnabled(["recruitment"])
+			? "employees-recruitment"
+			: "employees-directory";
+	const currentView = viewIds.find((id) => {
+		const el = document.getElementById(id);
+		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
+	});
+	return resolveAccessibleView(viewIds, currentView, fallbackView);
 }
 
 function getActiveSettingsViewId() {
@@ -836,12 +640,15 @@ function getActiveSettingsViewId() {
 		"set-kpi",
 		"set-org",
 	];
-	return (
-		panels.find((id) => {
-			const el = document.getElementById(id);
-			return el && !el.classList.contains("hidden");
-		}) || (state.currentUser?.role === "manager" ? "set-kpi" : "set-general")
-	);
+	const currentView = panels.find((id) => {
+		const el = document.getElementById(id);
+		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
+	});
+	const fallbackView =
+		state.currentUser?.role === "manager" && areAllModulesEnabled(["kpi"])
+			? "set-kpi"
+			: "set-general";
+	return resolveAccessibleView(panels, currentView, fallbackView);
 }
 
 // ---- Tab Navigation ----
@@ -855,6 +662,7 @@ async function switchTab(tabId, options = {}) {
 
 	const target = document.getElementById(tabId);
 	if (target) target.classList.add("active");
+	applyModuleSurfaceVisibility();
 	renderReportFilterOptions();
 
 	const tabMapping = {
@@ -877,7 +685,7 @@ async function switchTab(tabId, options = {}) {
 	// Trigger renders
 	if (tabId === "tab-dashboard") {
 		await renderDashboard();
-		toggleDashboardView(options.dashboardView || "dashboard-kpi");
+		toggleDashboardView(options.dashboardView || getActiveDashboardViewId());
 	}
 	if (tabId === "tab-records") {
 		const recordsView = options.recordsView || getActiveRecordsViewId();
@@ -889,7 +697,7 @@ async function switchTab(tabId, options = {}) {
 	if (tabId === "tab-assessment") await renderPendingList();
 	if (tabId === "tab-employees") {
 		await renderEmployeeManager();
-		await renderManpowerPlanning();
+		if (isModuleEnabled("manpower")) await renderManpowerPlanning();
 		toggleEmployeesView(options.employeesView || getActiveEmployeesViewId());
 	}
 	if (tabId === "tab-settings") {
@@ -900,19 +708,6 @@ async function switchTab(tabId, options = {}) {
 	if (tabId === "tab-documents") {
 		await renderDocumentsWorkspace();
 	}
-}
-
-function getAllowedNavigationGroups(role = state.currentUser?.role) {
-	return NAVIGATION_GROUPS.filter((group) =>
-		(group.roles || []).includes(role),
-	)
-		.map((group) => ({
-			...group,
-			children: (group.children || []).filter(
-				(child) => !child.roles || child.roles.includes(role),
-			),
-		}))
-		.filter((group) => group.children.length > 0);
 }
 
 function renderSidebarNavigation() {
@@ -966,11 +761,9 @@ function renderSidebarNavigation() {
 }
 
 async function handleSidebarItemClick(itemId) {
-	const target = NAVIGATION_GROUPS.flatMap((group) => group.children).find(
-		(child) => child.id === itemId,
-	);
+	const target = getNavigationItem(itemId);
 	if (!target) return;
-	await Promise.resolve(target.activate?.());
+	await switchTab(target.tabId, { ...(target.tabOptions || {}) });
 	setContentHeader(target);
 	syncSidebarActiveState(target.tabId, itemId);
 	closeSidebarMobile();
@@ -1200,64 +993,89 @@ async function toggleSettingsView(viewId, btn) {
 		!["set-competencies", "set-kpi"].includes(viewId)
 	)
 		return;
-	[
+	const viewIds = [
 		"set-general",
 		"set-users",
 		"set-competencies",
 		"set-kpi",
 		"set-org",
-	].forEach((id) => {
+	];
+	const nextViewId = resolveAccessibleView(
+		viewIds,
+		viewId,
+		getActiveSettingsViewId(),
+	);
+	viewIds.forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.classList.add("hidden");
 	});
-	const target = document.getElementById(viewId);
+	const target = document.getElementById(nextViewId);
 	if (target) target.classList.remove("hidden");
 	if (btn) btn.classList.add("active");
 	// Trigger KPI render when switching to KPI panel
-	if (viewId === "set-kpi") await renderKpiManager();
-	if (viewId === "set-competencies") await renderAdminList();
+	if (nextViewId === "set-kpi") await renderKpiManager();
+	if (nextViewId === "set-competencies") await renderAdminList();
 }
 
 // ---- Sub-View Toggle (Dashboard) ----
 function toggleDashboardView(viewId, btn) {
-	["dashboard-assessment", "dashboard-kpi"].forEach((id) => {
+	const viewIds = ["dashboard-assessment", "dashboard-kpi"];
+	const nextViewId = resolveAccessibleView(viewIds, viewId, "dashboard-kpi");
+	viewIds.forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.classList.add("hidden");
 	});
 	document
 		.querySelectorAll("#dashboardPills .nav-link")
 		.forEach((el) => el.classList.remove("active"));
-	const target = document.getElementById(viewId);
+	const target = document.getElementById(nextViewId);
 	if (target) target.classList.remove("hidden");
-	if (btn) btn.classList.add("active");
+	if (btn && btn.dataset.target === nextViewId) btn.classList.add("active");
 }
 
 function toggleEmployeesView(viewId) {
-	["employees-planning", "employees-recruitment", "employees-directory", "employees-add"].forEach(
+	const viewIds = [
+		"employees-planning",
+		"employees-recruitment",
+		"employees-directory",
+		"employees-add",
+	];
+	const nextViewId = resolveAccessibleView(
+		viewIds,
+		viewId,
+		getActiveEmployeesViewId(),
+	);
+	viewIds.forEach(
 		(id) => {
 			const el = document.getElementById(id);
 			if (el) el.classList.add("hidden");
 		},
 	);
-	const target = document.getElementById(viewId);
+	const target = document.getElementById(nextViewId);
 	if (target) target.classList.remove("hidden");
 }
 
 // ---- Sub-View Toggle (Records) ----
 async function toggleRecordsView(viewId, btn) {
-	["records-assessment", "records-kpi", "records-probation"].forEach((id) => {
+	const viewIds = ["records-assessment", "records-kpi", "records-probation"];
+	const nextViewId = resolveAccessibleView(
+		viewIds,
+		viewId,
+		getActiveRecordsViewId(),
+	);
+	viewIds.forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.classList.add("hidden");
 	});
 	document
 		.querySelectorAll("#recordsPills .nav-link")
 		.forEach((el) => el.classList.remove("active"));
-	const target = document.getElementById(viewId);
+	const target = document.getElementById(nextViewId);
 	if (target) target.classList.remove("hidden");
-	if (btn) btn.classList.add("active");
-	if (viewId === "records-assessment") await renderRecordsTable();
-	if (viewId === "records-kpi") await renderKpiHistory();
-	if (viewId === "records-probation") await renderProbationPipView();
+	if (btn && btn.dataset.target === nextViewId) btn.classList.add("active");
+	if (nextViewId === "records-assessment") await renderRecordsTable();
+	if (nextViewId === "records-kpi") await renderKpiHistory();
+	if (nextViewId === "records-probation") await renderProbationPipView();
 }
 
 // ---- Theme Toggle ----
@@ -1295,7 +1113,7 @@ async function attemptLogin() {
 
 	try {
 		await signIn(email, pass);
-		await syncAll();
+		await syncAll({ enabledModules: new Set(ACTIVE_MODULE_CONFIG.modules) });
 		await showApp();
 	} catch (err) {
 		if (errorEl) {
@@ -1352,6 +1170,8 @@ async function changeMyPassword() {
 async function showApp() {
 	document.getElementById("login-view").classList.add("hidden");
 	document.getElementById("main-app").classList.remove("hidden");
+	document.body.dataset.appModules = ACTIVE_MODULE_CONFIG.modules.join(",");
+	document.body.dataset.appModuleSource = ACTIVE_MODULE_CONFIG.source || "env";
 
 	const { currentUser } = state;
 	if (!currentUser) {
@@ -1364,6 +1184,7 @@ async function showApp() {
 	const role = currentUser.role;
 
 	renderSidebarNavigation();
+	applyModuleSurfaceVisibility();
 
 	// Hide all nav items first
 	document
@@ -1493,7 +1314,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 	try {
 		const user = await restoreSession();
 		if (user) {
-			await syncAll();
+			await syncAll({ enabledModules: new Set(ACTIVE_MODULE_CONFIG.modules) });
 			await showApp();
 		}
 	} catch (err) {

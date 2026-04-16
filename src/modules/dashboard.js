@@ -1,11 +1,13 @@
 import { renderAssessmentSummary } from './dashboard/assessmentSummary.js';
 import { renderKpiSummary } from './dashboard/kpiSummary.js';
+import { isAnyModuleEnabled } from '../config/app-modules.js';
 
 async function renderDashboard() {
-    await Promise.all([
-        renderAssessmentSummary(),
-        renderKpiSummary(),
-    ]);
+    const tasks = [renderKpiSummary()];
+    if (isAnyModuleEnabled(['assessment', 'tna'])) {
+        tasks.unshift(renderAssessmentSummary());
+    }
+    await Promise.all(tasks);
 }
 
 export { renderDashboard };
