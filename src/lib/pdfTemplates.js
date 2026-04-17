@@ -87,14 +87,149 @@ function documentTitle(type) {
 	return titleMap[type] || "HR Document";
 }
 
+function numberToBahasaWords(value) {
+	const units = [
+		"",
+		"satu",
+		"dua",
+		"tiga",
+		"empat",
+		"lima",
+		"enam",
+		"tujuh",
+		"delapan",
+		"sembilan",
+		"sepuluh",
+		"sebelas",
+	];
+	const n = Math.floor(Math.abs(Number(value) || 0));
+	if (n < 12) return units[n];
+	if (n < 20) return `${numberToBahasaWords(n - 10)} belas`;
+	if (n < 100) {
+		const tens = Math.floor(n / 10);
+		const rest = n % 10;
+		return `${numberToBahasaWords(tens)} puluh ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 200) return `seratus ${numberToBahasaWords(n - 100)}`.trim();
+	if (n < 1000) {
+		const hundreds = Math.floor(n / 100);
+		const rest = n % 100;
+		return `${numberToBahasaWords(hundreds)} ratus ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 2000) return `seribu ${numberToBahasaWords(n - 1000)}`.trim();
+	if (n < 1000000) {
+		const thousands = Math.floor(n / 1000);
+		const rest = n % 1000;
+		return `${numberToBahasaWords(thousands)} ribu ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 1000000000) {
+		const millions = Math.floor(n / 1000000);
+		const rest = n % 1000000;
+		return `${numberToBahasaWords(millions)} juta ${numberToBahasaWords(rest)}`.trim();
+	}
+	return String(n);
+}
+
+function buildTemplateVariables({ employee = {}, values = {}, branding = {}, signer = {} }) {
+	return {
+		company_name: asText(branding.companyName || branding.company_name, "Company"),
+		app_name: asText(branding.appName || branding.app_name, "HR Performance Suite"),
+		employee_name: asText(employee.name),
+		legal_name: asText(employee.legal_name || employee.name),
+		place_of_birth: asText(employee.place_of_birth),
+		date_of_birth: toDateLabel(employee.date_of_birth),
+		address: asText(employee.address),
+		nik_number: asText(employee.nik_number),
+		employee_id: asText(employee.id),
+		employee_position: asText(employee.position),
+		job_title: asText(employee.position),
+		job_level: asText(employee.job_level),
+		department: asText(employee.department),
+		signer_name: asText(signer.name, "HR Representative"),
+		signer_title: formatSignerRole(signer.role),
+		contract_type: asText(values.contract_type),
+		contract_duration: asText(values.contract_duration),
+		probation_duration: asText(values.probation_duration || values.probation_period),
+		nomor_surat: asText(values.nomor_surat),
+		letter_date: toDateLabel(values.letter_date),
+		start_date: toDateLabel(values.start_date),
+		contract_start_date: toDateLabel(values.contract_start_date),
+		work_location: asText(values.work_location),
+		basic_salary: toCurrency(values.basic_salary),
+		salary_in_words: `${numberToBahasaWords(values.basic_salary).replace(/\s+/g, " ").trim()} rupiah`,
+		warning_level: asText(values.warning_level),
+		last_working_day: toDateLabel(values.last_working_day),
+		termination_reason: asText(values.termination_reason, ""),
+	};
+}
+
+function interpolateTemplateText(text, variables) {
+	return String(text || "").replace(/\{\{\s*([\w_]+)\s*\}\}/g, (_, key) => {
+		return asText(variables[key], "-");
+	});
+}
+
+async function loadImageAsDataUrl(url) {
+	const src = String(url || "").trim();
+	if (!src) return null;
+	if (src.startsWith("data:image/")) return src;
+
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.crossOrigin = "anonymous";
+		img.onload = () => {
+			try {
+				const canvas = document.createElement("canvas");
+				canvas.width = img.naturalWidth || img.width;
+				canvas.height = img.naturalHeight || img.height;
+				const ctx = canvas.getContext("2d");
+				ctx.drawImage(img, 0, 0);
+				resolve(canvas.toDataURL("image/png"));
+			} catch {
+				resolve(null);
+			}
+		};
+		img.onerror = () => resolve(null);
+		img.src = src;
+	});
+}
+
+export function drawWatermark(doc, text = "", options = {}) {
+	const watermark = String(text || "").trim();
+	if (!watermark) return;
+	const pages = doc.getNumberOfPages();
+	const fontSize = Number(options.fontSize || 34);
+	for (let i = 1; i <= pages; i += 1) {
+		doc.setPage(i);
+		doc.saveGraphicsState?.();
+		doc.setTextColor(210, 214, 220);
+		doc.setFont("helvetica", "bold");
+		doc.setFontSize(fontSize);
+		doc.text(watermark, PAGE.width / 2, PAGE.height / 2, {
+			align: "center",
+			angle: 330,
+		});
+		doc.restoreGraphicsState?.();
+	}
+}
+
 export function drawLetterhead(doc, branding = {}, options = {}) {
 	const companyName = asText(branding.companyName || branding.company_name, "Company");
 	const appName = asText(branding.appName || branding.app_name, "HR Performance Suite");
 	const title = asText(options.title, "HR Document");
 	const subtitle = asText(options.subtitle, "");
 	const dateLabel = asText(options.dateLabel, "");
+	const logoDataUrl = asText(options.logoDataUrl, "");
 
 	let y = PAGE.marginTop;
+	if (logoDataUrl && logoDataUrl !== "-") {
+		try {
+			doc.addImage(logoDataUrl, "PNG", PAGE.width - PAGE.marginX - 24, y - 4, 24, 12);
+		} catch {
+			// Ignore unsupported or blocked images and continue with text letterhead.
+		}
+	}
+
 	doc.setFont("helvetica", "bold");
 	doc.setFontSize(15);
 	doc.text(companyName, PAGE.marginX, y);
@@ -180,159 +315,195 @@ export function drawPayslipTable(doc, rows = [], options = {}) {
 export function drawSignatureBlock(doc, signer = {}, options = {}) {
 	let y = options.startY ?? PAGE.marginTop;
 	y = ensureSpace(doc, y, 34);
+	const includeRecipient = Boolean(options.includeRecipient);
+	const recipient = options.recipient || {};
+	const leftX = PAGE.marginX;
+	const rightX = PAGE.marginX + 95;
 
 	doc.setFont("helvetica", "normal");
 	doc.setFontSize(11);
-	doc.text("Approved by,", PAGE.marginX, y);
+	doc.text("Approved by,", leftX, y);
+	if (includeRecipient) {
+		doc.text(options.recipientLabel || "Employee acknowledgment,", rightX, y);
+	}
 
 	y += 18;
 	doc.setFont("helvetica", "bold");
-	doc.text(asText(signer.name, "HR Representative"), PAGE.marginX, y);
+	doc.text(asText(signer.name, "HR Representative"), leftX, y);
+	if (includeRecipient) {
+		doc.text(asText(recipient.name, "Employee"), rightX, y);
+	}
 
 	y += 5;
 	doc.setFont("helvetica", "normal");
 	doc.setFontSize(10);
-	doc.text(formatSignerRole(signer.role), PAGE.marginX, y);
+	doc.text(formatSignerRole(signer.role), leftX, y);
+	if (includeRecipient) {
+		doc.text(asText(recipient.role, "-"), rightX, y);
+	}
 	return y + 4;
 }
 
-function addPageFooter(doc) {
+function addPageFooter(doc, footerText = "") {
 	const pages = doc.getNumberOfPages();
 	for (let i = 1; i <= pages; i += 1) {
 		doc.setPage(i);
 		doc.setFont("helvetica", "normal");
 		doc.setFontSize(9);
+		if (footerText) {
+			doc.text(footerText, PAGE.marginX, PAGE.height - 7);
+		}
 		doc.text(`Page ${i} of ${pages}`, PAGE.width - PAGE.marginX, PAGE.height - 7, {
 			align: "right",
 		});
 	}
 }
 
-function multilineText(value) {
-	return asText(value, "").replace(/\r\n/g, "\n");
+function renderTemplateBody(doc, template = {}, context = {}, startY) {
+	const blocks = Array.isArray(template?.body_json) ? template.body_json : [];
+	if (blocks.length === 0) return startY;
+	const variables = buildTemplateVariables(context);
+	const paragraphs = blocks
+		.map((block) => ({
+			text: interpolateTemplateText(block?.text || "", variables),
+			bold: Boolean(block?.bold),
+		}))
+		.filter((item) => item.text.trim());
+	return drawBodyText(doc, paragraphs, { startY });
 }
 
-function buildOfferLetter(doc, employee, values, signer) {
+function buildDefaultSections(type, employee, values) {
+	switch (type) {
+		case "offer_letter":
+			return [
+				`Dear ${asText(employee.name)},`,
+				`We are pleased to offer you the position of ${asText(employee.position)} in the ${asText(employee.department)} department, effective ${toDateLabel(values.start_date)}.`,
+				values.probation_period
+					? `Your probation period will run for ${asText(values.probation_period)}.`
+					: `Contract duration: ${asText(values.contract_duration)}.`,
+				{ text: "Compensation Details", bold: true, spacingAfter: 1.8 },
+				`Basic Salary: ${toCurrency(values.basic_salary)}`,
+			];
+		case "employment_contract":
+			return [
+				`This agreement is made between ${asText(values.branding.companyName || values.branding.company_name, "Company")} and ${asText(employee.name)} for the role of ${asText(employee.position)} under ${asText(employee.department)}.`,
+				`Contract start date: ${toDateLabel(values.contract_start_date)}.`,
+				values.probation_duration
+					? `Probation duration: ${asText(values.probation_duration)}.`
+					: `Contract duration: ${asText(values.contract_duration)}.`,
+				`Work location: ${asText(values.work_location)}.`,
+				`Base salary: ${toCurrency(values.basic_salary)} per month.`,
+			];
+		case "warning_letter":
+			return [
+				`To: ${asText(employee.name)} (${asText(employee.position)})`,
+				`This letter is issued as ${asText(values.warning_level)} based on the following findings:`,
+				asText(values.offense_details, ""),
+				`This warning remains valid for ${asText(values.validity_period)} from the date of issuance.`,
+			];
+		case "termination_letter":
+			return [
+				`Dear ${asText(employee.name)},`,
+				`This letter confirms the termination of your employment as ${asText(employee.position)} effective ${toDateLabel(values.last_working_day)}.`,
+				{ text: "Reason", bold: true, spacingAfter: 1.8 },
+				asText(values.termination_reason, ""),
+			];
+		default:
+			return [];
+	}
+}
+
+function buildStandardDocument(doc, type, employee, values, signer, recipientSigner, template, options = {}) {
 	let y = drawLetterhead(doc, values.branding, {
-		title: documentTitle("offer_letter"),
-		subtitle: `${asText(employee.name)} (${asText(employee.id)})`,
-		dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+		title: asText(template?.header_json?.title, documentTitle(type)),
+		subtitle: options.subtitle,
+		dateLabel: options.dateLabel,
+		logoDataUrl: options.logoDataUrl,
 	});
 
-	y = drawBodyText(doc, [
-		`Dear ${asText(employee.name)},`,
-		`We are pleased to offer you the position of ${asText(employee.position)} in the ${asText(employee.department)} department, effective ${toDateLabel(values.start_date)}.`,
-		`Your probation period will run for ${asText(values.probation_period)}.`,
-		{ text: "Compensation Details", bold: true, spacingAfter: 1.8 },
-		`Basic Salary: ${toCurrency(values.basic_salary)}`,
-		`Fixed Allowance: ${toCurrency(values.fixed_allowance)}`,
-		`Total Monthly Gross: ${toCurrency(normalizeNumber(values.basic_salary) + normalizeNumber(values.fixed_allowance))}`,
-	], { startY: y });
+	const bodyStartY = renderTemplateBody(doc, template, { employee, values, branding: values.branding, signer }, y);
+	y =
+		bodyStartY === y
+			? drawBodyText(doc, buildDefaultSections(type, employee, values), { startY: y })
+			: bodyStartY;
 
-	drawSignatureBlock(doc, signer, { startY: y + 6 });
-}
+	if (asText(values.job_description, "")) {
+		y = drawBodyText(doc, [{ text: "Job Description", bold: true }, asText(values.job_description, "")], { startY: y + 1 });
+	}
+	if (asText(values.offense_impact, "")) {
+		y = drawBodyText(doc, [{ text: "Outcome to Company", bold: true }, asText(values.offense_impact, "")], { startY: y + 1 });
+	}
+	if (asText(values.corrective_actions, "")) {
+		y = drawBodyText(doc, [{ text: "Corrective Actions", bold: true }, asText(values.corrective_actions, "")], { startY: y + 1 });
+	}
+	if (asText(values.legal_basis, "")) {
+		y = drawBodyText(doc, [{ text: "Legal Basis", bold: true }, asText(values.legal_basis, "")], { startY: y + 1 });
+	}
+	if (asText(values.company_policy_basis, "")) {
+		y = drawBodyText(doc, [{ text: "Company Policy", bold: true }, asText(values.company_policy_basis, "")], { startY: y + 1 });
+	}
+	if (asText(values.outcome_summary, "")) {
+		y = drawBodyText(doc, [{ text: "Outcome", bold: true }, asText(values.outcome_summary, "")], { startY: y + 1 });
+	}
+	if (asText(values.sanction_text, "")) {
+		y = drawBodyText(doc, [{ text: "Sanction / Punishment", bold: true }, asText(values.sanction_text, "")], { startY: y + 1 });
+	}
+	if (asText(values.severance_details, "")) {
+		y = drawBodyText(doc, [{ text: "Severance Details", bold: true }, asText(values.severance_details, "")], { startY: y + 1 });
+	}
 
-function buildEmploymentContract(doc, employee, values, signer) {
-	let y = drawLetterhead(doc, values.branding, {
-		title: documentTitle("employment_contract"),
-		subtitle: `Contract No: ${asText(values.contract_number)}`,
-		dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+	drawSignatureBlock(doc, signer, {
+		startY: y + 6,
+		includeRecipient: Boolean(options.includeRecipient),
+		recipient: recipientSigner,
+		recipientLabel: options.recipientLabel,
 	});
-
-	y = drawBodyText(doc, [
-		`This agreement is made between ${asText(values.branding.companyName || values.branding.company_name, "Company")} and ${asText(employee.name)} for the role of ${asText(employee.position)} under ${asText(employee.department)}.`,
-		`Contract start date: ${toDateLabel(values.contract_start_date)}.`,
-		`Contract duration: ${asText(values.contract_duration)}.`,
-		`Work location: ${asText(values.work_location)}.`,
-		`Base salary: ${toCurrency(values.basic_salary)} per month.`,
-	], { startY: y });
-
-	drawSignatureBlock(doc, signer, { startY: y + 6 });
 }
 
-function buildPayslip(doc, employee, values, signer) {
+function buildPayslip(doc, employee, values, signer, template, options = {}) {
 	let y = drawLetterhead(doc, values.branding, {
-		title: documentTitle("payslip"),
+		title: asText(template?.header_json?.title, documentTitle("payslip")),
 		subtitle: `${asText(employee.name)} (${asText(employee.id)})`,
 		dateLabel: `Period: ${toMonthLabel(values.period)} | Pay Date: ${toDateLabel(values.pay_date)}`,
+		logoDataUrl: options.logoDataUrl,
 	});
 
+	y = renderTemplateBody(doc, template, { employee, values, branding: values.branding, signer }, y);
 	y = drawBodyText(doc, [
 		`Position: ${asText(employee.position)}`,
 		`Department: ${asText(employee.department)}`,
-	], { startY: y, });
+	], { startY: y });
 
 	const basic = normalizeNumber(values.basic_salary);
-	const allowances = normalizeNumber(values.allowances);
-	const deductions = normalizeNumber(values.deductions);
-	const gross = basic + allowances;
-	const net = gross - deductions;
+	const earningsRows = Array.isArray(options.payroll?.earnings) ? options.payroll.earnings : [];
+	const deductionRows = Array.isArray(options.payroll?.deductions) ? options.payroll.deductions : [];
+	const totalAllowances = earningsRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);
+	const totalDeductions = deductionRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);
+	const gross = basic + totalAllowances;
+	const net = gross - totalDeductions;
 
-	y = drawPayslipTable(doc, [
+	const rows = [
 		{ label: "Basic Salary", amount: toCurrency(basic) },
-		{ label: "Allowances", amount: toCurrency(allowances) },
-		{ label: "Gross Earnings", amount: toCurrency(gross) },
-		{ label: "Deductions", amount: `(${toCurrency(deductions)})` },
+		...earningsRows.map((row) => ({ label: asText(row.name, "Allowance"), amount: toCurrency(row.amount) })),
+		{ label: "Total Earnings", amount: toCurrency(gross) },
+		...deductionRows.map((row) => ({ label: asText(row.name, "Deduction"), amount: `(${toCurrency(row.amount)})` })),
+		{ label: "Total Deductions", amount: `(${toCurrency(totalDeductions)})` },
 		{ label: "Net Pay", amount: toCurrency(net) },
-	], { startY: y + 2 });
+	];
 
+	y = drawPayslipTable(doc, rows, { startY: y + 2 });
 	drawSignatureBlock(doc, signer, { startY: y + 4 });
 }
 
-function buildWarningLetter(doc, employee, values, signer) {
-	let y = drawLetterhead(doc, values.branding, {
-		title: documentTitle("warning_letter"),
-		subtitle: `Reference: ${asText(values.warning_level)}`,
-		dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
-	});
-
-	y = drawBodyText(doc, [
-		`To: ${asText(employee.name)} (${asText(employee.position)})`,
-		`This letter is issued as ${asText(values.warning_level)} based on the following findings:`,
-		multilineText(values.offense_details),
-		`This warning remains valid for ${asText(values.validity_period)} from the date of issuance.`,
-	], { startY: y });
-
-	if (asText(values.corrective_actions, "")) {
-		y = drawBodyText(doc, [
-			{ text: "Corrective Actions", bold: true, spacingAfter: 1.8 },
-			multilineText(values.corrective_actions),
-		], { startY: y + 1 });
-	}
-
-	drawSignatureBlock(doc, signer, { startY: y + 4 });
-}
-
-function buildTerminationLetter(doc, employee, values, signer) {
-	let y = drawLetterhead(doc, values.branding, {
-		title: documentTitle("termination_letter"),
-		subtitle: `${asText(employee.name)} (${asText(employee.id)})`,
-		dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
-	});
-
-	y = drawBodyText(doc, [
-		`Dear ${asText(employee.name)},`,
-		`This letter confirms the termination of your employment as ${asText(employee.position)} effective ${toDateLabel(values.last_working_day)}.`,
-		{ text: "Reason", bold: true, spacingAfter: 1.8 },
-		multilineText(values.termination_reason),
-	], { startY: y });
-
-	if (asText(values.severance_details, "")) {
-		y = drawBodyText(doc, [
-			{ text: "Severance Details", bold: true, spacingAfter: 1.8 },
-			multilineText(values.severance_details),
-		], { startY: y + 1 });
-	}
-
-	drawSignatureBlock(doc, signer, { startY: y + 4 });
-}
-
-export function generateHrDocumentPdf({
+export async function generateHrDocumentPdf({
 	type,
 	employee = {},
 	values = {},
 	branding = {},
 	signer = {},
+	recipientSigner = {},
+	template = null,
+	payroll = {},
 }) {
 	const normalizedType = asText(type, "");
 	if (!normalizedType) {
@@ -340,6 +511,7 @@ export function generateHrDocumentPdf({
 	}
 
 	const doc = new jsPDF({ unit: "mm", format: "a4" });
+	const logoDataUrl = await loadImageAsDataUrl(branding.logoUrl || branding.document_logo_url);
 	const payloadValues = {
 		...values,
 		branding,
@@ -347,25 +519,52 @@ export function generateHrDocumentPdf({
 
 	switch (normalizedType) {
 		case "offer_letter":
-			buildOfferLetter(doc, employee, payloadValues, signer);
+			buildStandardDocument(doc, normalizedType, employee, payloadValues, signer, recipientSigner, template, {
+				subtitle: `${asText(employee.name)} (${asText(employee.id)})`,
+				dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+				includeRecipient: true,
+				recipientLabel: "Candidate acknowledgment,",
+				logoDataUrl,
+			});
 			break;
 		case "employment_contract":
-			buildEmploymentContract(doc, employee, payloadValues, signer);
+			buildStandardDocument(doc, normalizedType, employee, payloadValues, signer, recipientSigner, template, {
+				subtitle: `Contract No: ${asText(values.contract_number)}`,
+				dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+				includeRecipient: true,
+				recipientLabel: "Employee acknowledgment,",
+				logoDataUrl,
+			});
 			break;
 		case "payslip":
-			buildPayslip(doc, employee, payloadValues, signer);
+			buildPayslip(doc, employee, payloadValues, signer, template, { payroll, logoDataUrl });
 			break;
 		case "warning_letter":
-			buildWarningLetter(doc, employee, payloadValues, signer);
+			buildStandardDocument(doc, normalizedType, employee, payloadValues, signer, recipientSigner, template, {
+				subtitle: `Reference: ${asText(values.warning_level)}`,
+				dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+				logoDataUrl,
+			});
 			break;
 		case "termination_letter":
-			buildTerminationLetter(doc, employee, payloadValues, signer);
+			buildStandardDocument(doc, normalizedType, employee, payloadValues, signer, recipientSigner, template, {
+				subtitle: `${asText(employee.name)} (${asText(employee.id)})`,
+				dateLabel: `Date: ${toDateLabel(values.letter_date)}`,
+				logoDataUrl,
+			});
 			break;
 		default:
 			throw new Error(`Unsupported document type: ${normalizedType}`);
 	}
 
-	addPageFooter(doc);
+	addPageFooter(doc, asText(branding.documentFooterText, ""));
+	if (normalizedType === "payslip") {
+		drawWatermark(
+			doc,
+			asText(template?.header_json?.watermark_setting_key ? branding.defaultWatermark : branding.defaultWatermark, ""),
+			{ fontSize: 34 },
+		);
+	}
 
 	return {
 		doc,

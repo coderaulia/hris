@@ -1097,7 +1097,102 @@ function renderSignatureBlock(ctx, options = {}) {
 	`;
 }
 
+function numberToBahasaWords(value) {
+	const units = [
+		"",
+		"satu",
+		"dua",
+		"tiga",
+		"empat",
+		"lima",
+		"enam",
+		"tujuh",
+		"delapan",
+		"sembilan",
+		"sepuluh",
+		"sebelas",
+	];
+	const n = Math.floor(Math.abs(Number(value) || 0));
+	if (n < 12) return units[n];
+	if (n < 20) return `${numberToBahasaWords(n - 10)} belas`;
+	if (n < 100) {
+		const tens = Math.floor(n / 10);
+		const rest = n % 10;
+		return `${numberToBahasaWords(tens)} puluh ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 200) return `seratus ${numberToBahasaWords(n - 100)}`.trim();
+	if (n < 1000) {
+		const hundreds = Math.floor(n / 100);
+		const rest = n % 100;
+		return `${numberToBahasaWords(hundreds)} ratus ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 2000) return `seribu ${numberToBahasaWords(n - 1000)}`.trim();
+	if (n < 1000000) {
+		const thousands = Math.floor(n / 1000);
+		const rest = n % 1000;
+		return `${numberToBahasaWords(thousands)} ribu ${numberToBahasaWords(rest)}`.trim();
+	}
+	if (n < 1000000000) {
+		const millions = Math.floor(n / 1000000);
+		const rest = n % 1000000;
+		return `${numberToBahasaWords(millions)} juta ${numberToBahasaWords(rest)}`.trim();
+	}
+	return String(n);
+}
+
+function buildTemplateVariables(ctx) {
+	return {
+		company_name: ctx.companyName,
+		app_name: ctx.appName,
+		employee_name: ctx.subjectName,
+		legal_name: escapeHTML(String(ctx.subject.legal_name || ctx.subject.name || "-")),
+		place_of_birth: ctx.subjectPlaceOfBirth,
+		date_of_birth: ctx.subjectDateOfBirth,
+		address: ctx.subjectAddress,
+		nik_number: ctx.subjectNik,
+		employee_id: escapeHTML(String(ctx.subject.id || "-")),
+		employee_position: ctx.subjectPosition,
+		job_title: ctx.subjectPosition,
+		job_level: ctx.subjectJobLevel,
+		department: ctx.subjectDepartment,
+		signer_name: ctx.signerName,
+		signer_title: ctx.signerRole,
+		contract_type: ctx.formatted.contract_type || "-",
+		contract_duration: ctx.formatted.contract_duration || "-",
+		probation_duration: ctx.formatted.probation_duration || "-",
+		nomor_surat: ctx.formatted.nomor_surat || "-",
+		letter_date: ctx.formatted.letter_date || "-",
+		start_date: ctx.formatted.start_date || "-",
+		contract_start_date: ctx.formatted.contract_start_date || "-",
+		work_location: ctx.formatted.work_location || "-",
+		basic_salary: ctx.formatted.basic_salary_currency || "IDR 0",
+		salary_in_words: escapeHTML(
+			`${numberToBahasaWords(ctx.numbers.basic_salary || 0).replace(/\s+/g, " ").trim()} rupiah`,
+		),
+		warning_level: ctx.formatted.warning_level || "-",
+		last_working_day: ctx.formatted.last_working_day || "-",
+		termination_reason: formatMultiline(ctx.values.termination_reason || ""),
+	};
+}
+
+function renderTemplateBlocksPreview(ctx) {
+	const blocks = Array.isArray(ctx.template?.record?.body_json) ? ctx.template.record.body_json : [];
+	if (blocks.length === 0) return "";
+	const variables = buildTemplateVariables(ctx);
+	return blocks
+		.map((block) => {
+			const rawText = String(block?.text || "");
+			const interpolated = rawText.replace(/\{\{\s*([\w_]+)\s*\}\}/g, (_, key) => {
+				return variables[key] ?? "-";
+			});
+			if (!interpolated.trim()) return "";
+			return `<div class="documents-preview-block"><p>${interpolated}</p></div>`;
+		})
+		.join("");
+}
+
 function renderTemplatePreview(ctx) {
+	const templateBody = renderTemplateBlocksPreview(ctx);
 	switch (documentsDraft.documentType) {
 		case "offer_letter": {
 			const durationCopy =
@@ -1110,12 +1205,12 @@ function renderTemplatePreview(ctx) {
 					<p>Nomor Surat: <strong>${ctx.formatted.nomor_surat}</strong></p>
 					<p>Contract Type: <strong>${ctx.formatted.contract_type}</strong></p>
 				</div>
-				<div class="documents-preview-block">
+				${templateBody || `<div class="documents-preview-block">
 					<p>Dear ${ctx.subjectName},</p>
 					<p>We are pleased to offer you the position of <strong>${ctx.subjectPosition}</strong> in <strong>${ctx.subjectDepartment}</strong> effective on <strong>${ctx.formatted.start_date}</strong>.</p>
 					<p>${durationCopy}</p>
 					<p>Base monthly salary: <strong>${ctx.formatted.basic_salary_currency}</strong>.</p>
-				</div>
+				</div>`}
 				${
 					ctx.values.benefits
 						? `<div class="documents-preview-block"><p><strong>Benefits</strong><br>${formatMultiline(ctx.values.benefits)}</p></div>`
@@ -1131,7 +1226,7 @@ function renderTemplatePreview(ctx) {
 					<p>Date: ${ctx.formatted.letter_date}</p>
 					<p>Contract Type: <strong>${ctx.formatted.contract_type}</strong></p>
 				</div>
-				<div class="documents-preview-block">
+				${templateBody || `<div class="documents-preview-block">
 					<p>This employment agreement is made between <strong>${ctx.companyName}</strong> and <strong>${ctx.subjectName}</strong> for the role of <strong>${ctx.subjectPosition}</strong>.</p>
 					<p>Department: <strong>${ctx.subjectDepartment}</strong>. Job level: <strong>${ctx.subjectJobLevel}</strong>.</p>
 					<p>Place / DoB: <strong>${ctx.subjectPlaceOfBirth}</strong> / <strong>${ctx.subjectDateOfBirth}</strong>.</p>
@@ -1143,7 +1238,7 @@ function renderTemplatePreview(ctx) {
 							: `Contract duration: <strong>${ctx.formatted.contract_duration}</strong>.`
 					}</p>
 					<p>Base monthly salary: <strong>${ctx.formatted.basic_salary_currency}</strong>.</p>
-				</div>
+				</div>`}
 				${
 					ctx.values.job_description
 						? `<div class="documents-preview-block"><p><strong>Job Description</strong><br>${formatMultiline(ctx.values.job_description)}</p></div>`
@@ -1180,12 +1275,12 @@ function renderTemplatePreview(ctx) {
 					<p>Date: ${ctx.formatted.letter_date}</p>
 					<p>Reference: ${ctx.formatted.warning_level}</p>
 				</div>
-				<div class="documents-preview-block">
+				${templateBody || `<div class="documents-preview-block">
 					<p>To: ${ctx.subjectName} (${ctx.subjectPosition})</p>
 					<p>This letter serves as <strong>${ctx.formatted.warning_level}</strong> based on the following findings:</p>
 					<p>${formatMultiline(ctx.values.offense_details)}</p>
 					<p>This warning is valid for <strong>${ctx.formatted.validity_period}</strong> from the date of issuance.</p>
-				</div>
+				</div>`}
 				${ctx.values.offense_impact ? `<div class="documents-preview-block"><p><strong>Outcome to Company:</strong><br>${formatMultiline(ctx.values.offense_impact)}</p></div>` : ""}
 				${ctx.values.corrective_actions ? `<div class="documents-preview-block"><p><strong>Corrective Actions:</strong><br>${formatMultiline(ctx.values.corrective_actions)}</p></div>` : ""}
 				${renderSignatureBlock(ctx)}
@@ -1196,11 +1291,11 @@ function renderTemplatePreview(ctx) {
 					<p>Date: ${ctx.formatted.letter_date}</p>
 					<p>Subject: Employment Termination Notice</p>
 				</div>
-				<div class="documents-preview-block">
+				${templateBody || `<div class="documents-preview-block">
 					<p>Dear ${ctx.subjectName},</p>
 					<p>This letter confirms the termination of your employment as <strong>${ctx.subjectPosition}</strong> effective on <strong>${ctx.formatted.last_working_day}</strong>.</p>
 					<p><strong>Reason:</strong><br>${formatMultiline(ctx.values.termination_reason)}</p>
-				</div>
+				</div>`}
 				${ctx.values.legal_basis ? `<div class="documents-preview-block"><p><strong>Legal Basis:</strong><br>${formatMultiline(ctx.values.legal_basis)}</p></div>` : ""}
 				${ctx.values.company_policy_basis ? `<div class="documents-preview-block"><p><strong>Company Policy:</strong><br>${formatMultiline(ctx.values.company_policy_basis)}</p></div>` : ""}
 				${ctx.values.outcome_summary ? `<div class="documents-preview-block"><p><strong>Outcome:</strong><br>${formatMultiline(ctx.values.outcome_summary)}</p></div>` : ""}
@@ -1429,7 +1524,7 @@ function bindSetupHandlers() {
 					deductions: context.payroll.deductions.reduce((sum, row) => sum + row.amount, 0),
 				};
 
-				const { doc, filename } = generateHrDocumentPdf({
+				const { doc, filename } = await generateHrDocumentPdf({
 					type: documentsDraft.documentType,
 					employee: {
 						id: context.subject.id,
@@ -1441,6 +1536,11 @@ function bindSetupHandlers() {
 					branding: {
 						companyName: String(state.appSettings?.company_name || "").trim(),
 						appName: String(state.appSettings?.app_name || "").trim(),
+						logoUrl: String(state.appSettings?.document_logo_url || "").trim(),
+						documentFooterText: String(state.appSettings?.document_footer_text || "").trim(),
+						defaultWatermark: String(
+							state.appSettings?.document_default_watermark || "Confidential",
+						).trim(),
 					},
 					signer: {
 						name: String(getSelectedSigner()?.name || state.currentUser?.name || "HR Representative"),
@@ -1450,7 +1550,14 @@ function bindSetupHandlers() {
 								state.currentUser?.role ||
 								"hr",
 						),
+						signatureImageUrl: String(getSelectedSigner()?.signature_image_url || "").trim(),
 					},
+					recipientSigner: {
+						name: String(context.subject.name || ""),
+						role: String(context.subject.position || ""),
+					},
+					template: context.template.record || null,
+					payroll: context.payroll,
 				});
 
 				doc.save(filename);
