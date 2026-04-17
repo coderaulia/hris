@@ -2,6 +2,7 @@ import { state } from "../lib/store.js";
 import { escapeHTML } from "../lib/utils.js";
 import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
+import { saveEmployee } from "./data/employees.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const FALLBACK_CONTRACT_TYPES = ["PKWT", "PKWTT", "PKHL"];
@@ -85,6 +86,40 @@ function slugify(value, fallback = "manual-subject") {
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/^-+|-+$/g, "") || fallback
 	);
+}
+
+function parseValidityToDate(baseDate, validityPeriod) {
+	const raw = String(validityPeriod || "").trim().toLowerCase();
+	if (!raw) return "";
+
+	const match = raw.match(/(\d+)\s*(day|days|bulan|month|months|minggu|week|weeks)/i);
+	if (!match) return "";
+
+	const qty = Number(match[1]);
+	if (!Number.isFinite(qty) || qty <= 0) return "";
+
+	const date = baseDate ? new Date(baseDate) : new Date();
+	if (Number.isNaN(date.getTime())) return "";
+
+	const unit = match[2].toLowerCase();
+	if (unit.startsWith("day")) {
+		date.setDate(date.getDate() + qty);
+	} else if (unit.startsWith("week") || unit.startsWith("minggu")) {
+		date.setDate(date.getDate() + qty * 7);
+	} else {
+		date.setMonth(date.getMonth() + qty);
+	}
+
+	return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
+function isActiveSpRecord(rec = {}) {
+	const level = String(rec?.active_sp_level || "").trim();
+	if (!level) return false;
+	const until = String(rec?.active_sp_until || "").trim();
+	if (!until) return true;
+	const untilMs = Date.parse(until);
+	return Number.isFinite(untilMs) && untilMs >= Date.now();
 }
 
 function getReferenceOptions(groupKey, fallback = []) {
@@ -1561,6 +1596,21 @@ function bindSetupHandlers() {
 				});
 
 				doc.save(filename);
+
+				if (documentsDraft.documentType === "warning_letter" && state.db?.[context.subject.id]) {
+					const spUntil = parseValidityToDate(
+						context.values.letter_date || TODAY_ISO,
+						context.values.validity_period,
+					);
+					const nextRecord = {
+						...state.db[context.subject.id],
+						active_sp_level: String(context.values.warning_level || ""),
+						active_sp_until: spUntil || null,
+						active_sp_reason: String(context.values.offense_details || "").trim() || null,
+					};
+					await saveEmployee(nextRecord);
+				}
+
 				await logActivity({
 					action: "document.generate",
 					entityType: "employee_document",
@@ -1573,6 +1623,37 @@ function bindSetupHandlers() {
 						subject_mode: documentsDraft.subjectMode,
 						signer_id: documentsDraft.signerId || "",
 						template_id: documentsDraft.templateId || "",
+						active_sp_level:
+							documentsDraft.documentType === "warning_letter"
+								? String(context.values.warning_level || "")
+								: "",
+						active_sp_until:
+							documentsDraft.documentType === "warning_letter"
+								? parseValidityToDate(
+										context.values.letter_date || TODAY_ISO,
+										context.values.validity_period,
+								  )
+								: "",
+						termination_reason:
+							documentsDraft.documentType === "termination_letter"
+								? String(context.values.termination_reason || "")
+								: "",
+						termination_legal_basis:
+							documentsDraft.documentType === "termination_letter"
+								? String(context.values.legal_basis || "")
+								: "",
+						termination_company_policy:
+							documentsDraft.documentType === "termination_letter"
+								? String(context.values.company_policy_basis || "")
+								: "",
+						termination_outcome:
+							documentsDraft.documentType === "termination_letter"
+								? String(context.values.outcome_summary || "")
+								: "",
+						termination_sanction:
+							documentsDraft.documentType === "termination_letter"
+								? String(context.values.sanction_text || "")
+								: "",
 						generated_by: state.currentUser?.id || "",
 					},
 				});

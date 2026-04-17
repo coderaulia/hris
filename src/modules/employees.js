@@ -229,6 +229,15 @@ function getEmployeeDirectoryFilters() {
     };
 }
 
+function isActiveSpRecord(rec = {}) {
+    const level = String(rec?.active_sp_level || '').trim();
+    if (!level) return false;
+    const until = String(rec?.active_sp_until || '').trim();
+    if (!until) return true;
+    const untilMs = Date.parse(until);
+    return Number.isFinite(untilMs) && untilMs >= Date.now();
+}
+
 export function clearEmployeeDirectoryFilters() {
     const ids = ['emp-search', 'emp-filter-department', 'emp-filter-role'];
     ids.forEach(id => {
@@ -363,6 +372,9 @@ export function renderEmployeeManager() {
         else if (rec.role === 'manager') roleBadge = '<span class="badge bg-warning text-dark ms-1">Mgr</span>';
         else if (rec.role === 'director') roleBadge = '<span class="badge bg-info text-dark ms-1">Dir</span>';
         else if (rec.role === 'hr') roleBadge = '<span class="badge bg-success ms-1">HR</span>';
+        const spBadge = isActiveSpRecord(rec)
+            ? `<span class="badge bg-danger-subtle text-danger border ms-1">${escapeHTML(String(rec.active_sp_level || 'SP Active'))}</span>`
+            : '';
 
         const isMgr = rec.seniority && (rec.seniority.includes('Manager') || rec.seniority.includes('Lead'));
         const mgrIcon = isMgr ? '<i class="bi bi-star-fill text-warning me-1"></i>' : '';
@@ -381,7 +393,7 @@ export function renderEmployeeManager() {
         tbody.innerHTML += `
       <tr class="employee-row">
         <td>
-          <div class="fw-bold d-flex align-items-center gap-2">${mgrIcon}${escapeHTML(rec.name)}${roleBadge}</div>
+          <div class="fw-bold d-flex align-items-center gap-2">${mgrIcon}${escapeHTML(rec.name)}${roleBadge}${spBadge}</div>
           <div class="text-muted small font-monospace">${escapeHTML(rec.id)}</div>
         </td>
         <td>

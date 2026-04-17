@@ -387,7 +387,7 @@ async function syncEmployeeNormalizedRecords(rec) {
 
 async function saveEmployee(rec) {
     const hydrated = hydrateEmployeeRecord(rec);
-    const payload = {
+    const basePayload = {
         employee_id: hydrated.id,
         name: hydrated.name,
         position: hydrated.position,
@@ -401,6 +401,9 @@ async function saveEmployee(rec) {
         tenure_display: hydrated.tenure_display || '',
         kpi_targets: hydrated.kpi_targets || {},
         must_change_password: Boolean(hydrated.must_change_password),
+    };
+    const payload = {
+        ...basePayload,
         legal_name: hydrated.legal_name || null,
         place_of_birth: hydrated.place_of_birth || null,
         date_of_birth: hydrated.date_of_birth || null,
@@ -413,13 +416,25 @@ async function saveEmployee(rec) {
         active_sp_reason: hydrated.active_sp_reason || null,
     };
 
-    await execSupabase(
-        `Save employee "${hydrated.id}"`,
-        () => supabase
-            .from('employees')
-            .upsert(payload, { onConflict: 'employee_id' }),
-        { interactiveRetry: true, retries: 1 }
-    );
+    try {
+        await execSupabase(
+            `Save employee "${hydrated.id}"`,
+            () => supabase
+                .from('employees')
+                .upsert(payload, { onConflict: 'employee_id' }),
+            { interactiveRetry: true, retries: 1 }
+        );
+    } catch (error) {
+        if (!isMissingColumnError(error)) throw error;
+
+        await execSupabase(
+            `Save employee "${hydrated.id}" (legacy columns)`,
+            () => supabase
+                .from('employees')
+                .upsert(basePayload, { onConflict: 'employee_id' }),
+            { interactiveRetry: true, retries: 1 }
+        );
+    }
 
     await syncEmployeeNormalizedRecords(hydrated);
 
