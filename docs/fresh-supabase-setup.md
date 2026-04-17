@@ -26,7 +26,8 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 8. [20260409_drop_legacy_employee_assessment_columns.sql](/D:/web/hris/migrations/20260409_drop_legacy_employee_assessment_columns.sql)
 9. [20260409_manpower_planning.sql](/D:/web/hris/migrations/20260409_manpower_planning.sql)
 10. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
-11. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+11. [20260417_hr_documents_foundation.sql](/D:/web/hris/migrations/20260417_hr_documents_foundation.sql)
+12. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
 
 ## Migration Notes
 

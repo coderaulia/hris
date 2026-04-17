@@ -4,6 +4,8 @@
 
 export const state = {
     db: {},           // Employee database { id: { ...record } }
+    hrDocumentTemplates: [],
+    hrDocumentReferenceOptions: [],
     appConfig: {},    // Competency config { positionName: { competencies: [...] } }
     kpiConfig: [],    // KPI definitions
     kpiDefinitionVersions: [],
@@ -74,4 +76,3 @@ export function isDirector() {
 export function isEmployee() {
     return state.currentUser?.role === 'employee';
 }
-

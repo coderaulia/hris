@@ -28,6 +28,7 @@ import { reconcileCurrentUserProfile } from '../auth.js';
 const EMPLOYEE_COLUMNS = [
     'employee_id',
     'name',
+    'legal_name',
     'position',
     'seniority',
     'join_date',
@@ -39,6 +40,15 @@ const EMPLOYEE_COLUMNS = [
     'tenure_display',
     'kpi_targets',
     'must_change_password',
+    'place_of_birth',
+    'date_of_birth',
+    'address',
+    'nik_number',
+    'job_level',
+    'signature_image_url',
+    'active_sp_level',
+    'active_sp_until',
+    'active_sp_reason',
 ].join(',');
 const EMPLOYEE_ASSESSMENT_COLUMNS = 'id,employee_id,assessment_type,percentage,assessed_by,assessed_at,source_date';
 const EMPLOYEE_ASSESSMENT_SCORE_COLUMNS = 'assessment_id,competency_name,score,note';
@@ -362,6 +372,16 @@ async function saveEmployee(rec) {
         tenure_display: hydrated.tenure_display || '',
         kpi_targets: hydrated.kpi_targets || {},
         must_change_password: Boolean(hydrated.must_change_password),
+        legal_name: hydrated.legal_name || null,
+        place_of_birth: hydrated.place_of_birth || null,
+        date_of_birth: hydrated.date_of_birth || null,
+        address: hydrated.address || null,
+        nik_number: hydrated.nik_number || null,
+        job_level: hydrated.job_level || null,
+        signature_image_url: hydrated.signature_image_url || null,
+        active_sp_level: hydrated.active_sp_level || null,
+        active_sp_until: hydrated.active_sp_until || null,
+        active_sp_reason: hydrated.active_sp_reason || null,
     };
 
     await execSupabase(

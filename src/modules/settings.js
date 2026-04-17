@@ -274,6 +274,9 @@ function renderAppSettings() {
         { key: 'company_name', label: 'Company Name', placeholder: 'e.g. Your Company' },
         { key: 'company_short', label: 'Company Short Name', placeholder: 'e.g. YC' },
         { key: 'department_label', label: 'Department Label', placeholder: 'e.g. Human Resources Department' },
+        { key: 'document_logo_url', label: 'Document Logo URL', placeholder: 'https://.../company-logo.png' },
+        { key: 'document_default_watermark', label: 'Document Default Watermark', placeholder: 'e.g. Confidential' },
+        { key: 'document_footer_text', label: 'Document Footer Text', placeholder: 'e.g. PT Example Indonesia' },
         isAnyModuleEnabled(['assessment', 'tna'])
             ? { key: 'assessment_scale_max', label: 'Assessment Scale Max', placeholder: '10' }
             : null,
@@ -416,6 +419,9 @@ export async function saveAppSettings() {
         'company_name',
         'company_short',
         'department_label',
+        'document_logo_url',
+        'document_default_watermark',
+        'document_footer_text',
         ...(isAnyModuleEnabled(['assessment', 'tna'])
             ? ['assessment_scale_max', 'assessment_threshold']
             : []),

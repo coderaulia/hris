@@ -9,3 +9,4 @@ export * from './pip.js';
 export * from './manpower.js';
 export * from './dashboard.js';
 export * from './sync.js';
+export * from './hr-documents.js';

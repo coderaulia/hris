@@ -30,6 +30,10 @@ import {
     fetchHeadcountRequests,
     fetchRecruitmentPipeline,
 } from './manpower.js';
+import {
+    fetchHrDocumentTemplates,
+    fetchHrDocumentReferenceOptions,
+} from './hr-documents.js';
 
 function getRoleSyncFlags(role) {
     const normalizedRole = String(role || '').trim().toLowerCase();
@@ -49,6 +53,7 @@ async function syncAll(options = {}) {
     const enabledModules = options.enabledModules || getEnabledModuleSet();
     const hasModule = (moduleId) => enabledModules.has(moduleId);
     const hasAnyModule = (...moduleIds) => moduleIds.some((moduleId) => enabledModules.has(moduleId));
+    const includeHrDocuments = ['superadmin', 'hr'].includes(String(role || '').trim().toLowerCase());
 
     const tasks = [
         fetchSettings(),
@@ -100,6 +105,13 @@ async function syncAll(options = {}) {
 
     if (hasModule('recruitment') && flags.includeManpower) {
         tasks.push(fetchRecruitmentPipeline());
+    }
+
+    if (includeHrDocuments) {
+        tasks.push(
+            fetchHrDocumentTemplates(),
+            fetchHrDocumentReferenceOptions(),
+        );
     }
 
     if (hasModule('dashboard') && flags.includeDashboardReads) {
