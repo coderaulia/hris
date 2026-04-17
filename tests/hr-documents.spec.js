@@ -77,8 +77,10 @@ test("hr documents workspace supports preview + export + activity logging", asyn
 
 	await expect(page.locator("#tab-documents")).toBeVisible();
 	await expect(page.locator("#doc-preview")).toContainText(
-		"Select employee and document type to start preview.",
+		"Select document type and complete the subject details to start preview.",
 	);
+
+	await page.locator("#doc-type-select").selectOption("payslip");
 
 	const selectedEmployee = await page.locator("#doc-employee-select").evaluate((select) => {
 		const option = [...select.options].find((item) => item.value);
@@ -87,18 +89,19 @@ test("hr documents workspace supports preview + export + activity logging", asyn
 		select.dispatchEvent(new Event("change", { bubbles: true }));
 		return {
 			value: option.value,
-			name: String(option.textContent || "").split(" • ")[0].trim(),
+			name: String(option.textContent || "").split(" - ")[0].trim(),
 		};
 	});
 
 	expect(selectedEmployee.value).not.toBe("");
 
-	await page.locator("#doc-type-select").selectOption("payslip");
 	await page.locator('[data-doc-field="period"]').fill(currentPeriod());
 	await page.locator('[data-doc-field="pay_date"]').fill(todayIso());
 	await page.locator('[data-doc-field="basic_salary"]').fill("12000000");
-	await page.locator('[data-doc-field="allowances"]').fill("2500000");
-	await page.locator('[data-doc-field="deductions"]').fill("500000");
+	await page.locator('[data-doc-payroll-name="earnings:0"]').fill("Transport Allowance");
+	await page.locator('[data-doc-payroll-amount="earnings:0"]').fill("2500000");
+	await page.locator('[data-doc-payroll-name="deductions:0"]').fill("PPh21");
+	await page.locator('[data-doc-payroll-amount="deductions:0"]').fill("500000");
 
 	await expect(page.locator("#doc-validation-feedback")).toContainText(
 		"Ready to export PDF",

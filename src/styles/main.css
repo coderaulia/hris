@@ -1400,6 +1400,34 @@ body,
   border-top: 1px solid #e2e8f0;
 }
 
+.documents-preview-signature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.documents-preview-logo {
+  max-width: 88px;
+  max-height: 44px;
+  object-fit: contain;
+}
+
+.documents-preview-signer-summary {
+  padding: 12px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.documents-payroll-group {
+  padding-top: 4px;
+}
+
+.documents-preview-watermark {
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
 .documents-preview-table td {
   border-color: #e2e8f0;
 }
@@ -1417,7 +1445,8 @@ body,
 
 [data-bs-theme="dark"] .documents-preview-meta,
 [data-bs-theme="dark"] .documents-preview-signature,
-[data-bs-theme="dark"] .documents-preview-table td {
+[data-bs-theme="dark"] .documents-preview-table td,
+[data-bs-theme="dark"] .documents-preview-signer-summary {
   border-color: #334155;
 }
 
@@ -1426,4 +1455,10 @@ body,
 [data-bs-theme="dark"] .documents-preview-footer,
 [data-bs-theme="dark"] .documents-preview-fields .text-muted {
   color: #94a3b8 !important;
+}
+
+@media (max-width: 767px) {
+  .documents-preview-signature-grid {
+    grid-template-columns: 1fr;
+  }
 }

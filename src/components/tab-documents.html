@@ -16,18 +16,11 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-white border-bottom py-3">
                     <h6 class="fw-bold m-0"><i class="bi bi-sliders me-1"></i>Document Setup</h6>
-                    <div class="small text-muted mt-1">Select an employee and document type to begin.</div>
+                    <div class="small text-muted mt-1">Choose the template, subject source, and company signer for this document.</div>
                 </div>
                 <div class="card-body">
                     <div id="doc-access-denied" class="alert alert-warning hidden mb-3">
                         You do not have permission to use this workspace.
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Employee</label>
-                        <select id="doc-employee-select" class="form-select">
-                            <option value="">-- Select Employee --</option>
-                        </select>
                     </div>
 
                     <div class="mb-3">
@@ -37,8 +30,50 @@
                         </select>
                     </div>
 
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Template</label>
+                        <select id="doc-template-select" class="form-select">
+                            <option value="">-- Select Template --</option>
+                        </select>
+                    </div>
+
                     <div id="doc-template-hint" class="small text-muted mb-3">
                         Choose a document type to load template details.
+                    </div>
+
+                    <div class="border rounded-3 p-3 bg-light mb-3">
+                        <div class="small fw-bold text-muted text-uppercase mb-2">Subject Source</div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Subject Mode</label>
+                            <select id="doc-subject-mode" class="form-select" disabled>
+                                <option value="employee">Employee Database</option>
+                            </select>
+                        </div>
+
+                        <div id="doc-employee-wrap" class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Employee</label>
+                            <select id="doc-employee-select" class="form-select">
+                                <option value="">-- Select Employee --</option>
+                            </select>
+                        </div>
+
+                        <div id="doc-manual-identity-wrap" class="d-none"></div>
+                    </div>
+
+                    <div class="border rounded-3 p-3 bg-light mb-3">
+                        <div class="small fw-bold text-muted text-uppercase mb-2">Company Signer</div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Signer</label>
+                            <select id="doc-signer-select" class="form-select">
+                                <option value="">-- Select Signer --</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-muted">Signer Title Override</label>
+                            <input id="doc-signer-role-override" type="text" class="form-control" placeholder="Optional custom signer title">
+                        </div>
+                        <div id="doc-signer-summary" class="documents-preview-signer-summary"></div>
                     </div>
 
                     <div class="border rounded-3 p-3 bg-light mb-3">
@@ -65,12 +100,12 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-white border-bottom py-3">
                     <h6 class="fw-bold m-0"><i class="bi bi-file-earmark-text me-1"></i>Live Preview</h6>
-                    <div class="small text-muted mt-1">A4-style preview updates as you complete the form.</div>
+                    <div class="small text-muted mt-1">A4-style preview updates as you complete the form, including signer and subject changes.</div>
                 </div>
                 <div class="card-body documents-preview-wrap">
                     <div id="doc-preview" class="documents-preview-sheet">
                         <div class="documents-preview-empty">
-                            Select employee and document type to start preview.
+                            Select document type and complete the subject details to start preview.
                         </div>
                     </div>
                 </div>

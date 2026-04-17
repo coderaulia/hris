@@ -4,319 +4,32 @@ import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
-
-const DOCUMENT_TEMPLATES = {
-	offer_letter: {
-		label: "Offer Letter",
-		description:
-			"Initial employment offer with compensation package and onboarding terms.",
-		fields: [
-			{
-				key: "letter_date",
-				label: "Letter Date",
-				type: "date",
-				required: true,
-				defaultValue: TODAY_ISO,
-			},
-			{
-				key: "start_date",
-				label: "Start Date",
-				type: "date",
-				required: true,
-			},
-			{
-				key: "basic_salary",
-				label: "Basic Salary (IDR)",
-				type: "number",
-				required: true,
-				placeholder: "e.g. 8500000",
-			},
-			{
-				key: "fixed_allowance",
-				label: "Fixed Allowance (IDR)",
-				type: "number",
-				required: false,
-				placeholder: "e.g. 1500000",
-			},
-			{
-				key: "probation_period",
-				label: "Probation Period",
-				type: "text",
-				required: true,
-				placeholder: "e.g. 3 months",
-			},
-		],
-		renderPreview: (ctx) => {
-			const gross = ctx.numbers.basic_salary + ctx.numbers.fixed_allowance;
-			return `
-				<div class="documents-preview-block">
-					<p>Date: ${ctx.formatted.letter_date}</p>
-					<p>Subject: Employment Offer</p>
-				</div>
-				<div class="documents-preview-block">
-					<p>Dear ${ctx.employeeName},</p>
-					<p>We are pleased to offer you the position of <strong>${ctx.employeePosition}</strong> in the <strong>${ctx.employeeDepartment}</strong> department, with an effective start date of <strong>${ctx.formatted.start_date}</strong>.</p>
-					<p>Your initial probation period is <strong>${ctx.formatted.probation_period}</strong>.</p>
-				</div>
-				<div class="documents-preview-block">
-					<p><strong>Compensation Summary</strong></p>
-					<ul class="documents-preview-fields">
-						<li>Basic Salary: ${ctx.formatted.basic_salary_currency}</li>
-						<li>Fixed Allowance: ${ctx.formatted.fixed_allowance_currency}</li>
-						<li>Total Monthly Gross: <strong>${formatCurrencyId(gross)}</strong></li>
-					</ul>
-				</div>
-				${renderSignatureBlock(ctx)}
-			`;
-		},
-	},
-	employment_contract: {
-		label: "Employment Contract",
-		description:
-			"Contract draft with role scope, duration, and work arrangement details.",
-		fields: [
-			{
-				key: "contract_number",
-				label: "Contract Number",
-				type: "text",
-				required: true,
-				placeholder: "e.g. CTR-2026-04-001",
-			},
-			{
-				key: "letter_date",
-				label: "Contract Date",
-				type: "date",
-				required: true,
-				defaultValue: TODAY_ISO,
-			},
-			{
-				key: "contract_start_date",
-				label: "Contract Start Date",
-				type: "date",
-				required: true,
-			},
-			{
-				key: "contract_duration",
-				label: "Contract Duration",
-				type: "text",
-				required: true,
-				placeholder: "e.g. 12 months",
-			},
-			{
-				key: "work_location",
-				label: "Work Location",
-				type: "text",
-				required: true,
-				placeholder: "e.g. Jakarta HQ",
-			},
-			{
-				key: "basic_salary",
-				label: "Basic Salary (IDR)",
-				type: "number",
-				required: true,
-				placeholder: "e.g. 8500000",
-			},
-		],
-		renderPreview: (ctx) => `
-			<div class="documents-preview-block">
-				<p>Contract Number: <strong>${ctx.formatted.contract_number}</strong></p>
-				<p>Date: ${ctx.formatted.letter_date}</p>
-			</div>
-			<div class="documents-preview-block">
-				<p>This employment agreement is made between <strong>${ctx.companyName}</strong> and <strong>${ctx.employeeName}</strong>, appointed as <strong>${ctx.employeePosition}</strong> under the ${ctx.employeeDepartment} function.</p>
-				<p>Contract commencement date: <strong>${ctx.formatted.contract_start_date}</strong>.</p>
-				<p>Contract duration: <strong>${ctx.formatted.contract_duration}</strong>.</p>
-				<p>Primary work location: <strong>${ctx.formatted.work_location}</strong>.</p>
-				<p>Base monthly salary: <strong>${ctx.formatted.basic_salary_currency}</strong>.</p>
-			</div>
-			${renderSignatureBlock(ctx)}
-		`,
-	},
-	payslip: {
-		label: "Payslip",
-		description:
-			"Payroll breakdown including salary components and net payment calculation.",
-		fields: [
-			{
-				key: "period",
-				label: "Payroll Period",
-				type: "month",
-				required: true,
-			},
-			{
-				key: "pay_date",
-				label: "Pay Date",
-				type: "date",
-				required: true,
-				defaultValue: TODAY_ISO,
-			},
-			{
-				key: "basic_salary",
-				label: "Basic Salary (IDR)",
-				type: "number",
-				required: true,
-				placeholder: "e.g. 8500000",
-			},
-			{
-				key: "allowances",
-				label: "Allowances (IDR)",
-				type: "number",
-				required: false,
-				placeholder: "e.g. 1500000",
-			},
-			{
-				key: "deductions",
-				label: "Deductions (IDR)",
-				type: "number",
-				required: false,
-				placeholder: "e.g. 325000",
-			},
-		],
-		renderPreview: (ctx) => {
-			const totalEarnings = ctx.numbers.basic_salary + ctx.numbers.allowances;
-			const netPay = totalEarnings - ctx.numbers.deductions;
-			return `
-				<div class="documents-preview-block">
-					<p><strong>Employee:</strong> ${ctx.employeeName}</p>
-					<p><strong>Position:</strong> ${ctx.employeePosition}</p>
-					<p><strong>Period:</strong> ${ctx.formatted.period_month}</p>
-					<p><strong>Pay Date:</strong> ${ctx.formatted.pay_date}</p>
-				</div>
-				<div class="documents-preview-block">
-					<table class="table table-sm documents-preview-table mb-0">
-						<tbody>
-							<tr><td>Basic Salary</td><td class="text-end">${ctx.formatted.basic_salary_currency}</td></tr>
-							<tr><td>Allowances</td><td class="text-end">${ctx.formatted.allowances_currency}</td></tr>
-							<tr><td>Deductions</td><td class="text-end">(${ctx.formatted.deductions_currency})</td></tr>
-							<tr class="fw-bold"><td>Net Pay</td><td class="text-end">${formatCurrencyId(netPay)}</td></tr>
-						</tbody>
-					</table>
-				</div>
-				${renderSignatureBlock(ctx)}
-			`;
-		},
-	},
-	warning_letter: {
-		label: "Warning Letter (SP)",
-		description:
-			"Formal disciplinary notice with warning tier, incident context, and validity period.",
-		fields: [
-			{
-				key: "letter_date",
-				label: "Letter Date",
-				type: "date",
-				required: true,
-				defaultValue: TODAY_ISO,
-			},
-			{
-				key: "warning_level",
-				label: "Warning Level",
-				type: "select",
-				required: true,
-				options: [
-					{ value: "SP1", label: "SP1" },
-					{ value: "SP2", label: "SP2" },
-					{ value: "SP3", label: "SP3" },
-				],
-			},
-			{
-				key: "offense_details",
-				label: "Offense Details",
-				type: "textarea",
-				required: true,
-				placeholder: "Describe incident chronology and related policy breach.",
-			},
-			{
-				key: "validity_period",
-				label: "Validity Period",
-				type: "text",
-				required: true,
-				placeholder: "e.g. 6 months",
-			},
-			{
-				key: "corrective_actions",
-				label: "Corrective Actions",
-				type: "textarea",
-				required: false,
-				placeholder: "Expected improvement or corrective commitments.",
-			},
-		],
-		renderPreview: (ctx) => `
-			<div class="documents-preview-block">
-				<p>Date: ${ctx.formatted.letter_date}</p>
-				<p>Reference: ${ctx.formatted.warning_level}</p>
-			</div>
-			<div class="documents-preview-block">
-				<p>To: ${ctx.employeeName} (${ctx.employeePosition})</p>
-				<p>This letter serves as <strong>${ctx.formatted.warning_level}</strong> based on the following findings:</p>
-				<p>${formatMultiline(ctx.values.offense_details)}</p>
-				<p>This warning is valid for <strong>${ctx.formatted.validity_period}</strong> from the date of issuance.</p>
-			</div>
-			${
-				ctx.values.corrective_actions
-					? `<div class="documents-preview-block"><p><strong>Corrective Actions:</strong><br>${formatMultiline(ctx.values.corrective_actions)}</p></div>`
-					: ""
-			}
-			${renderSignatureBlock(ctx)}
-		`,
-	},
-	termination_letter: {
-		label: "Termination Letter",
-		description:
-			"Termination notice with final working date, rationale, and severance statement.",
-		fields: [
-			{
-				key: "letter_date",
-				label: "Letter Date",
-				type: "date",
-				required: true,
-				defaultValue: TODAY_ISO,
-			},
-			{
-				key: "last_working_day",
-				label: "Last Working Day",
-				type: "date",
-				required: true,
-			},
-			{
-				key: "termination_reason",
-				label: "Reason",
-				type: "textarea",
-				required: true,
-				placeholder: "Provide termination rationale clearly.",
-			},
-			{
-				key: "severance_details",
-				label: "Severance Details",
-				type: "textarea",
-				required: false,
-				placeholder: "Settlement and compensation notes.",
-			},
-		],
-		renderPreview: (ctx) => `
-			<div class="documents-preview-block">
-				<p>Date: ${ctx.formatted.letter_date}</p>
-				<p>Subject: Employment Termination Notice</p>
-			</div>
-			<div class="documents-preview-block">
-				<p>Dear ${ctx.employeeName},</p>
-				<p>This letter confirms the termination of your employment as <strong>${ctx.employeePosition}</strong> effective on <strong>${ctx.formatted.last_working_day}</strong>.</p>
-				<p><strong>Reason:</strong><br>${formatMultiline(ctx.values.termination_reason)}</p>
-				${
-					ctx.values.severance_details
-						? `<p><strong>Severance Details:</strong><br>${formatMultiline(ctx.values.severance_details)}</p>`
-						: ""
-				}
-			</div>
-			${renderSignatureBlock(ctx)}
-		`,
-	},
-};
+const FALLBACK_CONTRACT_TYPES = ["PKWT", "PKWTT", "PKHL"];
+const FALLBACK_WARNING_LEVELS = ["SP1", "SP2", "SP3"];
 
 const documentsDraft = {
+	subjectMode: "employee",
 	employeeId: "",
+	manualIdentity: {
+		name: "",
+		legal_name: "",
+		position: "",
+		department: "",
+		place_of_birth: "",
+		date_of_birth: "",
+		address: "",
+		nik_number: "",
+		job_level: "",
+	},
+	signerId: "",
+	signerRoleOverride: "",
 	documentType: "",
+	templateId: "",
 	fields: {},
+	payroll: {
+		earnings: [{ name: "Tunjangan", amount: "" }],
+		deductions: [{ name: "PPh21", amount: "" }],
+	},
 };
 
 function canAccessDocuments() {
@@ -327,14 +40,6 @@ function listEmployees() {
 	return Object.values(state.db || {}).sort((a, b) =>
 		String(a?.name || "").localeCompare(String(b?.name || "")),
 	);
-}
-
-function getTemplate(type = documentsDraft.documentType) {
-	return DOCUMENT_TEMPLATES[type] || null;
-}
-
-function getSelectedEmployee() {
-	return state.db?.[documentsDraft.employeeId] || null;
 }
 
 function normalizeNumber(value) {
@@ -372,14 +77,435 @@ function formatMultiline(value) {
 	return escapeHTML(String(value || "")).replace(/\n/g, "<br>");
 }
 
-function renderSignatureBlock(ctx) {
-	return `
-		<div class="documents-preview-signature">
-			<p class="mb-1">Approved by,</p>
-			<p class="mb-0"><strong>${ctx.signerName}</strong></p>
-			<p class="small text-muted mb-0">${ctx.signerRole}</p>
-		</div>
-	`;
+function slugify(value, fallback = "manual-subject") {
+	return (
+		String(value || "")
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "") || fallback
+	);
+}
+
+function getReferenceOptions(groupKey, fallback = []) {
+	const items = Array.isArray(state.hrDocumentReferenceOptions)
+		? state.hrDocumentReferenceOptions
+				.filter(
+					(item) =>
+						String(item?.group_key || "") === String(groupKey || "") &&
+						item?.is_active !== false,
+				)
+				.sort((a, b) => Number(a?.sort_order || 0) - Number(b?.sort_order || 0))
+		: [];
+
+	if (items.length > 0) {
+		return items.map((item) => ({
+			value: String(item?.option_value || item?.option_key || ""),
+			label: String(item?.option_label || item?.option_value || item?.option_key || ""),
+		}));
+	}
+
+	return fallback.map((value) => ({ value, label: value }));
+}
+
+function getContractTypeOptions() {
+	return getReferenceOptions("contract_type", FALLBACK_CONTRACT_TYPES);
+}
+
+function getWarningLevelOptions() {
+	return getReferenceOptions("sp_level", FALLBACK_WARNING_LEVELS);
+}
+
+function getSelectedSigner() {
+	const selected = state.db?.[documentsDraft.signerId];
+	if (selected) return selected;
+	if (state.currentUser?.id && state.db?.[state.currentUser.id]) {
+		return state.db[state.currentUser.id];
+	}
+	return null;
+}
+
+function getSelectedSubject() {
+	if (documentsDraft.subjectMode === "manual") {
+		const manualName = String(documentsDraft.manualIdentity.name || "").trim();
+		if (!manualName) return null;
+		return {
+			id: `manual-${slugify(manualName)}`,
+			name: manualName,
+			legal_name:
+				String(documentsDraft.manualIdentity.legal_name || "").trim() || manualName,
+			position: String(documentsDraft.manualIdentity.position || "").trim(),
+			department: String(documentsDraft.manualIdentity.department || "").trim(),
+			place_of_birth: String(documentsDraft.manualIdentity.place_of_birth || "").trim(),
+			date_of_birth: String(documentsDraft.manualIdentity.date_of_birth || "").trim(),
+			address: String(documentsDraft.manualIdentity.address || "").trim(),
+			nik_number: String(documentsDraft.manualIdentity.nik_number || "").trim(),
+			job_level: String(documentsDraft.manualIdentity.job_level || "").trim(),
+		};
+	}
+
+	return state.db?.[documentsDraft.employeeId] || null;
+}
+
+function getDocumentConfig(type = documentsDraft.documentType) {
+	const contractTypeOptions = getContractTypeOptions();
+	const warningLevelOptions = getWarningLevelOptions();
+	const byType = {
+		offer_letter: {
+			label: "Offer Letter",
+			description:
+				"Manual candidate offer with contract type, benefits, and dual-sign preview.",
+			defaultSubjectMode: "manual",
+			allowedSubjectModes: ["manual"],
+			fields: () => {
+				const contractType = String(documentsDraft.fields.contract_type || "");
+				return [
+					{
+						key: "nomor_surat",
+						label: "Nomor Surat",
+						type: "text",
+						required: true,
+						placeholder: "e.g. 001/HR/IV/2026",
+					},
+					{
+						key: "letter_date",
+						label: "Letter Date",
+						type: "date",
+						required: true,
+						defaultValue: TODAY_ISO,
+					},
+					{
+						key: "start_date",
+						label: "Start Date",
+						type: "date",
+						required: true,
+					},
+					{
+						key: "contract_type",
+						label: "Type of Contract",
+						type: "select",
+						required: true,
+						options: contractTypeOptions,
+					},
+					{
+						key: "basic_salary",
+						label: "Basic Salary (IDR)",
+						type: "number",
+						required: true,
+						placeholder: "e.g. 8500000",
+					},
+					{
+						key: "benefits",
+						label: "Benefits",
+						type: "textarea",
+						required: false,
+						placeholder: "List benefits, one per line.",
+					},
+					...(contractType === "PKWTT"
+						? [
+								{
+									key: "probation_duration",
+									label: "Probation Duration",
+									type: "text",
+									required: true,
+									placeholder: "e.g. 3 months",
+								},
+						  ]
+						: []),
+					...(contractType && contractType !== "PKWTT"
+						? [
+								{
+									key: "contract_duration",
+									label: "Contract Duration",
+									type: "text",
+									required: true,
+									placeholder: "e.g. 12 months",
+								},
+						  ]
+						: []),
+				];
+			},
+		},
+		employment_contract: {
+			label: "Employment Contract",
+			description:
+				"Contract setup with subject source, signer override, and contract-type-aware fields.",
+			defaultSubjectMode: "employee",
+			allowedSubjectModes: ["employee", "manual"],
+			fields: () => {
+				const contractType = String(documentsDraft.fields.contract_type || "");
+				return [
+					{
+						key: "contract_number",
+						label: "Contract Number",
+						type: "text",
+						required: true,
+						placeholder: "e.g. PKWT/HR/2026/001",
+					},
+					{
+						key: "letter_date",
+						label: "Contract Date",
+						type: "date",
+						required: true,
+						defaultValue: TODAY_ISO,
+					},
+					{
+						key: "contract_start_date",
+						label: "Contract Start Date",
+						type: "date",
+						required: true,
+					},
+					{
+						key: "contract_type",
+						label: "Type of Contract",
+						type: "select",
+						required: true,
+						options: contractTypeOptions,
+					},
+					{
+						key: "work_location",
+						label: "Work Location",
+						type: "text",
+						required: true,
+						placeholder: "e.g. Jakarta HQ",
+					},
+					{
+						key: "job_description",
+						label: "Job Description",
+						type: "textarea",
+						required: false,
+						placeholder: "Summarize responsibilities and expected scope.",
+					},
+					{
+						key: "basic_salary",
+						label: "Basic Salary (IDR)",
+						type: "number",
+						required: true,
+						placeholder: "e.g. 8500000",
+					},
+					...(contractType === "PKWTT"
+						? [
+								{
+									key: "probation_duration",
+									label: "Probation Duration",
+									type: "text",
+									required: true,
+									placeholder: "e.g. 3 months",
+								},
+						  ]
+						: []),
+					...(contractType && contractType !== "PKWTT"
+						? [
+								{
+									key: "contract_duration",
+									label: "Contract Duration",
+									type: "text",
+									required: true,
+									placeholder: "e.g. 12 months",
+								},
+						  ]
+						: []),
+				];
+			},
+		},
+		payslip: {
+			label: "Payslip",
+			description:
+				"Employee payslip with dynamic named earnings and deduction rows.",
+			defaultSubjectMode: "employee",
+			allowedSubjectModes: ["employee"],
+			fields: () => [
+				{
+					key: "period",
+					label: "Payroll Period",
+					type: "month",
+					required: true,
+				},
+				{
+					key: "pay_date",
+					label: "Pay Date",
+					type: "date",
+					required: true,
+					defaultValue: TODAY_ISO,
+				},
+				{
+					key: "basic_salary",
+					label: "Basic Salary (IDR)",
+					type: "number",
+					required: true,
+					placeholder: "e.g. 8500000",
+				},
+			],
+		},
+		warning_letter: {
+			label: "Warning Letter (SP)",
+			description:
+				"Formal disciplinary notice with issuer selection and offense outcome detail.",
+			defaultSubjectMode: "employee",
+			allowedSubjectModes: ["employee"],
+			fields: () => [
+				{
+					key: "letter_date",
+					label: "Letter Date",
+					type: "date",
+					required: true,
+					defaultValue: TODAY_ISO,
+				},
+				{
+					key: "warning_level",
+					label: "Warning Level",
+					type: "select",
+					required: true,
+					options: warningLevelOptions,
+				},
+				{
+					key: "offense_details",
+					label: "Offense Details",
+					type: "textarea",
+					required: true,
+					placeholder: "Describe incident chronology and related policy breach.",
+				},
+				{
+					key: "offense_impact",
+					label: "Outcome to Company",
+					type: "textarea",
+					required: false,
+					placeholder: "Describe the impact or outcome of the offense.",
+				},
+				{
+					key: "validity_period",
+					label: "Validity Period",
+					type: "text",
+					required: true,
+					placeholder: "e.g. 6 months",
+				},
+				{
+					key: "corrective_actions",
+					label: "Corrective Actions",
+					type: "textarea",
+					required: false,
+					placeholder: "Expected improvement or corrective commitments.",
+				},
+			],
+		},
+		termination_letter: {
+			label: "Termination Letter",
+			description:
+				"Termination setup with reason, legal/company references, and sanction text.",
+			defaultSubjectMode: "employee",
+			allowedSubjectModes: ["employee"],
+			fields: () => [
+				{
+					key: "letter_date",
+					label: "Letter Date",
+					type: "date",
+					required: true,
+					defaultValue: TODAY_ISO,
+				},
+				{
+					key: "last_working_day",
+					label: "Last Working Day",
+					type: "date",
+					required: true,
+				},
+				{
+					key: "termination_reason",
+					label: "Reason",
+					type: "textarea",
+					required: true,
+					placeholder: "Provide termination rationale clearly.",
+				},
+				{
+					key: "legal_basis",
+					label: "Legal Basis",
+					type: "text",
+					required: false,
+					placeholder: "e.g. UU Ketenagakerjaan / internal regulation",
+				},
+				{
+					key: "company_policy_basis",
+					label: "Company Policy Basis",
+					type: "text",
+					required: false,
+					placeholder: "Reference internal policy / regulation.",
+				},
+				{
+					key: "outcome_summary",
+					label: "Outcome from Reason",
+					type: "textarea",
+					required: false,
+					placeholder: "Describe the resulting impact.",
+				},
+				{
+					key: "sanction_text",
+					label: "Sanction / Punishment",
+					type: "textarea",
+					required: false,
+					placeholder: "Describe sanction or punishment notes.",
+				},
+				{
+					key: "severance_details",
+					label: "Severance Details",
+					type: "textarea",
+					required: false,
+					placeholder: "Settlement and compensation notes.",
+				},
+			],
+		},
+	};
+
+	return byType[type] || null;
+}
+
+function defaultSubjectModeForType(type) {
+	const config = getDocumentConfig(type);
+	return config?.defaultSubjectMode || "employee";
+}
+
+function isSubjectModeAllowed(type, mode) {
+	const config = getDocumentConfig(type);
+	return Boolean(config?.allowedSubjectModes?.includes(mode));
+}
+
+function getFilteredTemplates(type = documentsDraft.documentType) {
+	const selectedContractType = String(documentsDraft.fields.contract_type || "");
+	return Array.isArray(state.hrDocumentTemplates)
+		? state.hrDocumentTemplates.filter((item) => {
+				if (String(item?.document_type || "") !== String(type || "")) return false;
+				if (!selectedContractType) return true;
+				if (type !== "employment_contract") return true;
+				return String(item?.contract_type || "") === selectedContractType;
+		  })
+		: [];
+}
+
+function getTemplate(type = documentsDraft.documentType) {
+	const config = getDocumentConfig(type);
+	if (!config) return null;
+
+	const candidates = getFilteredTemplates(type);
+	const selected =
+		candidates.find((item) => String(item?.id || "") === String(documentsDraft.templateId || "")) ||
+		candidates.find((item) => item?.is_default) ||
+		candidates[0] ||
+		null;
+
+	return {
+		id: selected?.id || "",
+		label: String(selected?.template_name || config.label),
+		description: config.description,
+		header: selected?.header_json || {},
+		record: selected,
+		...config,
+		fields: typeof config.fields === "function" ? config.fields() : config.fields || [],
+	};
+}
+
+function resetPayrollRows() {
+	documentsDraft.payroll = {
+		earnings: [{ name: "Tunjangan", amount: "" }],
+		deductions: [{ name: "PPh21", amount: "" }],
+	};
 }
 
 function ensureTemplateDefaults() {
@@ -390,36 +516,66 @@ function ensureTemplateDefaults() {
 		if (field.defaultValue === undefined) return;
 		documentsDraft.fields[field.key] = String(field.defaultValue);
 	});
+
+	if (!documentsDraft.signerId) {
+		const fallbackSigner = getSelectedSigner();
+		if (fallbackSigner?.id) documentsDraft.signerId = String(fallbackSigner.id);
+		else if (state.currentUser?.id) documentsDraft.signerId = String(state.currentUser.id);
+	}
+
+	const templates = getFilteredTemplates(documentsDraft.documentType);
+	if (!documentsDraft.templateId && templates.length > 0) {
+		const preferred = templates.find((item) => item?.is_default) || templates[0];
+		documentsDraft.templateId = String(preferred?.id || "");
+	}
 }
 
 function getMissingRequiredFields() {
 	const template = getTemplate();
+	const subject = getSelectedSubject();
 	if (!template) return [];
-	return template.fields.filter((field) => {
-		if (!field.required) return false;
+
+	const missing = [];
+	if (!subject) {
+		missing.push({
+			key: documentsDraft.subjectMode === "manual" ? "manual_identity" : "employeeId",
+			label:
+				documentsDraft.subjectMode === "manual"
+					? "Candidate / manual subject"
+					: "Employee",
+		});
+	}
+
+	template.fields.forEach((field) => {
+		if (!field.required) return;
 		const value = String(documentsDraft.fields?.[field.key] || "").trim();
-		return !value;
+		if (!value) missing.push(field);
 	});
+
+	if (!documentsDraft.signerId && !getSelectedSigner()) {
+		missing.push({ key: "signer", label: "Company signer" });
+	}
+
+	if (documentsDraft.documentType === "payslip") {
+		const invalidEarnings = documentsDraft.payroll.earnings.some(
+			(row) => !String(row?.name || "").trim() || !String(row?.amount || "").trim(),
+		);
+		const invalidDeductions = documentsDraft.payroll.deductions.some(
+			(row) => !String(row?.name || "").trim() || !String(row?.amount || "").trim(),
+		);
+		if (invalidEarnings) {
+			missing.push({ key: "earnings_rows", label: "Allowance / earning rows" });
+		}
+		if (invalidDeductions) {
+			missing.push({ key: "deduction_rows", label: "Deduction rows" });
+		}
+	}
+
+	return missing;
 }
 
 function isDraftReady() {
-	return Boolean(getSelectedEmployee() && getTemplate() && getMissingRequiredFields().length === 0);
-}
-
-function setControlsDisabled(disabled) {
-	[
-		"doc-employee-select",
-		"doc-type-select",
-		"doc-download-btn",
-		"doc-reset-btn",
-	].forEach((id) => {
-		const el = document.getElementById(id);
-		if (el) el.disabled = Boolean(disabled);
-	});
-
-	document.querySelectorAll("#doc-dynamic-fields [data-doc-field]").forEach((field) => {
-		field.disabled = Boolean(disabled);
-	});
+	return Boolean(getTemplate() && getMissingRequiredFields().length === 0);
 }
 
 function renderEmployeeOptions() {
@@ -439,7 +595,24 @@ function renderEmployeeOptions() {
 			const position = String(employee?.position || "-");
 			const department = String(employee?.department || "-");
 			const selected = documentsDraft.employeeId === id ? "selected" : "";
-			return `<option value="${escapeHTML(id)}" ${selected}>${escapeHTML(name)} • ${escapeHTML(position)} • ${escapeHTML(department)}</option>`;
+			return `<option value="${escapeHTML(id)}" ${selected}>${escapeHTML(name)} - ${escapeHTML(position)} - ${escapeHTML(department)}</option>`;
+		}),
+	].join("");
+}
+
+function renderSignerOptions() {
+	const signerSelect = document.getElementById("doc-signer-select");
+	if (!signerSelect) return;
+
+	const employees = listEmployees();
+	signerSelect.innerHTML = [
+		'<option value="">-- Select Signer --</option>',
+		...employees.map((employee) => {
+			const id = String(employee?.id || "");
+			const name = String(employee?.name || id);
+			const position = String(employee?.position || "-");
+			const selected = documentsDraft.signerId === id ? "selected" : "";
+			return `<option value="${escapeHTML(id)}" ${selected}>${escapeHTML(name)} - ${escapeHTML(position)}</option>`;
 		}),
 	].join("");
 }
@@ -448,16 +621,63 @@ function renderDocumentTypeOptions() {
 	const typeSelect = document.getElementById("doc-type-select");
 	if (!typeSelect) return;
 
-	if (documentsDraft.documentType && !getTemplate(documentsDraft.documentType)) {
-		documentsDraft.documentType = "";
-		documentsDraft.fields = {};
-	}
-
 	typeSelect.innerHTML = [
 		'<option value="">-- Select Document Type --</option>',
-		...Object.entries(DOCUMENT_TEMPLATES).map(([value, template]) => {
-			const selected = documentsDraft.documentType === value ? "selected" : "";
-			return `<option value="${escapeHTML(value)}" ${selected}>${escapeHTML(template.label)}</option>`;
+		...["offer_letter", "employment_contract", "payslip", "warning_letter", "termination_letter"].map(
+			(type) => {
+				const config = getDocumentConfig(type);
+				const selected = documentsDraft.documentType === type ? "selected" : "";
+				return `<option value="${escapeHTML(type)}" ${selected}>${escapeHTML(config?.label || type)}</option>`;
+			},
+		),
+	].join("");
+}
+
+function renderSubjectModeOptions() {
+	const select = document.getElementById("doc-subject-mode");
+	if (!select) return;
+	const config = getDocumentConfig();
+	if (!config) {
+		select.innerHTML = '<option value="employee">Employee Database</option>';
+		select.disabled = true;
+		return;
+	}
+
+	select.disabled = false;
+	select.innerHTML = (config.allowedSubjectModes || ["employee"])
+		.map((mode) => {
+			const label = mode === "manual" ? "Manual Entry" : "Employee Database";
+			const selected = documentsDraft.subjectMode === mode ? "selected" : "";
+			return `<option value="${escapeHTML(mode)}" ${selected}>${escapeHTML(label)}</option>`;
+		})
+		.join("");
+}
+
+function renderTemplateOptions() {
+	const select = document.getElementById("doc-template-select");
+	if (!select) return;
+
+	const templates = getFilteredTemplates();
+	if (!documentsDraft.documentType) {
+		select.disabled = true;
+		select.innerHTML = '<option value="">-- Select Template --</option>';
+		return;
+	}
+
+	if (!documentsDraft.templateId && templates.length > 0) {
+		const preferred = templates.find((item) => item?.is_default) || templates[0];
+		documentsDraft.templateId = String(preferred?.id || "");
+	}
+
+	select.disabled = false;
+	select.innerHTML = [
+		'<option value="">-- Select Template --</option>',
+		...templates.map((template) => {
+			const value = String(template?.id || "");
+			const label = String(template?.template_name || template?.document_type || "Template");
+			const suffix = template?.contract_type ? ` (${template.contract_type})` : "";
+			const selected = documentsDraft.templateId === value ? "selected" : "";
+			return `<option value="${escapeHTML(value)}" ${selected}>${escapeHTML(`${label}${suffix}`)}</option>`;
 		}),
 	].join("");
 }
@@ -470,7 +690,107 @@ function renderTemplateHint() {
 		hintEl.innerHTML = "Choose a document type to load template details.";
 		return;
 	}
-	hintEl.innerHTML = `<span class="fw-semibold">${escapeHTML(template.label)}:</span> ${escapeHTML(template.description)}`;
+
+	const templateLabel = template.id ? template.label : `${template.label} (default layout)`;
+	hintEl.innerHTML = `<span class="fw-semibold">${escapeHTML(templateLabel)}:</span> ${escapeHTML(template.description)}`;
+}
+
+function renderSubjectSourceSection() {
+	const employeeWrap = document.getElementById("doc-employee-wrap");
+	const manualWrap = document.getElementById("doc-manual-identity-wrap");
+	if (!employeeWrap || !manualWrap) return;
+
+	const manualMode = documentsDraft.subjectMode === "manual";
+	employeeWrap.classList.toggle("d-none", manualMode);
+	manualWrap.classList.toggle("d-none", !manualMode);
+
+	manualWrap.innerHTML = manualMode
+		? `
+			<div class="vstack gap-3">
+				<div>
+					<label class="form-label small fw-bold text-muted">Candidate / Employee Name</label>
+					<input id="doc-manual-name" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.name || "")}" placeholder="e.g. Andi Saputra">
+				</div>
+				<div>
+					<label class="form-label small fw-bold text-muted">Legal Name</label>
+					<input id="doc-manual-legal-name" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.legal_name || "")}" placeholder="Optional if different from display name">
+				</div>
+				<div class="row g-3">
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">Title / Position</label>
+						<input id="doc-manual-position" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.position || "")}" placeholder="e.g. Backend Engineer">
+					</div>
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">Department</label>
+						<input id="doc-manual-department" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.department || "")}" placeholder="e.g. Engineering">
+					</div>
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">Place of Birth</label>
+						<input id="doc-manual-place-of-birth" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.place_of_birth || "")}" placeholder="e.g. Jakarta">
+					</div>
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">Date of Birth</label>
+						<input id="doc-manual-date-of-birth" type="date" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.date_of_birth || "")}">
+					</div>
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">NIK Number</label>
+						<input id="doc-manual-nik-number" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.nik_number || "")}" placeholder="16-digit national ID">
+					</div>
+					<div class="col-md-6">
+						<label class="form-label small fw-bold text-muted">Job Level</label>
+						<input id="doc-manual-job-level" type="text" class="form-control" value="${escapeHTML(documentsDraft.manualIdentity.job_level || "")}" placeholder="e.g. Staff / Senior Staff">
+					</div>
+				</div>
+				<div>
+					<label class="form-label small fw-bold text-muted">Address</label>
+					<textarea id="doc-manual-address" class="form-control" rows="2" placeholder="Full address">${escapeHTML(documentsDraft.manualIdentity.address || "")}</textarea>
+				</div>
+			</div>
+		`
+		: "";
+
+	const fields = [
+		["doc-manual-name", "name"],
+		["doc-manual-legal-name", "legal_name"],
+		["doc-manual-position", "position"],
+		["doc-manual-department", "department"],
+		["doc-manual-place-of-birth", "place_of_birth"],
+		["doc-manual-date-of-birth", "date_of_birth"],
+		["doc-manual-nik-number", "nik_number"],
+		["doc-manual-job-level", "job_level"],
+		["doc-manual-address", "address"],
+	];
+
+	fields.forEach(([id, key]) => {
+		const el = document.getElementById(id);
+		if (!el) return;
+		el.addEventListener("input", (event) => {
+			documentsDraft.manualIdentity[key] = String(event.currentTarget?.value || "");
+			renderPreview();
+			refreshValidationState();
+		});
+	});
+}
+
+function renderSignerSummary() {
+	const target = document.getElementById("doc-signer-summary");
+	if (!target) return;
+	const signer = getSelectedSigner();
+	const overrideTitle = String(documentsDraft.signerRoleOverride || "").trim();
+	if (!signer) {
+		target.innerHTML = '<div class="small text-muted">Choose the company-side signer for this document.</div>';
+		return;
+	}
+
+	const title = overrideTitle || signer.position || signer.role || "-";
+	const hasImage = signer.signature_image_url ? "Digital signature image available" : "No signature image uploaded yet";
+	target.innerHTML = `
+		<div class="small">
+			<div class="fw-semibold">${escapeHTML(String(signer.name || signer.id || "Signer"))}</div>
+			<div class="text-muted">${escapeHTML(String(title || "-"))}</div>
+			<div class="text-muted">${escapeHTML(hasImage)}</div>
+		</div>
+	`;
 }
 
 function renderFieldControl(field) {
@@ -525,6 +845,44 @@ function renderFieldControl(field) {
 	`;
 }
 
+function renderPayrollRows() {
+	if (documentsDraft.documentType !== "payslip") return "";
+
+	const renderGroup = (title, rows, rowType, addLabel) => `
+		<div class="documents-payroll-group">
+			<div class="d-flex justify-content-between align-items-center mb-2">
+				<div class="small fw-bold text-muted text-uppercase">${escapeHTML(title)}</div>
+				<button type="button" class="btn btn-outline-primary btn-sm" data-doc-payroll-add="${escapeHTML(rowType)}">${escapeHTML(addLabel)}</button>
+			</div>
+			<div class="vstack gap-2">
+				${rows
+					.map(
+						(row, index) => `
+							<div class="row g-2 align-items-center" data-doc-payroll-row="${escapeHTML(`${rowType}:${index}`)}">
+								<div class="col-7">
+									<input type="text" class="form-control" data-doc-payroll-name="${escapeHTML(`${rowType}:${index}`)}" value="${escapeHTML(row.name || "")}" placeholder="Component name">
+								</div>
+								<div class="col-4">
+									<input type="number" class="form-control" data-doc-payroll-amount="${escapeHTML(`${rowType}:${index}`)}" value="${escapeHTML(String(row.amount || ""))}" placeholder="0">
+								</div>
+								<div class="col-1">
+									<button type="button" class="btn btn-outline-danger btn-sm w-100" data-doc-payroll-remove="${escapeHTML(`${rowType}:${index}`)}">-</button>
+								</div>
+							</div>`,
+					)
+					.join("")}
+			</div>
+		</div>
+	`;
+
+	return `
+		<div class="documents-payroll-editor vstack gap-3">
+			${renderGroup("Allowance / Earnings", documentsDraft.payroll.earnings, "earnings", "Add Row")}
+			${renderGroup("Deductions", documentsDraft.payroll.deductions, "deductions", "Add Row")}
+		</div>
+	`;
+}
+
 function renderDynamicFields() {
 	const container = document.getElementById("doc-dynamic-fields");
 	if (!container) return;
@@ -536,13 +894,80 @@ function renderDynamicFields() {
 		return;
 	}
 
-	container.innerHTML = template.fields.map(renderFieldControl).join("");
+	container.innerHTML = `
+		${template.fields.map(renderFieldControl).join("")}
+		${renderPayrollRows()}
+	`;
 
 	container.querySelectorAll("[data-doc-field]").forEach((input) => {
 		const eventName = input.tagName === "SELECT" ? "change" : "input";
 		input.addEventListener(eventName, (event) => {
 			const key = String(event.currentTarget?.dataset?.docField || "");
 			documentsDraft.fields[key] = String(event.currentTarget?.value || "");
+
+			if (key === "contract_type") {
+				renderTemplateOptions();
+				ensureTemplateDefaults();
+				renderTemplateHint();
+				renderDynamicFields();
+			}
+
+			renderPreview();
+			refreshValidationState();
+		});
+	});
+
+	container.querySelectorAll("[data-doc-payroll-add]").forEach((button) => {
+		button.addEventListener("click", (event) => {
+			const type = String(event.currentTarget?.dataset?.docPayrollAdd || "");
+			const targetRows =
+				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			targetRows.push({ name: "", amount: "" });
+			renderDynamicFields();
+			refreshValidationState();
+			renderPreview();
+		});
+	});
+
+	container.querySelectorAll("[data-doc-payroll-remove]").forEach((button) => {
+		button.addEventListener("click", (event) => {
+			const [type, rawIndex] = String(
+				event.currentTarget?.dataset?.docPayrollRemove || "",
+			).split(":");
+			const index = Number(rawIndex);
+			const targetRows =
+				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			targetRows.splice(index, 1);
+			if (targetRows.length === 0) targetRows.push({ name: "", amount: "" });
+			renderDynamicFields();
+			refreshValidationState();
+			renderPreview();
+		});
+	});
+
+	container.querySelectorAll("[data-doc-payroll-name]").forEach((input) => {
+		input.addEventListener("input", (event) => {
+			const [type, rawIndex] = String(
+				event.currentTarget?.dataset?.docPayrollName || "",
+			).split(":");
+			const index = Number(rawIndex);
+			const targetRows =
+				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			if (targetRows[index]) targetRows[index].name = String(event.currentTarget?.value || "");
+			renderPreview();
+			refreshValidationState();
+		});
+	});
+
+	container.querySelectorAll("[data-doc-payroll-amount]").forEach((input) => {
+		input.addEventListener("input", (event) => {
+			const [type, rawIndex] = String(
+				event.currentTarget?.dataset?.docPayrollAmount || "",
+			).split(":");
+			const index = Number(rawIndex);
+			const targetRows =
+				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			if (targetRows[index]) targetRows[index].amount = String(event.currentTarget?.value || "");
 			renderPreview();
 			refreshValidationState();
 		});
@@ -550,9 +975,10 @@ function renderDynamicFields() {
 }
 
 function buildPreviewContext() {
-	const employee = getSelectedEmployee();
+	const subject = getSelectedSubject();
 	const template = getTemplate();
-	if (!employee || !template) return null;
+	const signer = getSelectedSigner();
+	if (!subject || !template) return null;
 
 	const values = {};
 	template.fields.forEach((field) => {
@@ -564,6 +990,29 @@ function buildPreviewContext() {
 			.filter((field) => field.type === "number")
 			.map((field) => [field.key, normalizeNumber(values[field.key])]),
 	);
+
+	const payroll = {
+		earnings: documentsDraft.payroll.earnings
+			.map((row) => ({
+				name: String(row?.name || "").trim(),
+				amount: normalizeNumber(row?.amount),
+			}))
+			.filter((row) => row.name || row.amount),
+		deductions: documentsDraft.payroll.deductions
+			.map((row) => ({
+				name: String(row?.name || "").trim(),
+				amount: normalizeNumber(row?.amount),
+			}))
+			.filter((row) => row.name || row.amount),
+	};
+
+	const totals = {
+		totalEarnings:
+			normalizeNumber(values.basic_salary) +
+			payroll.earnings.reduce((sum, row) => sum + row.amount, 0),
+		totalDeductions: payroll.deductions.reduce((sum, row) => sum + row.amount, 0),
+	};
+	totals.netPay = totals.totalEarnings - totals.totalDeductions;
 
 	const formatted = {};
 	Object.entries(values).forEach(([key, value]) => {
@@ -582,28 +1031,186 @@ function buildPreviewContext() {
 		formatted[`${key}_currency`] = formatCurrencyId(value);
 	});
 
-	const signerName = escapeHTML(state.currentUser?.name || "HR Representative");
-	const signerRoleRaw = String(state.currentUser?.role || "hr");
-	const signerRole = signerRoleRaw === "superadmin" ? "Superadmin" : "HR";
+	const signerName = escapeHTML(
+		String(signer?.name || state.currentUser?.name || "HR Representative"),
+	);
+	const signerRole = escapeHTML(
+		String(documentsDraft.signerRoleOverride || signer?.position || signer?.role || "HR"),
+	);
 
 	return {
-		employee,
+		subject,
+		employee: subject,
 		template,
 		values,
 		numbers,
 		formatted,
+		payroll,
+		totals,
 		companyName: escapeHTML(
 			String(state.appSettings?.company_name || "").trim() || "Company",
 		),
 		appName: escapeHTML(
 			String(state.appSettings?.app_name || "").trim() || "HR Performance Suite",
 		),
-		employeeName: escapeHTML(String(employee.name || employee.id || "Employee")),
-		employeePosition: escapeHTML(String(employee.position || "-")),
-		employeeDepartment: escapeHTML(String(employee.department || "-")),
+		subjectName: escapeHTML(String(subject.name || subject.id || "Employee")),
+		subjectPosition: escapeHTML(String(subject.position || "-")),
+		subjectDepartment: escapeHTML(String(subject.department || "-")),
+		subjectJobLevel: escapeHTML(String(subject.job_level || "-")),
+		subjectPlaceOfBirth: escapeHTML(String(subject.place_of_birth || "-")),
+		subjectDateOfBirth: escapeHTML(formatDateLong(subject.date_of_birth || "")),
+		subjectAddress: escapeHTML(String(subject.address || "-")),
+		subjectNik: escapeHTML(String(subject.nik_number || "-")),
 		signerName,
 		signerRole,
+		signerHasImage: Boolean(signer?.signature_image_url),
 	};
+}
+
+function renderSignatureBlock(ctx, options = {}) {
+	const signerMeta = ctx.signerHasImage
+		? '<p class="small text-muted mb-0">Digital signature image available</p>'
+		: '<p class="small text-muted mb-0">Signature image not uploaded</p>';
+	const recipientTitle =
+		documentsDraft.documentType === "offer_letter"
+			? "Candidate acknowledgment"
+			: "Employee acknowledgment";
+
+	return `
+		<div class="documents-preview-signature-grid">
+			<div class="documents-preview-signature">
+				<p class="mb-1">Approved by,</p>
+				<p class="mb-0"><strong>${ctx.signerName}</strong></p>
+				<p class="small text-muted mb-0">${ctx.signerRole}</p>
+				${signerMeta}
+			</div>
+			${
+				options.includeRecipient
+					? `<div class="documents-preview-signature">
+						<p class="mb-1">${recipientTitle}</p>
+						<p class="mb-0"><strong>${ctx.subjectName}</strong></p>
+						<p class="small text-muted mb-0">${ctx.subjectPosition}</p>
+					</div>`
+					: ""
+			}
+		</div>
+	`;
+}
+
+function renderTemplatePreview(ctx) {
+	switch (documentsDraft.documentType) {
+		case "offer_letter": {
+			const durationCopy =
+				ctx.values.contract_type === "PKWTT"
+					? `Probation period: <strong>${ctx.formatted.probation_duration}</strong>.`
+					: `Contract duration: <strong>${ctx.formatted.contract_duration}</strong>.`;
+			return `
+				<div class="documents-preview-block">
+					<p>Date: ${ctx.formatted.letter_date}</p>
+					<p>Nomor Surat: <strong>${ctx.formatted.nomor_surat}</strong></p>
+					<p>Contract Type: <strong>${ctx.formatted.contract_type}</strong></p>
+				</div>
+				<div class="documents-preview-block">
+					<p>Dear ${ctx.subjectName},</p>
+					<p>We are pleased to offer you the position of <strong>${ctx.subjectPosition}</strong> in <strong>${ctx.subjectDepartment}</strong> effective on <strong>${ctx.formatted.start_date}</strong>.</p>
+					<p>${durationCopy}</p>
+					<p>Base monthly salary: <strong>${ctx.formatted.basic_salary_currency}</strong>.</p>
+				</div>
+				${
+					ctx.values.benefits
+						? `<div class="documents-preview-block"><p><strong>Benefits</strong><br>${formatMultiline(ctx.values.benefits)}</p></div>`
+						: ""
+				}
+				${renderSignatureBlock(ctx, { includeRecipient: true })}
+			`;
+		}
+		case "employment_contract":
+			return `
+				<div class="documents-preview-block">
+					<p>Contract Number: <strong>${ctx.formatted.contract_number}</strong></p>
+					<p>Date: ${ctx.formatted.letter_date}</p>
+					<p>Contract Type: <strong>${ctx.formatted.contract_type}</strong></p>
+				</div>
+				<div class="documents-preview-block">
+					<p>This employment agreement is made between <strong>${ctx.companyName}</strong> and <strong>${ctx.subjectName}</strong> for the role of <strong>${ctx.subjectPosition}</strong>.</p>
+					<p>Department: <strong>${ctx.subjectDepartment}</strong>. Job level: <strong>${ctx.subjectJobLevel}</strong>.</p>
+					<p>Place / DoB: <strong>${ctx.subjectPlaceOfBirth}</strong> / <strong>${ctx.subjectDateOfBirth}</strong>.</p>
+					<p>Address: <strong>${ctx.subjectAddress}</strong>. NIK: <strong>${ctx.subjectNik}</strong>.</p>
+					<p>Start date: <strong>${ctx.formatted.contract_start_date}</strong>. Work location: <strong>${ctx.formatted.work_location}</strong>.</p>
+					<p>${
+						ctx.values.contract_type === "PKWTT"
+							? `Probation duration: <strong>${ctx.formatted.probation_duration}</strong>.`
+							: `Contract duration: <strong>${ctx.formatted.contract_duration}</strong>.`
+					}</p>
+					<p>Base monthly salary: <strong>${ctx.formatted.basic_salary_currency}</strong>.</p>
+				</div>
+				${
+					ctx.values.job_description
+						? `<div class="documents-preview-block"><p><strong>Job Description</strong><br>${formatMultiline(ctx.values.job_description)}</p></div>`
+						: ""
+				}
+				${renderSignatureBlock(ctx, { includeRecipient: true })}
+			`;
+		case "payslip":
+			return `
+				<div class="documents-preview-block">
+					<p><strong>Employee:</strong> ${ctx.subjectName}</p>
+					<p><strong>Position:</strong> ${ctx.subjectPosition}</p>
+					<p><strong>Period:</strong> ${ctx.formatted.period_month}</p>
+					<p><strong>Pay Date:</strong> ${ctx.formatted.pay_date}</p>
+				</div>
+				<div class="documents-preview-block">
+					<div class="documents-preview-watermark small text-uppercase text-muted">Confidential Document</div>
+					<table class="table table-sm documents-preview-table mb-0">
+						<tbody>
+							<tr><td>Basic Salary</td><td class="text-end">${ctx.formatted.basic_salary_currency}</td></tr>
+							${ctx.payroll.earnings.map((row) => `<tr><td>${escapeHTML(row.name || "Allowance")}</td><td class="text-end">${formatCurrencyId(row.amount)}</td></tr>`).join("")}
+							<tr class="fw-semibold"><td>Total Earnings</td><td class="text-end">${formatCurrencyId(ctx.totals.totalEarnings)}</td></tr>
+							${ctx.payroll.deductions.map((row) => `<tr><td>${escapeHTML(row.name || "Deduction")}</td><td class="text-end">(${formatCurrencyId(row.amount)})</td></tr>`).join("")}
+							<tr class="fw-semibold"><td>Total Deductions</td><td class="text-end">(${formatCurrencyId(ctx.totals.totalDeductions)})</td></tr>
+							<tr class="fw-bold"><td>Net Pay</td><td class="text-end">${formatCurrencyId(ctx.totals.netPay)}</td></tr>
+						</tbody>
+					</table>
+				</div>
+				${renderSignatureBlock(ctx)}
+			`;
+		case "warning_letter":
+			return `
+				<div class="documents-preview-block">
+					<p>Date: ${ctx.formatted.letter_date}</p>
+					<p>Reference: ${ctx.formatted.warning_level}</p>
+				</div>
+				<div class="documents-preview-block">
+					<p>To: ${ctx.subjectName} (${ctx.subjectPosition})</p>
+					<p>This letter serves as <strong>${ctx.formatted.warning_level}</strong> based on the following findings:</p>
+					<p>${formatMultiline(ctx.values.offense_details)}</p>
+					<p>This warning is valid for <strong>${ctx.formatted.validity_period}</strong> from the date of issuance.</p>
+				</div>
+				${ctx.values.offense_impact ? `<div class="documents-preview-block"><p><strong>Outcome to Company:</strong><br>${formatMultiline(ctx.values.offense_impact)}</p></div>` : ""}
+				${ctx.values.corrective_actions ? `<div class="documents-preview-block"><p><strong>Corrective Actions:</strong><br>${formatMultiline(ctx.values.corrective_actions)}</p></div>` : ""}
+				${renderSignatureBlock(ctx)}
+			`;
+		case "termination_letter":
+			return `
+				<div class="documents-preview-block">
+					<p>Date: ${ctx.formatted.letter_date}</p>
+					<p>Subject: Employment Termination Notice</p>
+				</div>
+				<div class="documents-preview-block">
+					<p>Dear ${ctx.subjectName},</p>
+					<p>This letter confirms the termination of your employment as <strong>${ctx.subjectPosition}</strong> effective on <strong>${ctx.formatted.last_working_day}</strong>.</p>
+					<p><strong>Reason:</strong><br>${formatMultiline(ctx.values.termination_reason)}</p>
+				</div>
+				${ctx.values.legal_basis ? `<div class="documents-preview-block"><p><strong>Legal Basis:</strong><br>${formatMultiline(ctx.values.legal_basis)}</p></div>` : ""}
+				${ctx.values.company_policy_basis ? `<div class="documents-preview-block"><p><strong>Company Policy:</strong><br>${formatMultiline(ctx.values.company_policy_basis)}</p></div>` : ""}
+				${ctx.values.outcome_summary ? `<div class="documents-preview-block"><p><strong>Outcome:</strong><br>${formatMultiline(ctx.values.outcome_summary)}</p></div>` : ""}
+				${ctx.values.sanction_text ? `<div class="documents-preview-block"><p><strong>Sanction / Punishment:</strong><br>${formatMultiline(ctx.values.sanction_text)}</p></div>` : ""}
+				${ctx.values.severance_details ? `<div class="documents-preview-block"><p><strong>Severance Details:</strong><br>${formatMultiline(ctx.values.severance_details)}</p></div>` : ""}
+				${renderSignatureBlock(ctx)}
+			`;
+		default:
+			return "";
+	}
 }
 
 function renderPreview() {
@@ -614,23 +1221,27 @@ function renderPreview() {
 	if (!ctx) {
 		previewEl.innerHTML = `
 			<div class="documents-preview-empty">
-				Select employee and document type to start preview.
+				Select document type and complete the subject details to start preview.
 			</div>
 		`;
 		return;
 	}
 
+	const logoUrl = String(state.appSettings?.document_logo_url || "").trim();
 	previewEl.innerHTML = `
 		<div class="documents-preview-header">
-			<div class="documents-preview-company">${ctx.companyName}</div>
-			<div class="documents-preview-app">${ctx.appName}</div>
+			<div>
+				<div class="documents-preview-company">${ctx.companyName}</div>
+				<div class="documents-preview-app">${ctx.appName}</div>
+			</div>
+			${logoUrl ? `<img src="${escapeHTML(logoUrl)}" alt="Company logo" class="documents-preview-logo">` : ""}
 		</div>
 		<hr class="my-3">
 		<div class="documents-preview-title">${escapeHTML(ctx.template.label)}</div>
 		<div class="documents-preview-meta small text-muted mb-3">
-			Employee ID: ${escapeHTML(String(ctx.employee.id || "-"))}
+			Subject ID: ${escapeHTML(String(ctx.subject.id || "-"))}
 		</div>
-		${ctx.template.renderPreview(ctx)}
+		${renderTemplatePreview(ctx)}
 	`;
 }
 
@@ -661,6 +1272,19 @@ function markInvalidFields(missingFields) {
 		if (missingKeys.has(key)) input.classList.add("is-invalid");
 		else input.classList.remove("is-invalid");
 	});
+
+	const employeeSelect = document.getElementById("doc-employee-select");
+	if (employeeSelect) {
+		employeeSelect.classList.toggle("is-invalid", missingKeys.has("employeeId"));
+	}
+	const signerSelect = document.getElementById("doc-signer-select");
+	if (signerSelect) {
+		signerSelect.classList.toggle("is-invalid", missingKeys.has("signer"));
+	}
+	const manualName = document.getElementById("doc-manual-name");
+	if (manualName) {
+		manualName.classList.toggle("is-invalid", missingKeys.has("manual_identity"));
+	}
 }
 
 function refreshValidationState() {
@@ -679,9 +1303,46 @@ function refreshValidationState() {
 	markInvalidFields(missingFields);
 }
 
+function setControlsDisabled(disabled) {
+	[
+		"doc-subject-mode",
+		"doc-employee-select",
+		"doc-type-select",
+		"doc-template-select",
+		"doc-signer-select",
+		"doc-signer-role-override",
+		"doc-download-btn",
+		"doc-reset-btn",
+	].forEach((id) => {
+		const el = document.getElementById(id);
+		if (el) el.disabled = Boolean(disabled);
+	});
+
+	document.querySelectorAll("#doc-dynamic-fields input, #doc-dynamic-fields select, #doc-dynamic-fields textarea, #doc-manual-identity-wrap input, #doc-manual-identity-wrap textarea").forEach((field) => {
+		field.disabled = Boolean(disabled);
+	});
+}
+
+function rerenderDocumentWorkspace() {
+	renderSubjectModeOptions();
+	renderEmployeeOptions();
+	renderSignerOptions();
+	renderTemplateOptions();
+	renderTemplateHint();
+	renderSubjectSourceSection();
+	renderSignerSummary();
+	renderDynamicFields();
+	renderPreview();
+	refreshValidationState();
+}
+
 function bindSetupHandlers() {
 	const employeeSelect = document.getElementById("doc-employee-select");
 	const typeSelect = document.getElementById("doc-type-select");
+	const subjectModeSelect = document.getElementById("doc-subject-mode");
+	const templateSelect = document.getElementById("doc-template-select");
+	const signerSelect = document.getElementById("doc-signer-select");
+	const signerRoleInput = document.getElementById("doc-signer-role-override");
 	const downloadBtn = document.getElementById("doc-download-btn");
 	const resetBtn = document.getElementById("doc-reset-btn");
 
@@ -693,18 +1354,57 @@ function bindSetupHandlers() {
 		};
 	}
 
+	if (subjectModeSelect) {
+		subjectModeSelect.onchange = (event) => {
+			const nextMode = String(event.target?.value || "employee");
+			documentsDraft.subjectMode = isSubjectModeAllowed(documentsDraft.documentType, nextMode)
+				? nextMode
+				: defaultSubjectModeForType(documentsDraft.documentType);
+			rerenderDocumentWorkspace();
+		};
+	}
+
 	if (typeSelect) {
 		typeSelect.onchange = (event) => {
 			const nextType = String(event.target?.value || "");
 			if (nextType !== documentsDraft.documentType) {
 				documentsDraft.documentType = nextType;
+				documentsDraft.templateId = "";
 				documentsDraft.fields = {};
+				documentsDraft.subjectMode = defaultSubjectModeForType(nextType);
+				if (documentsDraft.subjectMode === "manual") {
+					documentsDraft.employeeId = "";
+				}
+				resetPayrollRows();
 			}
 			ensureTemplateDefaults();
+			rerenderDocumentWorkspace();
+		};
+	}
+
+	if (templateSelect) {
+		templateSelect.onchange = (event) => {
+			documentsDraft.templateId = String(event.target?.value || "");
 			renderTemplateHint();
-			renderDynamicFields();
 			renderPreview();
 			refreshValidationState();
+		};
+	}
+
+	if (signerSelect) {
+		signerSelect.onchange = (event) => {
+			documentsDraft.signerId = String(event.target?.value || "");
+			renderSignerSummary();
+			renderPreview();
+			refreshValidationState();
+		};
+	}
+
+	if (signerRoleInput) {
+		signerRoleInput.oninput = (event) => {
+			documentsDraft.signerRoleOverride = String(event.target?.value || "");
+			renderSignerSummary();
+			renderPreview();
 		};
 	}
 
@@ -720,22 +1420,36 @@ function bindSetupHandlers() {
 				if (!context) throw new Error("Document data is not ready for export.");
 				const { generateHrDocumentPdf } = await import("../lib/pdfTemplates.js");
 
+				const exportValues = {
+					...context.values,
+					probation_period:
+						context.values.probation_duration || context.values.probation_period || "",
+					contract_duration: context.values.contract_duration || "",
+					allowances: context.payroll.earnings.reduce((sum, row) => sum + row.amount, 0),
+					deductions: context.payroll.deductions.reduce((sum, row) => sum + row.amount, 0),
+				};
+
 				const { doc, filename } = generateHrDocumentPdf({
 					type: documentsDraft.documentType,
 					employee: {
-						id: context.employee.id,
-						name: context.employee.name,
-						position: context.employee.position,
-						department: context.employee.department,
+						id: context.subject.id,
+						name: context.subject.name,
+						position: context.subject.position,
+						department: context.subject.department,
 					},
-					values: context.values,
+					values: exportValues,
 					branding: {
 						companyName: String(state.appSettings?.company_name || "").trim(),
 						appName: String(state.appSettings?.app_name || "").trim(),
 					},
 					signer: {
-						name: String(state.currentUser?.name || "HR Representative"),
-						role: String(state.currentUser?.role || "hr"),
+						name: String(getSelectedSigner()?.name || state.currentUser?.name || "HR Representative"),
+						role: String(
+							documentsDraft.signerRoleOverride ||
+								getSelectedSigner()?.position ||
+								state.currentUser?.role ||
+								"hr",
+						),
 					},
 				});
 
@@ -743,12 +1457,15 @@ function bindSetupHandlers() {
 				await logActivity({
 					action: "document.generate",
 					entityType: "employee_document",
-					entityId: context.employee.id,
+					entityId: context.subject.id,
 					details: {
 						document_type: documentsDraft.documentType,
-						employee_id: context.employee.id,
-						employee_name: context.employee.name || "",
+						employee_id: context.subject.id,
+						employee_name: context.subject.name || "",
 						filename,
+						subject_mode: documentsDraft.subjectMode,
+						signer_id: documentsDraft.signerId || "",
+						template_id: documentsDraft.templateId || "",
 						generated_by: state.currentUser?.id || "",
 					},
 				});
@@ -768,9 +1485,25 @@ function bindSetupHandlers() {
 }
 
 export function resetDocumentsWorkspace() {
+	documentsDraft.subjectMode = "employee";
 	documentsDraft.employeeId = "";
+	documentsDraft.manualIdentity = {
+		name: "",
+		legal_name: "",
+		position: "",
+		department: "",
+		place_of_birth: "",
+		date_of_birth: "",
+		address: "",
+		nik_number: "",
+		job_level: "",
+	};
+	documentsDraft.signerId = String(state.currentUser?.id || "");
+	documentsDraft.signerRoleOverride = "";
 	documentsDraft.documentType = "";
+	documentsDraft.templateId = "";
 	documentsDraft.fields = {};
+	resetPayrollRows();
 	renderDocumentsWorkspace();
 }
 
@@ -801,13 +1534,9 @@ export function renderDocumentsWorkspace() {
 		return;
 	}
 
-	renderEmployeeOptions();
-	renderDocumentTypeOptions();
 	ensureTemplateDefaults();
-	renderTemplateHint();
-	renderDynamicFields();
-	renderPreview();
-	refreshValidationState();
+	renderDocumentTypeOptions();
+	rerenderDocumentWorkspace();
 	bindSetupHandlers();
 	setControlsDisabled(false);
 }
