@@ -222,6 +222,34 @@ test("offer letter supports manual candidate entry, signer selection, and manual
 	expect(String(logRow.details?.employee_name || "")).toBe(candidateName);
 });
 
+test("template editor updates live preview before saving", async ({ page }) => {
+	await loginAs(page, "hr");
+	await openDocumentsWorkspace(page);
+
+	await page.locator("#doc-type-select").selectOption("offer_letter");
+	await page.locator("#doc-manual-name").fill("Template Preview Candidate");
+	await page.locator("#doc-manual-position").fill("Product Designer");
+	await page.locator("#doc-manual-department").fill("Design");
+	await page.locator('[data-doc-field="nomor_surat"]').fill("009/HR/IV/2026");
+	await page.locator('[data-doc-field="start_date"]').fill(todayIso());
+	await page.locator('[data-doc-field="contract_type"]').selectOption("PKWTT");
+	await page.locator('[data-doc-field="basic_salary"]').fill("10000000");
+	await page.locator('[data-doc-field="probation_duration"]').fill("3 months");
+
+	await page.locator("#doc-template-title-input").fill("Surat Penawaran Kerja");
+	await page
+		.locator("#doc-template-body-input")
+		.fill(
+			"Yang terhormat {{employee_name}}\n\nKami menawarkan posisi {{employee_position}} di departemen {{department}}.",
+		);
+
+	await expect(page.locator(".documents-preview-title")).toContainText("Surat Penawaran Kerja");
+	await expect(page.locator("#doc-preview")).toContainText("Yang terhormat Template Preview Candidate");
+	await expect(page.locator("#doc-preview")).toContainText(
+		"Kami menawarkan posisi Product Designer di departemen Design.",
+	);
+});
+
 test("employment contract switches fields between PKWT and PKWTT", async ({ page }) => {
 	await loginAs(page, "hr");
 	await openDocumentsWorkspace(page);

@@ -1419,6 +1419,28 @@ body,
   background: rgba(255, 255, 255, 0.7);
 }
 
+.documents-template-editor {
+  padding: 2px 0;
+}
+
+.documents-template-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px dashed #cbd5e1;
+}
+
+.documents-template-body-input {
+  min-height: 220px;
+  resize: vertical;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  line-height: 1.55;
+}
+
 .documents-payroll-group {
   padding-top: 4px;
 }
@@ -1446,7 +1468,8 @@ body,
 [data-bs-theme="dark"] .documents-preview-meta,
 [data-bs-theme="dark"] .documents-preview-signature,
 [data-bs-theme="dark"] .documents-preview-table td,
-[data-bs-theme="dark"] .documents-preview-signer-summary {
+[data-bs-theme="dark"] .documents-preview-signer-summary,
+[data-bs-theme="dark"] .documents-template-meta {
   border-color: #334155;
 }
 
@@ -1455,6 +1478,10 @@ body,
 [data-bs-theme="dark"] .documents-preview-footer,
 [data-bs-theme="dark"] .documents-preview-fields .text-muted {
   color: #94a3b8 !important;
+}
+
+[data-bs-theme="dark"] .documents-template-meta {
+  background: rgba(15, 23, 42, 0.8);
 }
 
 @media (max-width: 767px) {

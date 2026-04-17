@@ -3,10 +3,26 @@ import { escapeHTML } from "../lib/utils.js";
 import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
 import { saveEmployee } from "./data/employees.js";
+import {
+	fetchHrDocumentReferenceOptions,
+	fetchHrDocumentTemplates,
+	saveHrDocumentTemplate,
+} from "./data/hr-documents.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const FALLBACK_CONTRACT_TYPES = ["PKWT", "PKWTT", "PKHL"];
 const FALLBACK_WARNING_LEVELS = ["SP1", "SP2", "SP3"];
+const TEMPLATE_VARIABLE_TOKENS = [
+	"{{company_name}}",
+	"{{employee_name}}",
+	"{{employee_position}}",
+	"{{department}}",
+	"{{contract_type}}",
+	"{{basic_salary}}",
+	"{{salary_in_words}}",
+	"{{signer_name}}",
+	"{{signer_title}}",
+];
 
 const documentsDraft = {
 	subjectMode: "employee",
@@ -32,6 +48,20 @@ const documentsDraft = {
 		deductions: [{ name: "PPh21", amount: "" }],
 	},
 };
+
+const templateEditorDraft = {
+	syncKey: "",
+	sourceTemplateId: "",
+	templateName: "",
+	templateTitle: "",
+	bodyText: "",
+	dirty: false,
+	saveState: "idle",
+	statusText: "",
+};
+
+let templateCollectionsPromise = null;
+let templateCollectionsLoaded = false;
 
 function canAccessDocuments() {
 	return ["superadmin", "hr"].includes(state.currentUser?.role);
@@ -514,9 +544,65 @@ function getFilteredTemplates(type = documentsDraft.documentType) {
 		: [];
 }
 
-function getTemplate(type = documentsDraft.documentType) {
+function templateBodyBlocksToText(blocks = []) {
+	return (Array.isArray(blocks) ? blocks : [])
+		.map((block) => String(block?.text || "").trim())
+		.filter(Boolean)
+		.join("\n\n");
+}
+
+function templateTextToBodyBlocks(text) {
+	return String(text || "")
+		.split(/\r?\n\s*\r?\n|\r?\n/g)
+		.map((line) => String(line || "").trim())
+		.filter(Boolean)
+		.map((line) => ({ type: "paragraph", text: line }));
+}
+
+function buildLocalTemplateRecord(config, type, fields, selected = null) {
+	const contractType =
+		type === "employment_contract"
+			? String(documentsDraft.fields.contract_type || "").trim() || null
+			: null;
+	return {
+		id: String(selected?.id || ""),
+		document_type: String(type || ""),
+		locale: String(selected?.locale || "id-ID"),
+		contract_type: selected?.contract_type ?? contractType,
+		template_name: String(selected?.template_name || config.label),
+		template_status: String(selected?.template_status || "draft"),
+		version_no: Number(selected?.version_no || 1),
+		header_json: {
+			title: String(selected?.header_json?.title || config.label),
+			...(selected?.header_json || {}),
+		},
+		body_json: Array.isArray(selected?.body_json) ? selected.body_json : [],
+		body_markup: String(selected?.body_markup || ""),
+		signature_config_json:
+			selected?.signature_config_json && typeof selected.signature_config_json === "object"
+				? selected.signature_config_json
+				: {},
+		field_schema_json:
+			selected?.field_schema_json && typeof selected.field_schema_json === "object"
+				? selected.field_schema_json
+				: { fields: fields.map(({ key, label, type: fieldType, required }) => ({ key, label, type: fieldType, required })) },
+		is_default: Boolean(selected?.is_default),
+	};
+}
+
+function buildTemplateEditorKey(type = documentsDraft.documentType, templateId = documentsDraft.templateId) {
+	return [
+		String(type || ""),
+		String(templateId || "default"),
+		String(documentsDraft.fields.contract_type || ""),
+	].join("::");
+}
+
+function resolveTemplateBase(type = documentsDraft.documentType) {
 	const config = getDocumentConfig(type);
 	if (!config) return null;
+
+	const fields = typeof config.fields === "function" ? config.fields() : config.fields || [];
 
 	const candidates = getFilteredTemplates(type);
 	const selected =
@@ -526,13 +612,103 @@ function getTemplate(type = documentsDraft.documentType) {
 		null;
 
 	return {
-		id: selected?.id || "",
-		label: String(selected?.template_name || config.label),
-		description: config.description,
-		header: selected?.header_json || {},
-		record: selected,
-		...config,
-		fields: typeof config.fields === "function" ? config.fields() : config.fields || [],
+		config,
+		fields,
+		record: buildLocalTemplateRecord(config, type, fields, selected),
+		selected,
+	};
+}
+
+function syncTemplateEditorWithSelection(force = false) {
+	const resolved = resolveTemplateBase();
+	if (!resolved) {
+		templateEditorDraft.syncKey = "";
+		templateEditorDraft.sourceTemplateId = "";
+		templateEditorDraft.templateName = "";
+		templateEditorDraft.templateTitle = "";
+		templateEditorDraft.bodyText = "";
+		templateEditorDraft.dirty = false;
+		templateEditorDraft.saveState = "idle";
+		templateEditorDraft.statusText = "";
+		return;
+	}
+
+	const nextKey = buildTemplateEditorKey(documentsDraft.documentType, resolved.record.id);
+	if (!force && templateEditorDraft.syncKey === nextKey) return;
+
+	templateEditorDraft.syncKey = nextKey;
+	templateEditorDraft.sourceTemplateId = String(resolved.record.id || "");
+	templateEditorDraft.templateName = String(
+		resolved.record.template_name || resolved.config.label || "Template",
+	);
+	templateEditorDraft.templateTitle = String(
+		resolved.record.header_json?.title || resolved.config.label || "",
+	);
+	templateEditorDraft.bodyText = templateBodyBlocksToText(resolved.record.body_json);
+	templateEditorDraft.dirty = false;
+	templateEditorDraft.saveState = "idle";
+	templateEditorDraft.statusText = resolved.record.id
+		? "Template loaded. Edit the content below to update preview and export."
+		: "Editing the local default layout. Save to create a reusable database template.";
+}
+
+function buildEditedTemplateRecord(type = documentsDraft.documentType) {
+	const resolved = resolveTemplateBase(type);
+	if (!resolved) return null;
+	if (templateEditorDraft.syncKey !== buildTemplateEditorKey(type, resolved.record.id)) {
+		return resolved.record;
+	}
+
+	const record = {
+		...resolved.record,
+		template_name: String(templateEditorDraft.templateName || resolved.config.label).trim() || resolved.config.label,
+		header_json: {
+			...(resolved.record.header_json || {}),
+			title:
+				String(templateEditorDraft.templateTitle || "").trim() ||
+				String(resolved.record.header_json?.title || resolved.config.label || ""),
+		},
+		body_json: templateTextToBodyBlocks(templateEditorDraft.bodyText),
+		body_markup: String(templateEditorDraft.bodyText || "").trim(),
+		field_schema_json:
+			resolved.record.field_schema_json && typeof resolved.record.field_schema_json === "object"
+				? resolved.record.field_schema_json
+				: {
+						fields: resolved.fields.map(({ key, label, type: fieldType, required }) => ({
+							key,
+							label,
+							type: fieldType,
+							required,
+						})),
+				  },
+	};
+
+	return {
+		...record,
+		contract_type:
+			type === "employment_contract"
+				? String(documentsDraft.fields.contract_type || "").trim() || null
+				: record.contract_type || null,
+	};
+}
+
+function getTemplate(type = documentsDraft.documentType) {
+	const resolved = resolveTemplateBase(type);
+	if (!resolved) return null;
+
+	const editedRecord = buildEditedTemplateRecord(type);
+	const record = editedRecord || resolved.record;
+	const title = String(record?.header_json?.title || resolved.config.label || "");
+
+	return {
+		id: record?.id || "",
+		label: String(record?.template_name || resolved.config.label),
+		displayTitle: title || String(record?.template_name || resolved.config.label),
+		description: resolved.config.description,
+		header: record?.header_json || {},
+		record,
+		...resolved.config,
+		fields: resolved.fields,
 	};
 }
 
@@ -563,6 +739,8 @@ function ensureTemplateDefaults() {
 		const preferred = templates.find((item) => item?.is_default) || templates[0];
 		documentsDraft.templateId = String(preferred?.id || "");
 	}
+
+	syncTemplateEditorWithSelection();
 }
 
 function getMissingRequiredFields() {
@@ -728,6 +906,177 @@ function renderTemplateHint() {
 
 	const templateLabel = template.id ? template.label : `${template.label} (default layout)`;
 	hintEl.innerHTML = `<span class="fw-semibold">${escapeHTML(templateLabel)}:</span> ${escapeHTML(template.description)}`;
+}
+
+async function ensureHrDocumentCollectionsLoaded() {
+	if (templateCollectionsLoaded) return;
+	if (templateCollectionsPromise) return templateCollectionsPromise;
+
+	templateCollectionsPromise = Promise.allSettled([
+		fetchHrDocumentTemplates(),
+		fetchHrDocumentReferenceOptions(),
+	]).finally(() => {
+		templateCollectionsLoaded = true;
+		templateCollectionsPromise = null;
+		ensureTemplateDefaults();
+		if (canAccessDocuments()) {
+			rerenderDocumentWorkspace();
+		}
+	});
+
+	return templateCollectionsPromise;
+}
+
+function refreshTemplateEditorStatus() {
+	const statusEl = document.getElementById("doc-template-editor-status");
+	if (statusEl) {
+		statusEl.className = `small ${
+			templateEditorDraft.saveState === "error" ? "text-danger" : "text-muted"
+		}`;
+		statusEl.textContent = templateEditorDraft.statusText || "";
+	}
+
+	const metaNodes = document.querySelectorAll(".documents-template-meta-state");
+	metaNodes.forEach((node) => {
+		node.textContent = templateEditorDraft.dirty ? "Unsaved changes" : "Synced";
+	});
+}
+
+function renderTemplateEditor() {
+	const editor = document.getElementById("doc-template-editor");
+	if (!editor) return;
+
+	const template = getTemplate();
+	if (!template) {
+		editor.innerHTML =
+			'<div class="small text-muted">Choose a document type to start editing the template body.</div>';
+		return;
+	}
+
+	const helperText = TEMPLATE_VARIABLE_TOKENS.map((token) => `<code>${escapeHTML(token)}</code>`).join(" ");
+	const sourceLabel = template.id ? "Database template" : "Default local layout";
+	const saveLabel = template.id ? "Save Changes" : "Save as Template";
+
+	editor.innerHTML = `
+		<div class="documents-template-editor vstack gap-3">
+			<div class="documents-template-meta">
+				<div>
+					<div class="small fw-bold text-muted text-uppercase">Template Source</div>
+					<div class="small">${escapeHTML(sourceLabel)}</div>
+				</div>
+				<div class="small text-muted documents-template-meta-state">${escapeHTML(templateEditorDraft.dirty ? "Unsaved changes" : "Synced")}</div>
+			</div>
+			<div>
+				<label class="form-label small fw-bold text-muted">Template Name</label>
+				<input id="doc-template-name-input" type="text" class="form-control" value="${escapeHTML(templateEditorDraft.templateName || "")}" placeholder="e.g. Offer Letter Bahasa Indonesia">
+			</div>
+			<div>
+				<label class="form-label small fw-bold text-muted">Document Title</label>
+				<input id="doc-template-title-input" type="text" class="form-control" value="${escapeHTML(templateEditorDraft.templateTitle || "")}" placeholder="e.g. Surat Penawaran Kerja">
+			</div>
+			<div>
+				<label class="form-label small fw-bold text-muted">Template Body</label>
+				<textarea id="doc-template-body-input" class="form-control documents-template-body-input" rows="10" placeholder="One paragraph per line. You can use placeholders like {{employee_name}} and {{basic_salary}}.">${escapeHTML(templateEditorDraft.bodyText || "")}</textarea>
+				<div class="form-text">Use placeholders to inject live values: ${helperText}</div>
+			</div>
+			<div class="d-flex gap-2 justify-content-end">
+				<button id="doc-template-reset-btn" type="button" class="btn btn-outline-secondary btn-sm">Reset Template</button>
+				<button id="doc-template-save-btn" type="button" class="btn btn-outline-primary btn-sm">${escapeHTML(saveLabel)}</button>
+			</div>
+			<div id="doc-template-editor-status" class="small ${templateEditorDraft.saveState === "error" ? "text-danger" : "text-muted"}">${escapeHTML(templateEditorDraft.statusText || "")}</div>
+		</div>
+	`;
+
+	const templateNameInput = document.getElementById("doc-template-name-input");
+	if (templateNameInput) {
+		templateNameInput.addEventListener("input", (event) => {
+			templateEditorDraft.templateName = String(event.currentTarget?.value || "");
+			templateEditorDraft.dirty = true;
+			templateEditorDraft.saveState = "idle";
+			templateEditorDraft.statusText = "Unsaved changes in template editor.";
+			renderTemplateHint();
+			refreshTemplateEditorStatus();
+			renderPreview();
+		});
+	}
+
+	const templateTitleInput = document.getElementById("doc-template-title-input");
+	if (templateTitleInput) {
+		templateTitleInput.addEventListener("input", (event) => {
+			templateEditorDraft.templateTitle = String(event.currentTarget?.value || "");
+			templateEditorDraft.dirty = true;
+			templateEditorDraft.saveState = "idle";
+			templateEditorDraft.statusText = "Unsaved changes in template editor.";
+			refreshTemplateEditorStatus();
+			renderPreview();
+		});
+	}
+
+	const templateBodyInput = document.getElementById("doc-template-body-input");
+	if (templateBodyInput) {
+		templateBodyInput.addEventListener("input", (event) => {
+			templateEditorDraft.bodyText = String(event.currentTarget?.value || "");
+			templateEditorDraft.dirty = true;
+			templateEditorDraft.saveState = "idle";
+			templateEditorDraft.statusText = "Unsaved changes in template editor.";
+			refreshTemplateEditorStatus();
+			renderPreview();
+		});
+	}
+
+	const templateResetBtn = document.getElementById("doc-template-reset-btn");
+	if (templateResetBtn) {
+		templateResetBtn.addEventListener("click", () => {
+			syncTemplateEditorWithSelection(true);
+			renderTemplateHint();
+			renderTemplateEditor();
+			renderPreview();
+		});
+	}
+
+	const templateSaveBtn = document.getElementById("doc-template-save-btn");
+	if (templateSaveBtn) {
+		templateSaveBtn.addEventListener("click", async () => {
+			const editedRecord = buildEditedTemplateRecord();
+			if (!editedRecord) return;
+
+			templateEditorDraft.saveState = "saving";
+			templateEditorDraft.statusText = "Saving template...";
+			renderTemplateEditor();
+
+			try {
+				const savedTemplate = await saveHrDocumentTemplate({
+					...editedRecord,
+					template_status: "active",
+				});
+				documentsDraft.templateId = String(savedTemplate?.id || "");
+				syncTemplateEditorWithSelection(true);
+				templateEditorDraft.saveState = "success";
+				templateEditorDraft.statusText = "Template saved and ready for reuse.";
+				rerenderDocumentWorkspace();
+				await logActivity({
+					action: "document_template.save",
+					entityType: "hr_document_template",
+					entityId: savedTemplate?.id || "",
+					details: {
+						document_type: String(savedTemplate?.document_type || documentsDraft.documentType || ""),
+						template_name: String(savedTemplate?.template_name || ""),
+						contract_type: String(savedTemplate?.contract_type || ""),
+					},
+				});
+				await notify.success("Document template saved successfully.", "Template Saved");
+			} catch (error) {
+				templateEditorDraft.saveState = "error";
+				templateEditorDraft.statusText =
+					error?.message || "Template could not be saved in the current environment.";
+				renderTemplateEditor();
+				await notify.error(
+					`Failed to save template: ${error?.message || String(error)}`,
+					"Template Save Failed",
+				);
+			}
+		});
+	}
 }
 
 function renderSubjectSourceSection() {
@@ -943,7 +1292,9 @@ function renderDynamicFields() {
 			if (key === "contract_type") {
 				renderTemplateOptions();
 				ensureTemplateDefaults();
+				syncTemplateEditorWithSelection(true);
 				renderTemplateHint();
+				renderTemplateEditor();
 				renderDynamicFields();
 			}
 
@@ -1367,7 +1718,7 @@ function renderPreview() {
 			${logoUrl ? `<img src="${escapeHTML(logoUrl)}" alt="Company logo" class="documents-preview-logo">` : ""}
 		</div>
 		<hr class="my-3">
-		<div class="documents-preview-title">${escapeHTML(ctx.template.label)}</div>
+		<div class="documents-preview-title">${escapeHTML(ctx.template.displayTitle || ctx.template.label)}</div>
 		<div class="documents-preview-meta small text-muted mb-3">
 			Subject ID: ${escapeHTML(String(ctx.subject.id || "-"))}
 		</div>
@@ -1439,6 +1790,8 @@ function setControlsDisabled(disabled) {
 		"doc-employee-select",
 		"doc-type-select",
 		"doc-template-select",
+		"doc-template-save-btn",
+		"doc-template-reset-btn",
 		"doc-signer-select",
 		"doc-signer-role-override",
 		"doc-download-btn",
@@ -1448,9 +1801,13 @@ function setControlsDisabled(disabled) {
 		if (el) el.disabled = Boolean(disabled);
 	});
 
-	document.querySelectorAll("#doc-dynamic-fields input, #doc-dynamic-fields select, #doc-dynamic-fields textarea, #doc-manual-identity-wrap input, #doc-manual-identity-wrap textarea").forEach((field) => {
-		field.disabled = Boolean(disabled);
-	});
+	document
+		.querySelectorAll(
+			"#doc-dynamic-fields input, #doc-dynamic-fields select, #doc-dynamic-fields textarea, #doc-manual-identity-wrap input, #doc-manual-identity-wrap textarea, #doc-template-editor input, #doc-template-editor textarea, #doc-template-editor button",
+		)
+		.forEach((field) => {
+			field.disabled = Boolean(disabled);
+		});
 }
 
 function rerenderDocumentWorkspace() {
@@ -1459,6 +1816,7 @@ function rerenderDocumentWorkspace() {
 	renderSignerOptions();
 	renderTemplateOptions();
 	renderTemplateHint();
+	renderTemplateEditor();
 	renderSubjectSourceSection();
 	renderSignerSummary();
 	renderDynamicFields();
@@ -1508,6 +1866,7 @@ function bindSetupHandlers() {
 				resetPayrollRows();
 			}
 			ensureTemplateDefaults();
+			syncTemplateEditorWithSelection(true);
 			rerenderDocumentWorkspace();
 		};
 	}
@@ -1515,7 +1874,9 @@ function bindSetupHandlers() {
 	if (templateSelect) {
 		templateSelect.onchange = (event) => {
 			documentsDraft.templateId = String(event.target?.value || "");
+			syncTemplateEditorWithSelection(true);
 			renderTemplateHint();
+			renderTemplateEditor();
 			renderPreview();
 			refreshValidationState();
 		};
@@ -1692,6 +2053,7 @@ export function resetDocumentsWorkspace() {
 	documentsDraft.templateId = "";
 	documentsDraft.fields = {};
 	resetPayrollRows();
+	syncTemplateEditorWithSelection(true);
 	renderDocumentsWorkspace();
 }
 
@@ -1707,6 +2069,7 @@ export function renderDocumentsWorkspace() {
 		const dynamicFields = document.getElementById("doc-dynamic-fields");
 		const previewEl = document.getElementById("doc-preview");
 		const hintEl = document.getElementById("doc-template-hint");
+		const templateEditor = document.getElementById("doc-template-editor");
 		const validationEl = document.getElementById("doc-validation-feedback");
 		if (dynamicFields) {
 			dynamicFields.innerHTML =
@@ -1717,11 +2080,13 @@ export function renderDocumentsWorkspace() {
 				'<div class="documents-preview-empty">You do not have access to this workspace.</div>';
 		}
 		if (hintEl) hintEl.textContent = "";
+		if (templateEditor) templateEditor.innerHTML = "";
 		if (validationEl) validationEl.textContent = "";
 		setControlsDisabled(true);
 		return;
 	}
 
+	void ensureHrDocumentCollectionsLoaded();
 	ensureTemplateDefaults();
 	renderDocumentTypeOptions();
 	rerenderDocumentWorkspace();
