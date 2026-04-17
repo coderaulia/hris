@@ -8,6 +8,7 @@ import {
     toNumber,
     toDateLabel,
     isMissingRelationError,
+    isMissingColumnError,
     normalizeScoreRows,
     mapLegacyEmployeeRow,
     execSupabase,
@@ -50,6 +51,21 @@ const EMPLOYEE_COLUMNS = [
     'active_sp_until',
     'active_sp_reason',
 ].join(',');
+const LEGACY_EMPLOYEE_COLUMNS = [
+    'employee_id',
+    'name',
+    'position',
+    'seniority',
+    'join_date',
+    'department',
+    'manager_id',
+    'auth_email',
+    'auth_id',
+    'role',
+    'tenure_display',
+    'kpi_targets',
+    'must_change_password',
+].join(',');
 const EMPLOYEE_ASSESSMENT_COLUMNS = 'id,employee_id,assessment_type,percentage,assessed_by,assessed_at,source_date';
 const EMPLOYEE_ASSESSMENT_SCORE_COLUMNS = 'assessment_id,competency_name,score,note';
 const EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS = 'employee_id,assessed_on,percentage,seniority,position,created_at';
@@ -57,11 +73,24 @@ const EMPLOYEE_TRAINING_RECORD_COLUMNS = 'employee_id,course,start_date,end_date
 
 async function fetchEmployees() {
     try {
-        const { data: employeeRows } = await execSupabase(
-            'Fetch employees',
-            () => supabase.from('employees').select(EMPLOYEE_COLUMNS),
-            { retries: 1 }
-        );
+        let employeeRows = [];
+        try {
+            const result = await execSupabase(
+                'Fetch employees',
+                () => supabase.from('employees').select(EMPLOYEE_COLUMNS),
+                { retries: 1 }
+            );
+            employeeRows = result.data || [];
+        } catch (error) {
+            if (!isMissingColumnError(error)) throw error;
+
+            const fallbackResult = await execSupabase(
+                'Fetch employees (legacy columns)',
+                () => supabase.from('employees').select(LEGACY_EMPLOYEE_COLUMNS),
+                { retries: 1 }
+            );
+            employeeRows = fallbackResult.data || [];
+        }
 
         let normalizedTables = null;
         try {

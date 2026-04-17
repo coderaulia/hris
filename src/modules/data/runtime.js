@@ -134,6 +134,25 @@ function isMissingRelationError(error) {
     return false;
 }
 
+function isMissingColumnError(error) {
+    const code = String(error?.code || '').toUpperCase();
+    if (code === '42703' || code === 'PGRST204') return true;
+
+    const msg = [
+        error?.message,
+        error?.details,
+        error?.hint,
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+    if (!msg) return false;
+    if (/column\s+.+\s+does not exist/.test(msg)) return true;
+    if (/could not find the ['"]?.+['"]?\s+column/.test(msg)) return true;
+    return false;
+}
+
 function normalizeScoreRows(items = []) {
     return asArray(items)
         .map(item => {
@@ -342,4 +361,5 @@ export {
     clamp,
     average,
     fetchOptionalCollection,
+    isMissingColumnError,
 };
