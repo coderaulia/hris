@@ -126,8 +126,37 @@ async function saveHrDocumentTemplate(template = {}) {
     }
 }
 
+async function deleteHrDocumentTemplate(templateId) {
+    const id = String(templateId || '').trim();
+    if (!id) return;
+
+    try {
+        await execSupabase(
+            `Delete HR document template "${id}"`,
+            () => supabase.from('hr_document_templates').delete().eq('id', id),
+            { interactiveRetry: true, retries: 1 }
+        );
+
+        state.hrDocumentTemplates = (Array.isArray(state.hrDocumentTemplates)
+            ? state.hrDocumentTemplates
+            : []
+        ).filter(item => String(item?.id || '') !== id);
+        emit('data:hrDocumentTemplates', state.hrDocumentTemplates);
+    } catch (error) {
+        if (isMissingRelationError(error)) {
+            const migrationError = new Error(
+                'The hr_document_templates table is not available yet. Run the HR document foundation migration first.'
+            );
+            migrationError.code = 'HR_DOCUMENT_TEMPLATES_MISSING';
+            throw migrationError;
+        }
+        throw error;
+    }
+}
+
 export {
     fetchHrDocumentTemplates,
     fetchHrDocumentReferenceOptions,
     saveHrDocumentTemplate,
+    deleteHrDocumentTemplate,
 };

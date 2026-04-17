@@ -236,13 +236,15 @@ test("template editor updates live preview before saving", async ({ page }) => {
 	await page.locator('[data-doc-field="basic_salary"]').fill("10000000");
 	await page.locator('[data-doc-field="probation_duration"]').fill("3 months");
 
+	await page.locator("#doc-surface-edit-btn").click();
 	await page.locator("#doc-template-title-input").fill("Surat Penawaran Kerja");
 	await page
-		.locator("#doc-template-body-input")
+		.locator("#doc-template-canvas-editor")
 		.fill(
 			"Yang terhormat {{employee_name}}\n\nKami menawarkan posisi {{employee_position}} di departemen {{department}}.",
 		);
 
+	await page.locator("#doc-surface-preview-btn").click();
 	await expect(page.locator(".documents-preview-title")).toContainText("Surat Penawaran Kerja");
 	await expect(page.locator("#doc-preview")).toContainText("Yang terhormat Template Preview Candidate");
 	await expect(page.locator("#doc-preview")).toContainText(

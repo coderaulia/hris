@@ -105,9 +105,15 @@
 
         <div class="col-xl-8">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h6 class="fw-bold m-0"><i class="bi bi-file-earmark-text me-1"></i>Live Preview</h6>
-                    <div class="small text-muted mt-1">A4-style preview updates as you complete the form, including signer and subject changes.</div>
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <h6 class="fw-bold m-0"><i class="bi bi-file-earmark-text me-1"></i>Document Surface</h6>
+                        <div class="small text-muted mt-1">Switch between A4 preview and A4 template editing while keeping the same document data.</div>
+                    </div>
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Document surface mode">
+                        <button id="doc-surface-preview-btn" type="button" class="btn btn-outline-secondary active">Preview</button>
+                        <button id="doc-surface-edit-btn" type="button" class="btn btn-outline-secondary">Edit Template</button>
+                    </div>
                 </div>
                 <div class="card-body documents-preview-wrap">
                     <div id="doc-preview" class="documents-preview-sheet">

@@ -314,34 +314,66 @@ export function drawPayslipTable(doc, rows = [], options = {}) {
 
 export function drawSignatureBlock(doc, signer = {}, options = {}) {
 	let y = options.startY ?? PAGE.marginTop;
-	y = ensureSpace(doc, y, 34);
+	y = ensureSpace(doc, y, 64);
 	const includeRecipient = Boolean(options.includeRecipient);
 	const recipient = options.recipient || {};
 	const leftX = PAGE.marginX;
 	const rightX = PAGE.marginX + 95;
+	const boxWidth = 76;
+	const boxHeight = 30;
 
-	doc.setFont("helvetica", "normal");
-	doc.setFontSize(11);
-	doc.text("Approved by,", leftX, y);
-	if (includeRecipient) {
-		doc.text(options.recipientLabel || "Employee acknowledgment,", rightX, y);
+	function drawSignatureSlot(baseX, topY, heading, person = {}, hasDigitalImage = false) {
+		doc.setFont("helvetica", "normal");
+		doc.setFontSize(11);
+		doc.text(heading, baseX, topY);
+
+		const boxY = topY + 4;
+		doc.setDrawColor(148, 163, 184);
+		doc.roundedRect(baseX, boxY, boxWidth, boxHeight, 2.5, 2.5);
+
+		doc.setFont("helvetica", "normal");
+		doc.setFontSize(8.5);
+		doc.setTextColor(100, 116, 139);
+		const digitalCopy = hasDigitalImage
+			? "Digital signature image on file. E-sign placement."
+			: "Digital signature placeholder.";
+		doc.text(doc.splitTextToSize(digitalCopy, boxWidth - 8), baseX + 4, boxY + 7);
+		doc.line(baseX + 4, boxY + 17, baseX + boxWidth - 4, boxY + 17);
+		doc.text("Wet signature area for printed copy", baseX + 4, boxY + 24);
+
+		doc.setTextColor(0, 0, 0);
+		doc.setFont("helvetica", "bold");
+		doc.setFontSize(11);
+		doc.text(asText(person.name, "Employee"), baseX, boxY + boxHeight + 8);
+
+		doc.setFont("helvetica", "normal");
+		doc.setFontSize(10);
+		doc.text(formatSignerRole(person.role), baseX, boxY + boxHeight + 13);
 	}
 
-	y += 18;
-	doc.setFont("helvetica", "bold");
-	doc.text(asText(signer.name, "HR Representative"), leftX, y);
+	drawSignatureSlot(
+		leftX,
+		y,
+		"Approved by,",
+		{
+			name: asText(signer.name, "HR Representative"),
+			role: signer.role,
+		},
+		Boolean(signer.signatureImageUrl),
+	);
 	if (includeRecipient) {
-		doc.text(asText(recipient.name, "Employee"), rightX, y);
+		drawSignatureSlot(
+			rightX,
+			y,
+			options.recipientLabel || "Employee acknowledgment,",
+			{
+				name: asText(recipient.name, "Employee"),
+				role: asText(recipient.role, "-"),
+			},
+			Boolean(recipient.signatureImageUrl),
+		);
 	}
-
-	y += 5;
-	doc.setFont("helvetica", "normal");
-	doc.setFontSize(10);
-	doc.text(formatSignerRole(signer.role), leftX, y);
-	if (includeRecipient) {
-		doc.text(asText(recipient.role, "-"), rightX, y);
-	}
-	return y + 4;
+	return y + boxHeight + 22;
 }
 
 function addPageFooter(doc, footerText = "") {

@@ -1394,10 +1394,36 @@ body,
   margin-bottom: 6px;
 }
 
-.documents-preview-signature {
-  margin-top: 36px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
+.documents-preview-signature-card {
+  margin-top: 22px;
+}
+
+.documents-preview-signature-label {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.documents-preview-signature-box {
+  min-height: 118px;
+  margin-bottom: 10px;
+  padding: 14px 12px;
+  border: 1px dashed #94a3b8;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(241, 245, 249, 0.85));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.documents-preview-signature-box-copy {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.documents-preview-signature-box-line {
+  border-top: 1px solid #94a3b8;
+  margin: 8px 0;
 }
 
 .documents-preview-signature-grid {
@@ -1434,11 +1460,31 @@ body,
   border: 1px dashed #cbd5e1;
 }
 
-.documents-template-body-input {
-  min-height: 220px;
-  resize: vertical;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-  line-height: 1.55;
+.documents-template-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.documents-template-canvas {
+  min-height: 820px;
+  outline: none;
+  line-height: 1.65;
+  color: #0f172a;
+  font-family: "IBM Plex Serif", Georgia, serif;
+}
+
+.documents-template-canvas:empty::before {
+  content: attr(data-placeholder);
+  color: #94a3b8;
+}
+
+.documents-template-canvas p {
+  margin-bottom: 12px;
+}
+
+.documents-template-canvas-footer {
+  margin-top: 40px;
 }
 
 .documents-payroll-group {
@@ -1466,11 +1512,19 @@ body,
 }
 
 [data-bs-theme="dark"] .documents-preview-meta,
-[data-bs-theme="dark"] .documents-preview-signature,
 [data-bs-theme="dark"] .documents-preview-table td,
 [data-bs-theme="dark"] .documents-preview-signer-summary,
 [data-bs-theme="dark"] .documents-template-meta {
   border-color: #334155;
+}
+
+[data-bs-theme="dark"] .documents-preview-signature-box {
+  border-color: #475569;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.7), rgba(30, 41, 59, 0.82));
+}
+
+[data-bs-theme="dark"] .documents-preview-signature-box-copy {
+  color: #94a3b8;
 }
 
 [data-bs-theme="dark"] .documents-preview-empty,
@@ -1484,8 +1538,16 @@ body,
   background: rgba(15, 23, 42, 0.8);
 }
 
+[data-bs-theme="dark"] .documents-template-canvas {
+  color: #e2e8f0;
+}
+
 @media (max-width: 767px) {
   .documents-preview-signature-grid {
     grid-template-columns: 1fr;
+  }
+
+  .documents-template-actions {
+    flex-direction: column;
   }
 }

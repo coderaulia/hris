@@ -4,6 +4,7 @@ import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
 import { saveEmployee } from "./data/employees.js";
 import {
+	deleteHrDocumentTemplate,
 	fetchHrDocumentReferenceOptions,
 	fetchHrDocumentTemplates,
 	saveHrDocumentTemplate,
@@ -26,6 +27,8 @@ const TEMPLATE_VARIABLE_TOKENS = [
 
 const documentsDraft = {
 	subjectMode: "employee",
+	surfaceMode: "preview",
+	templateDraftMode: false,
 	employeeId: "",
 	manualIdentity: {
 		name: "",
@@ -106,6 +109,14 @@ function formatMonthLabel(value) {
 
 function formatMultiline(value) {
 	return escapeHTML(String(value || "")).replace(/\n/g, "<br>");
+}
+
+function normalizeMultilineText(value) {
+	return String(value || "")
+		.replace(/\u00a0/g, " ")
+		.replace(/\r/g, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
 }
 
 function slugify(value, fallback = "manual-subject") {
@@ -655,12 +666,10 @@ function syncTemplateEditorWithSelection(force = false) {
 function buildEditedTemplateRecord(type = documentsDraft.documentType) {
 	const resolved = resolveTemplateBase(type);
 	if (!resolved) return null;
-	if (templateEditorDraft.syncKey !== buildTemplateEditorKey(type, resolved.record.id)) {
-		return resolved.record;
-	}
 
 	const record = {
 		...resolved.record,
+		id: String(templateEditorDraft.sourceTemplateId || ""),
 		template_name: String(templateEditorDraft.templateName || resolved.config.label).trim() || resolved.config.label,
 		header_json: {
 			...(resolved.record.header_json || {}),
@@ -736,6 +745,10 @@ function ensureTemplateDefaults() {
 
 	const templates = getFilteredTemplates(documentsDraft.documentType);
 	if (!documentsDraft.templateId && templates.length > 0) {
+		if (documentsDraft.templateDraftMode) {
+			syncTemplateEditorWithSelection();
+			return;
+		}
 		const preferred = templates.find((item) => item?.is_default) || templates[0];
 		documentsDraft.templateId = String(preferred?.id || "");
 	}
@@ -877,14 +890,14 @@ function renderTemplateOptions() {
 		return;
 	}
 
-	if (!documentsDraft.templateId && templates.length > 0) {
+	if (!documentsDraft.templateId && templates.length > 0 && !documentsDraft.templateDraftMode) {
 		const preferred = templates.find((item) => item?.is_default) || templates[0];
 		documentsDraft.templateId = String(preferred?.id || "");
 	}
 
 	select.disabled = false;
 	select.innerHTML = [
-		'<option value="">-- Select Template --</option>',
+		`<option value="">${documentsDraft.templateDraftMode ? "-- Unsaved Draft --" : "-- Select Template --"}</option>`,
 		...templates.map((template) => {
 			const value = String(template?.id || "");
 			const label = String(template?.template_name || template?.document_type || "Template");
@@ -901,6 +914,11 @@ function renderTemplateHint() {
 	const template = getTemplate();
 	if (!template) {
 		hintEl.innerHTML = "Choose a document type to load template details.";
+		return;
+	}
+
+	if (documentsDraft.templateDraftMode) {
+		hintEl.innerHTML = `<span class="fw-semibold">Unsaved draft:</span> edit on the A4 canvas, then save it as a reusable template.`;
 		return;
 	}
 
@@ -942,6 +960,35 @@ function refreshTemplateEditorStatus() {
 	});
 }
 
+function startTemplateDraft(mode = "new") {
+	const currentTemplate = getTemplate();
+	const fallbackName = currentTemplate?.label || getDocumentConfig()?.label || "Template";
+	const fallbackTitle =
+		currentTemplate?.displayTitle || currentTemplate?.label || getDocumentConfig()?.label || "Template";
+	const currentBodyText =
+		mode === "blank" ? "" : normalizeMultilineText(templateEditorDraft.bodyText || "");
+
+	documentsDraft.templateDraftMode = true;
+	documentsDraft.templateId = "";
+	documentsDraft.surfaceMode = "edit";
+	templateEditorDraft.sourceTemplateId = "";
+	templateEditorDraft.syncKey = buildTemplateEditorKey(documentsDraft.documentType, "draft");
+	templateEditorDraft.templateName =
+		mode === "duplicate" ? `${fallbackName} Copy` : `${fallbackName} Draft`;
+	templateEditorDraft.templateTitle = fallbackTitle;
+	templateEditorDraft.bodyText = currentBodyText;
+	templateEditorDraft.dirty = true;
+	templateEditorDraft.saveState = "idle";
+	templateEditorDraft.statusText =
+		mode === "duplicate"
+			? "Duplicated into a new draft. Save to create another reusable template."
+			: "New template draft ready. Edit on the A4 canvas, then save it.";
+}
+
+function clearTemplateDraftMode() {
+	documentsDraft.templateDraftMode = false;
+}
+
 function renderTemplateEditor() {
 	const editor = document.getElementById("doc-template-editor");
 	if (!editor) return;
@@ -954,8 +1001,15 @@ function renderTemplateEditor() {
 	}
 
 	const helperText = TEMPLATE_VARIABLE_TOKENS.map((token) => `<code>${escapeHTML(token)}</code>`).join(" ");
-	const sourceLabel = template.id ? "Database template" : "Default local layout";
-	const saveLabel = template.id ? "Save Changes" : "Save as Template";
+	const sourceLabel = documentsDraft.templateDraftMode
+		? "Unsaved draft"
+		: template.id
+			? "Database template"
+			: "Default local layout";
+	const saveLabel =
+		documentsDraft.templateDraftMode || !template.id ? "Save as Template" : "Save Changes";
+	const deleteDisabled = !template.id || documentsDraft.templateDraftMode ? "disabled" : "";
+	const duplicateDisabled = !documentsDraft.documentType ? "disabled" : "";
 
 	editor.innerHTML = `
 		<div class="documents-template-editor vstack gap-3">
@@ -975,9 +1029,15 @@ function renderTemplateEditor() {
 				<input id="doc-template-title-input" type="text" class="form-control" value="${escapeHTML(templateEditorDraft.templateTitle || "")}" placeholder="e.g. Surat Penawaran Kerja">
 			</div>
 			<div>
-				<label class="form-label small fw-bold text-muted">Template Body</label>
-				<textarea id="doc-template-body-input" class="form-control documents-template-body-input" rows="10" placeholder="One paragraph per line. You can use placeholders like {{employee_name}} and {{basic_salary}}.">${escapeHTML(templateEditorDraft.bodyText || "")}</textarea>
-				<div class="form-text">Use placeholders to inject live values: ${helperText}</div>
+				<label class="form-label small fw-bold text-muted">Body Editing Surface</label>
+				<div class="small text-muted">
+					Use the A4 editor on the right side for long-form body content. Placeholders supported: ${helperText}
+				</div>
+			</div>
+			<div class="documents-template-actions">
+				<button id="doc-template-new-btn" type="button" class="btn btn-outline-secondary btn-sm" ${duplicateDisabled}>New Draft</button>
+				<button id="doc-template-duplicate-btn" type="button" class="btn btn-outline-secondary btn-sm" ${duplicateDisabled}>Duplicate</button>
+				<button id="doc-template-delete-btn" type="button" class="btn btn-outline-danger btn-sm" ${deleteDisabled}>Delete</button>
 			</div>
 			<div class="d-flex gap-2 justify-content-end">
 				<button id="doc-template-reset-btn" type="button" class="btn btn-outline-secondary btn-sm">Reset Template</button>
@@ -1012,25 +1072,30 @@ function renderTemplateEditor() {
 		});
 	}
 
-	const templateBodyInput = document.getElementById("doc-template-body-input");
-	if (templateBodyInput) {
-		templateBodyInput.addEventListener("input", (event) => {
-			templateEditorDraft.bodyText = String(event.currentTarget?.value || "");
-			templateEditorDraft.dirty = true;
-			templateEditorDraft.saveState = "idle";
-			templateEditorDraft.statusText = "Unsaved changes in template editor.";
-			refreshTemplateEditorStatus();
-			renderPreview();
-		});
-	}
-
 	const templateResetBtn = document.getElementById("doc-template-reset-btn");
 	if (templateResetBtn) {
 		templateResetBtn.addEventListener("click", () => {
+			clearTemplateDraftMode();
 			syncTemplateEditorWithSelection(true);
 			renderTemplateHint();
 			renderTemplateEditor();
 			renderPreview();
+		});
+	}
+
+	const templateNewBtn = document.getElementById("doc-template-new-btn");
+	if (templateNewBtn) {
+		templateNewBtn.addEventListener("click", () => {
+			startTemplateDraft("blank");
+			rerenderDocumentWorkspace();
+		});
+	}
+
+	const templateDuplicateBtn = document.getElementById("doc-template-duplicate-btn");
+	if (templateDuplicateBtn) {
+		templateDuplicateBtn.addEventListener("click", () => {
+			startTemplateDraft("duplicate");
+			rerenderDocumentWorkspace();
 		});
 	}
 
@@ -1049,6 +1114,7 @@ function renderTemplateEditor() {
 					...editedRecord,
 					template_status: "active",
 				});
+				clearTemplateDraftMode();
 				documentsDraft.templateId = String(savedTemplate?.id || "");
 				syncTemplateEditorWithSelection(true);
 				templateEditorDraft.saveState = "success";
@@ -1077,6 +1143,68 @@ function renderTemplateEditor() {
 			}
 		});
 	}
+
+	const templateDeleteBtn = document.getElementById("doc-template-delete-btn");
+	if (templateDeleteBtn) {
+		templateDeleteBtn.addEventListener("click", async () => {
+			if (!template.id || documentsDraft.templateDraftMode) return;
+			const confirmed = await notify.confirm(
+				`Delete template "${template.label}"? This cannot be undone.`,
+				{
+					title: "Delete Template",
+					confirmButtonText: "Delete",
+					cancelButtonText: "Cancel",
+					icon: "warning",
+				},
+			);
+			if (!confirmed) return;
+
+			try {
+				await deleteHrDocumentTemplate(template.id);
+				clearTemplateDraftMode();
+				documentsDraft.templateId = "";
+				syncTemplateEditorWithSelection(true);
+				rerenderDocumentWorkspace();
+				await logActivity({
+					action: "document_template.delete",
+					entityType: "hr_document_template",
+					entityId: template.id,
+					details: {
+						document_type: documentsDraft.documentType,
+						template_name: template.label,
+					},
+				});
+				await notify.success("Template deleted.", "Template Deleted");
+			} catch (error) {
+				await notify.error(
+					`Failed to delete template: ${error?.message || String(error)}`,
+					"Template Delete Failed",
+				);
+			}
+		});
+	}
+}
+
+function renderSurfaceModeControls() {
+	const previewBtn = document.getElementById("doc-surface-preview-btn");
+	const editBtn = document.getElementById("doc-surface-edit-btn");
+	if (previewBtn) {
+		previewBtn.classList.toggle("active", documentsDraft.surfaceMode !== "edit");
+	}
+	if (editBtn) {
+		editBtn.classList.toggle("active", documentsDraft.surfaceMode === "edit");
+	}
+}
+
+function renderTemplateCanvasBody() {
+	const blocks = templateTextToBodyBlocks(templateEditorDraft.bodyText);
+	if (blocks.length === 0) return "";
+	return blocks
+		.map(
+			(block) =>
+				`<p>${escapeHTML(String(block?.text || ""))}</p>`,
+		)
+		.join("");
 }
 
 function renderSubjectSourceSection() {
@@ -1450,13 +1578,34 @@ function buildPreviewContext() {
 		signerName,
 		signerRole,
 		signerHasImage: Boolean(signer?.signature_image_url),
+		recipientHasImage: Boolean(subject?.signature_image_url),
 	};
 }
 
+function renderSignaturePlaceholderCard({
+	label,
+	name,
+	role,
+	hasDigitalImage = false,
+} = {}) {
+	const digitalText = hasDigitalImage
+		? "Digital signature image on file. Exported document can place the e-sign here."
+		: "Digital signature placeholder. Upload an image later or keep this as e-sign placement.";
+	return `
+		<div class="documents-preview-signature-card">
+			<p class="documents-preview-signature-label">${escapeHTML(String(label || "Signature"))}</p>
+			<div class="documents-preview-signature-box">
+				<div class="documents-preview-signature-box-copy">${escapeHTML(digitalText)}</div>
+				<div class="documents-preview-signature-box-line"></div>
+				<div class="documents-preview-signature-box-copy">Wet signature area for printed copy</div>
+			</div>
+			<p class="mb-0"><strong>${name}</strong></p>
+			<p class="small text-muted mb-0">${role}</p>
+		</div>
+	`;
+}
+
 function renderSignatureBlock(ctx, options = {}) {
-	const signerMeta = ctx.signerHasImage
-		? '<p class="small text-muted mb-0">Digital signature image available</p>'
-		: '<p class="small text-muted mb-0">Signature image not uploaded</p>';
 	const recipientTitle =
 		documentsDraft.documentType === "offer_letter"
 			? "Candidate acknowledgment"
@@ -1464,19 +1613,20 @@ function renderSignatureBlock(ctx, options = {}) {
 
 	return `
 		<div class="documents-preview-signature-grid">
-			<div class="documents-preview-signature">
-				<p class="mb-1">Approved by,</p>
-				<p class="mb-0"><strong>${ctx.signerName}</strong></p>
-				<p class="small text-muted mb-0">${ctx.signerRole}</p>
-				${signerMeta}
-			</div>
+			${renderSignaturePlaceholderCard({
+				label: "Approved by",
+				name: ctx.signerName,
+				role: ctx.signerRole,
+				hasDigitalImage: ctx.signerHasImage,
+			})}
 			${
 				options.includeRecipient
-					? `<div class="documents-preview-signature">
-						<p class="mb-1">${recipientTitle}</p>
-						<p class="mb-0"><strong>${ctx.subjectName}</strong></p>
-						<p class="small text-muted mb-0">${ctx.subjectPosition}</p>
-					</div>`
+					? renderSignaturePlaceholderCard({
+							label: recipientTitle,
+							name: ctx.subjectName,
+							role: ctx.subjectPosition,
+							hasDigitalImage: ctx.recipientHasImage,
+					  })
 					: ""
 			}
 		</div>
@@ -1709,6 +1859,51 @@ function renderPreview() {
 	}
 
 	const logoUrl = String(state.appSettings?.document_logo_url || "").trim();
+	if (documentsDraft.surfaceMode === "edit") {
+		previewEl.innerHTML = `
+			<div class="documents-preview-header">
+				<div>
+					<div class="documents-preview-company">${ctx.companyName}</div>
+					<div class="documents-preview-app">${ctx.appName}</div>
+				</div>
+				${logoUrl ? `<img src="${escapeHTML(logoUrl)}" alt="Company logo" class="documents-preview-logo">` : ""}
+			</div>
+			<hr class="my-3">
+			<div class="documents-preview-title">${escapeHTML(ctx.template.displayTitle || ctx.template.label)}</div>
+			<div class="documents-preview-meta small text-muted mb-3">
+				A4 template editor. Edit the body directly on the page. Dynamic signature and generated sections still use the document setup values.
+			</div>
+			<div
+				id="doc-template-canvas-editor"
+				class="documents-template-canvas"
+				contenteditable="true"
+				spellcheck="false"
+				data-placeholder="Type the body of the document here. Use placeholders like {{employee_name}} or {{salary_in_words}}."
+			>${renderTemplateCanvasBody()}</div>
+			<div class="documents-template-canvas-footer">
+				${renderSignatureBlock(ctx, {
+					includeRecipient: ["offer_letter", "employment_contract"].includes(
+						documentsDraft.documentType,
+					),
+				})}
+			</div>
+		`;
+
+		const canvasEditor = document.getElementById("doc-template-canvas-editor");
+		if (canvasEditor) {
+			canvasEditor.addEventListener("input", (event) => {
+				templateEditorDraft.bodyText = normalizeMultilineText(
+					event.currentTarget?.innerText || "",
+				);
+				templateEditorDraft.dirty = true;
+				templateEditorDraft.saveState = "idle";
+				templateEditorDraft.statusText = "Unsaved changes in template editor.";
+				refreshTemplateEditorStatus();
+			});
+		}
+		return;
+	}
+
 	previewEl.innerHTML = `
 		<div class="documents-preview-header">
 			<div>
@@ -1790,6 +1985,8 @@ function setControlsDisabled(disabled) {
 		"doc-employee-select",
 		"doc-type-select",
 		"doc-template-select",
+		"doc-surface-preview-btn",
+		"doc-surface-edit-btn",
 		"doc-template-save-btn",
 		"doc-template-reset-btn",
 		"doc-signer-select",
@@ -1811,6 +2008,7 @@ function setControlsDisabled(disabled) {
 }
 
 function rerenderDocumentWorkspace() {
+	renderSurfaceModeControls();
 	renderSubjectModeOptions();
 	renderEmployeeOptions();
 	renderSignerOptions();
@@ -1829,6 +2027,8 @@ function bindSetupHandlers() {
 	const typeSelect = document.getElementById("doc-type-select");
 	const subjectModeSelect = document.getElementById("doc-subject-mode");
 	const templateSelect = document.getElementById("doc-template-select");
+	const surfacePreviewBtn = document.getElementById("doc-surface-preview-btn");
+	const surfaceEditBtn = document.getElementById("doc-surface-edit-btn");
 	const signerSelect = document.getElementById("doc-signer-select");
 	const signerRoleInput = document.getElementById("doc-signer-role-override");
 	const downloadBtn = document.getElementById("doc-download-btn");
@@ -1857,6 +2057,7 @@ function bindSetupHandlers() {
 			const nextType = String(event.target?.value || "");
 			if (nextType !== documentsDraft.documentType) {
 				documentsDraft.documentType = nextType;
+				clearTemplateDraftMode();
 				documentsDraft.templateId = "";
 				documentsDraft.fields = {};
 				documentsDraft.subjectMode = defaultSubjectModeForType(nextType);
@@ -1873,12 +2074,29 @@ function bindSetupHandlers() {
 
 	if (templateSelect) {
 		templateSelect.onchange = (event) => {
+			clearTemplateDraftMode();
 			documentsDraft.templateId = String(event.target?.value || "");
 			syncTemplateEditorWithSelection(true);
 			renderTemplateHint();
 			renderTemplateEditor();
 			renderPreview();
 			refreshValidationState();
+		};
+	}
+
+	if (surfacePreviewBtn) {
+		surfacePreviewBtn.onclick = () => {
+			documentsDraft.surfaceMode = "preview";
+			renderSurfaceModeControls();
+			renderPreview();
+		};
+	}
+
+	if (surfaceEditBtn) {
+		surfaceEditBtn.onclick = () => {
+			documentsDraft.surfaceMode = "edit";
+			renderSurfaceModeControls();
+			renderPreview();
 		};
 	}
 
@@ -1951,6 +2169,7 @@ function bindSetupHandlers() {
 					recipientSigner: {
 						name: String(context.subject.name || ""),
 						role: String(context.subject.position || ""),
+						signatureImageUrl: String(context.subject.signature_image_url || "").trim(),
 					},
 					template: context.template.record || null,
 					payroll: context.payroll,
@@ -2035,6 +2254,8 @@ function bindSetupHandlers() {
 
 export function resetDocumentsWorkspace() {
 	documentsDraft.subjectMode = "employee";
+	documentsDraft.surfaceMode = "preview";
+	clearTemplateDraftMode();
 	documentsDraft.employeeId = "";
 	documentsDraft.manualIdentity = {
 		name: "",
