@@ -262,6 +262,7 @@ const {
 	importEmployeeCSV,
 	clearEmployeeDirectoryFilters,
 } = createFeatureActions("employees", [
+	"switchManpowerTab",
 	"renderManpowerPlanning",
 	"renderHeadcountRequests",
 	"renderRecruitmentBoard",
@@ -500,6 +501,7 @@ window.__app = {
 	removeCompetencyRow,
 
 	// Employees
+	switchManpowerTab,
 	renderManpowerPlanning,
 	renderHeadcountRequests,
 	renderRecruitmentBoard,

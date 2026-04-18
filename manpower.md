@@ -1,70 +1,115 @@
 # Manpower Planning Workflow Redesign (Phase 3B & 3C)
 
+## Status: Phase 3B ✅ COMPLETE | Phase 3C ✅ COMPLETE
+
 This plan details the UI overhaul of the Manpower Planning workspace to transition it from a data-table-heavy view to an intuitive "Funnel Layout" with actionable insights and analytics.
 
-## Goal
+## Implementation Summary
 
-Make manpower planning readable as one end-to-end workflow: plan headcount, submit requests, manage recruitment progress, and see staffing gaps without cross-checking raw tables. This will be achieved by implementing Phase 3B and 3C from `docs/manpower-planning-plan.md`.
+### Phase 3B - UI Redesign (Completed ✅)
 
-## Proposed Changes
+#### 1. Workforce Summary (Top-level metrics)
+- ✅ Top counter cards preserved (Plan Rows, Approved Headcount, Filled Headcount, Gap to Fill)
+- ✅ Secondary metrics added (Pending Requests, Active Pipeline, Hires This Period, Overdue Targets)
 
-### 1. UI Redesign (Frontend HTML)
+#### 2. Planning Funnel (Visual strip)
+- ✅ 4-step horizontal strip: Plan → Request → Recruit → Fill
+- ✅ Current counts displayed per step
+- ✅ Bottleneck indicators when counts are zero
+- ✅ **Clickable steps** - clicking navigates to the relevant tab
 
-#### [MODIFY] src/components/tab-employees.html
+#### 3. Action Panels (Left & Right Insights)
+- ✅ **Left Panel**: "Headcount Gap by Department" with progress bars showing approved vs filled
+- ✅ **Right Panel**: "Attention Needed" showing:
+  - Approved requests awaiting sourcing (no pipeline candidates)
+  - Overdue recruitment items (past target hire date)
 
-We will restructure the `#employees-planning` container to follow the funnel and action panel approach:
+#### 4. Detailed Views (Tab/Pill Switcher)
+- ✅ Tab 1: **Plans** - Phase 1 setup form + table
+- ✅ Tab 2: **Requests** - Phase 2 intake + queue
+- ✅ Tab 3: **Recruitment** - Kanban board
+- ✅ Tab 4: **Analytics** - Hiring insights and charts
 
-**Section 1: Workforce Summary (Top-level metrics)**
+### Phase 3C - Hiring Analytics (Completed ✅)
 
-- Will keep and enhance the top counter cards.
-- Add "Hires this period".
+#### Analytics Widgets Implemented
 
-**Section 2: Planning Funnel (Visual strip)**
+1. **Planned vs Approved vs Filled** (Chart.js bar chart)
+   - Shows total headcount comparison across all plans
+   - Visual bar chart for quick comprehension
 
-- Create a 4-step horizontal strip: Plan -> Request -> Recruit -> Fill.
-- Include current counts and bottleneck indicators (e.g., "5 plans delayed", "3 overdue requests").
-- Make steps clickable to scroll or filter the main view.
+2. **Time in Pipeline by Stage** (Chart.js bar chart)
+   - Average days spent in each active stage
+   - Red highlighting for stages with 7+ days average (bottleneck indicator)
 
-**Section 3: Action Panels (Left & Right Insights)**
+3. **Approved Requests Without Pipeline**
+   - Lists approved requests that haven't started sourcing
+   - Shows request code, department, position
 
-- Left: "Headcount Gap by Department" progress bars or list.
-- Right: "Awaiting Sourcing" (approved requests without active candidates) and "Overdue/Stalled Recruitment Items".
+4. **Upcoming Hire Deadlines**
+   - Requests with target hire dates within 30 days
+   - Color-coded urgency (red ≤7 days, yellow ≤14 days)
+   - Sorted by closest deadline first
 
-**Section 4: Detailed Views (Tab/Pill Switcher)**
-Instead of all tables stacked vertically, they will be hidden behind a pill navigation switcher inside the Manpower Workspace:
+### Data Logic Improvements
 
-- Tab 1: **Plans Setup & Table (Phase 1)**
-- Tab 2: **Requests Intake & Queue (Phase 2)**
-- Tab 3: **Hiring Analytics (Phase 3C)**
-  _Note: The Recruitment Board itself remains a separate subview accessible via the Navigation or a dedicated button, but we will ensure the analytical summary is present in the funnel._
+#### "Hires This Period" Fix
+- ✅ Now filters to **current month only** using `stage_updated_at` timestamp
+- Previously showed ALL hired candidates ever, not just current period
 
-### 2. Logic Implementation (JavaScript Module)
+## Files Modified
 
-#### [MODIFY] src/modules/employees.js
+### src/components/tab-employees.html
+- Added `funnel-step` class with `cursor:pointer` to funnel strip columns
+- Added `onclick` handlers to funnel steps for tab navigation
+- Added `mp-chart-planned` and `mp-chart-pipeline-age` canvas elements for Chart.js
+- Replaced static progress bar divs with chart canvases
 
-- **Render Function (`renderManpowerPlanning`)**:
-   - Overhaul to generate the stats for the Funnel steps.
-   - Compute Department Gap aggregations and render the left action panel ("Headcount gap by department").
-   - Compute Action Items and render the right action panel (overdue tasks, approved requests awaiting sourcing).
-- **Tab Switcher Logic**: Add functions to handle the "Detailed Views" tab switching (Plans, Requests, Analytics).
-- **UI Data Formatting**: Compute "Hires this period" by filtering recruitment pipelines for hired dates.
+### src/modules/employees.js
+- Added `getChartCtor` import from `chartLoader.js`
+- Added `mpChartPlanned` and `mpChartPipelineAge` chart instance variables
+- Updated `renderManpowerAnalytics()` to:
+  - Use Chart.js for "Planned vs Approved vs Filled" visualization
+  - Use Chart.js for "Time in Pipeline by Stage" visualization
+  - Retained table views for "Not Started" and "Deadlines" sections
+- Updated `renderManpowerFunnel()` to filter hires by current month
 
-#### [MODIFY] src/modules/data/manpower.js
+## Verification Checklist
 
-- Ensure helper functions exist for any complex analytics parsing, though most can be done in memory in `employees.js` given the current dataset load approach (`fetchManpowerPlans`, `fetchHeadcountRequests`, `fetchRecruitmentPipeline`). Add specific selectors if needed.
+- [x] Load Manpower Planning tab → Funnel strip loads instantly
+- [x] Funnel steps are clickable and navigate to correct tabs
+- [x] Action panels show real delayed requests
+- [x] Analytics tab renders Chart.js charts correctly
+- [x] "Hires this period" only shows current month's hires
+- [x] Responsive layout works on smaller screens
 
-## Open Questions
+## Dependencies
 
-1. **Charting Library**: We currently use `Chart.js` via `chartLoader.js`. Do we want the analytics tab to include actual charts (like pie charts for Department Gaps) or just HTML-based progress bars/lists?
-2. **"Hires this period" Definition**: Are we defining "this period" as the current month based on `expected_start_date` or `stage_updated_at`?
-3. **Tab Persistence**: When switching between "Plans", "Requests", and "Analytics", should the app remember the user's last selected tab in this session, or default to the "Analytics/Overview" every time they open Manpower Planning?
+- Chart.js (loaded via `chartLoader.js` lazy import)
+- Bootstrap 5 for UI components
+- Supabase for data persistence
 
-## Verification Plan
+## Known Limitations / Future Improvements
 
-### Manual Verification
+1. **Chart Tooltips**: Could add detailed tooltips showing exact numbers
+2. **Export Analytics**: Add export to CSV/PDF for reporting
+3. **Department Filter**: Add ability to filter analytics by department
+4. **Trend Charts**: Add month-over-month trend visualization
+5. **Real-time Updates**: Charts could auto-refresh when data changes
 
-1. Load the Manpower Planning tab and confirm the top summary and 4-step funnel appear instantly.
-2. Ensure the "Action Panels" flag real delayed requests (if a request is overdue, it shows up on the right).
-3. Test the tab switcher to open Plans Form, Requests Form, and read the tabular data.
-4. Verify responsivness to ensure the funnel and analytics cards flex correctly on smaller views.
-5. Create an overdue request and check if the bottleneck indicators increment properly.
+## Architecture Notes
+
+### State Dependencies
+The analytics rely on three state arrays:
+- `state.manpowerPlans` - Phase 1 plan data
+- `state.headcountRequests` - Phase 2 request data
+- `state.recruitmentPipeline` - Phase 3 recruitment cards
+
+### Chart Lifecycle
+Charts are destroyed and recreated when switching to the Analytics tab to prevent memory leaks and ensure fresh data.
+
+## Open Questions (Resolved)
+
+1. **Charting Library**: Chart.js via `chartLoader.js` ✅
+2. **"Hires this period" Definition**: Current month based on `stage_updated_at` ✅
+3. **Tab Persistence**: Defaults to "Plans" tab (session not persisted) ✅

@@ -23,8 +23,11 @@ import { logActivity } from './data/activity.js';
 import { requireRecentAuth } from './auth.js';
 import * as notify from '../lib/notify.js';
 import { getSwal } from '../lib/swal.js';
+import { getChartCtor } from '../lib/chartLoader.js';
 
 const RECRUITMENT_STAGES = ['requested', 'sourcing', 'screening', 'interview', 'offer', 'hired', 'closed'];
+let mpChartPlanned = null;
+let mpChartPipelineAge = null;
 
 function parseCsvOptions(value, fallback) {
     return (value || fallback || '')
@@ -707,6 +710,279 @@ export function resetManpowerPlanForm() {
     }
 }
 
+// Manpower workspace tab state
+let _mpActiveTab = 'plans';
+
+export function switchManpowerTab(tab) {
+    _mpActiveTab = tab;
+    const tabs = ['plans', 'requests', 'recruitment', 'analytics'];
+    tabs.forEach(t => {
+        const btn = document.querySelector(`[data-mp-tab="${t}"]`);
+        const pane = document.getElementById(`mp-tab-${t}`);
+        const isActive = t === tab;
+        if (btn) {
+            btn.className = `btn btn-sm ${isActive ? 'btn-primary' : 'btn-outline-secondary'} fw-semibold`;
+            btn.setAttribute('aria-selected', String(isActive));
+        }
+        if (pane) pane.classList.toggle('hidden', !isActive);
+    });
+
+    if (tab === 'recruitment') {
+        renderRecruitmentBoard();
+    } else if (tab === 'analytics') {
+        renderManpowerAnalytics();
+    }
+}
+
+function ensureChartCanvas(wrapperId, canvasId) {
+    const wrapper = document.getElementById(wrapperId);
+    if (!wrapper) return null;
+    let canvas = document.getElementById(canvasId);
+    if (!canvas) {
+        wrapper.innerHTML = `<canvas id="${canvasId}" style="max-height:200px;"></canvas>`;
+        canvas = document.getElementById(canvasId);
+    }
+    return canvas;
+}
+
+function renderChartEmptyState(wrapperId, message) {
+    const wrapper = document.getElementById(wrapperId);
+    if (wrapper) {
+        wrapper.innerHTML = `<div class="p-3 text-muted small">${escapeHTML(message)}</div>`;
+    }
+}
+
+function renderManpowerFunnel(plans, requests, pipeline) {
+    const activePlans = plans.filter(p => ['draft','submitted','approved','active'].includes(String(p.status||'').toLowerCase())).length;
+    const openApprovedRequests = requests.filter(r => String(r.approval_status||'').toLowerCase()==='approved' && getRequestRemainingOpenings(r)>0).length;
+    const activePipelineCount = pipeline.filter(c => !['hired','closed'].includes(String(c.stage||'').toLowerCase())).length;
+    // Hires this period: filter by current month using stage_updated_at
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const hiresThisPeriod = pipeline.filter(c => {
+        if (String(c.stage||'').toLowerCase() !== 'hired') return false;
+        const updated = new Date(c.stage_updated_at || c.updated_at || c.created_at);
+        return updated.getMonth() === currentMonth && updated.getFullYear() === currentYear;
+    }).length;
+
+    const setText = (id, value) => { const el = document.getElementById(id); if(el) el.innerText = String(value); };
+    const setNote = (id, msg) => {
+        const el = document.getElementById(id);
+        if (el) { el.innerText = msg; el.classList.toggle('hidden', !msg); }
+    };
+
+    setText('mp-funnel-step-plan', activePlans);
+    setText('mp-funnel-step-request', openApprovedRequests);
+    setText('mp-funnel-step-recruit', activePipelineCount);
+    setText('mp-funnel-step-fill', hiresThisPeriod);
+
+    setNote('mp-funnel-step-plan-note', activePlans === 0 ? 'No active plans' : '');
+    setNote('mp-funnel-step-request-note', openApprovedRequests === 0 ? 'No open approved requests' : '');
+    setNote('mp-funnel-step-recruit-note', activePipelineCount === 0 ? 'No active candidates' : '');
+    setNote('mp-funnel-step-fill-note', hiresThisPeriod === 0 ? 'No hires yet' : '');
+}
+
+function renderManpowerActionPanels(plans, requests, pipeline) {
+    const gapEl = document.getElementById('mp-gap-by-dept');
+    const actionEl = document.getElementById('mp-action-items');
+
+    if (!gapEl || !actionEl) return;
+
+    // Left panel: gap by department
+    const deptGap = {};
+    plans.forEach(p => {
+        const dept = p.department || 'Unknown';
+        if (!deptGap[dept]) deptGap[dept] = { planned: 0, approved: 0, filled: 0, gap: 0 };
+        deptGap[dept].planned += Number(p.planned_headcount || 0);
+        deptGap[dept].approved += Number(p.approved_headcount || 0);
+        deptGap[dept].filled += Number(p.filled_headcount || 0);
+        deptGap[dept].gap += Number(p.gap_headcount || 0);
+    });
+
+    const deptRows = Object.entries(deptGap).sort((a, b) => b[1].gap - a[1].gap);
+    if (deptRows.length === 0) {
+        gapEl.innerHTML = '<div class="p-3 text-muted small">No plans to show gap data.</div>';
+    } else {
+        const maxGap = Math.max(...deptRows.map(([, d]) => Math.max(d.gap, 1)), 1);
+        gapEl.innerHTML = deptRows.map(([dept, d]) => {
+            const pct = Math.min(Math.round((d.gap / maxGap) * 100), 100);
+            const gapColor = d.gap > 0 ? 'bg-warning' : 'bg-success';
+            return `
+                <div class="px-3 py-2 border-bottom">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="fw-semibold">${escapeHTML(dept)}</span>
+                        <span class="${d.gap > 0 ? 'text-warning fw-bold' : 'text-success'}">${d.gap} gap</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar ${gapColor}" style="width: ${pct}%"></div>
+                    </div>
+                    <div class="d-flex justify-content-between small text-muted mt-1">
+                        <span>Approved: ${d.approved}</span>
+                        <span>Filled: ${d.filled}</span>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    // Right panel: action items
+    const awaitingSourcing = requests.filter(r => {
+        if (String(r.approval_status||'').toLowerCase() !== 'approved') return false;
+        const hasPipeline = pipeline.some(c => c.request_id === r.id);
+        return !hasPipeline;
+    });
+
+    const overdueRecruitment = requests.filter(r => {
+        if (String(r.approval_status||'').toLowerCase() !== 'approved') return false;
+        if (getRequestRemainingOpenings(r) <= 0 || !r.target_hire_date) return false;
+        const target = new Date(r.target_hire_date);
+        return !Number.isNaN(target.getTime()) && target < new Date(new Date().toDateString());
+    });
+
+    const actionItems = [];
+    if (awaitingSourcing.length > 0) {
+        actionItems.push(`<div class="px-3 py-2 border-bottom"><div class="small fw-semibold text-warning"><i class="bi bi-hourglass-split me-1"></i>${awaitingSourcing.length} Approved Request${awaitingSourcing.length===1?'':'s'} Awaiting Sourcing</div></div>`);
+    }
+    if (overdueRecruitment.length > 0) {
+        actionItems.push(`<div class="px-3 py-2 border-bottom"><div class="small fw-semibold text-danger"><i class="bi bi-exclamation-circle me-1"></i>${overdueRecruitment.length} Overdue Hire Target${overdueRecruitment.length===1?'':'s'}</div></div>`);
+    }
+
+    if (actionItems.length === 0) {
+        actionEl.innerHTML = '<div class="p-3 text-muted small"><i class="bi bi-check-circle me-1 text-success"></i>No action items. Everything looks good!</div>';
+    } else {
+        actionEl.innerHTML = actionItems.join('');
+    }
+}
+
+async function renderManpowerAnalytics() {
+    const plans = Array.isArray(state.manpowerPlans) ? state.manpowerPlans : [];
+    const requests = Array.isArray(state.headcountRequests) ? state.headcountRequests : [];
+    const pipeline = Array.isArray(state.recruitmentPipeline) ? state.recruitmentPipeline : [];
+
+    // Chart: Planned vs Approved vs Filled
+    if (plans.length === 0) {
+        if (mpChartPlanned) {
+            mpChartPlanned.destroy();
+            mpChartPlanned = null;
+        }
+        renderChartEmptyState('mp-chart-planned-wrap', 'No plan data.');
+    } else {
+        const totalPlanned = plans.reduce((s, p) => s + Number(p.planned_headcount || 0), 0);
+        const totalApproved = plans.reduce((s, p) => s + Number(p.approved_headcount || 0), 0);
+        const totalFilled = plans.reduce((s, p) => s + Number(p.filled_headcount || 0), 0);
+        const ctxPlanned = ensureChartCanvas('mp-chart-planned-wrap', 'mp-chart-planned');
+        if (ctxPlanned) {
+            if (mpChartPlanned) {
+                mpChartPlanned.destroy();
+                mpChartPlanned = null;
+            }
+            const Chart = await getChartCtor();
+            mpChartPlanned = new Chart(ctxPlanned, {
+                type: 'bar',
+                data: {
+                    labels: ['Planned', 'Approved', 'Filled'],
+                    datasets: [{
+                        label: 'Headcount',
+                        data: [totalPlanned, totalApproved, totalFilled],
+                        backgroundColor: ['#0d6efd', '#198754', '#20c997'],
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                },
+            });
+        }
+    }
+
+    // Chart: Time in Pipeline by Stage
+    const ctxPipelineAge = ensureChartCanvas('mp-chart-pipeline-age-wrap', 'mp-chart-pipeline-age');
+    if (ctxPipelineAge) {
+        const stageAgeMap = {};
+        RECRUITMENT_STAGES.forEach(s => stageAgeMap[s] = []);
+        pipeline.forEach(c => {
+            const stage = String(c.stage||'').toLowerCase();
+            if (stageAgeMap[stage]) stageAgeMap[stage].push(Number(c.stage_age_days || 0));
+        });
+        
+        const activeStages = RECRUITMENT_STAGES.filter(s => !['hired','closed'].includes(s));
+        const stageLabels = activeStages.map(s => s.charAt(0).toUpperCase() + s.slice(1));
+        const stageAverages = activeStages.map(s => {
+            const ages = stageAgeMap[s] || [];
+            return ages.length > 0 ? Math.round(ages.reduce((a,b)=>a+b,0)/ages.length) : 0;
+        });
+        
+        if (mpChartPipelineAge) { mpChartPipelineAge.destroy(); mpChartPipelineAge = null; }
+        const Chart = await getChartCtor();
+        mpChartPipelineAge = new Chart(ctxPipelineAge, {
+            type: 'bar',
+            data: {
+                labels: stageLabels,
+                datasets: [{
+                    label: 'Avg Days',
+                    data: stageAverages,
+                    backgroundColor: stageAverages.map(a => a >= 7 ? '#dc3545' : '#0d6efd'),
+                    borderRadius: 4,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, title: { display: true, text: 'Days' } } },
+            },
+        });
+    }
+
+    // Approved requests without pipeline
+    const notStartedEl = document.getElementById('mp-analytics-not-started');
+    if (notStartedEl) {
+        const notStarted = requests.filter(r =>
+            String(r.approval_status||'').toLowerCase()==='approved'
+            && !pipeline.some(c => c.request_id === r.id)
+        );
+        if (notStarted.length === 0) {
+            notStartedEl.innerHTML = '<div class="p-3 text-muted small"><i class="bi bi-check-circle me-1 text-success"></i>All approved requests have pipeline activity.</div>';
+        } else {
+            notStartedEl.innerHTML = `<table class="table table-sm mb-0"><tbody>${notStarted.map(r => `
+                <tr>
+                    <td class="ps-3"><span class="small fw-semibold">${escapeHTML(r.request_code||'-')}</span></td>
+                    <td class="small">${escapeHTML(r.department||'-')} · ${escapeHTML(r.position||'-')}</td>
+                    <td class="small text-end pe-3 text-warning fw-bold">Not Started</td>
+                </tr>`).join('')}</tbody></table>`;
+        }
+    }
+
+    // Upcoming hire deadlines
+    const deadlinesEl = document.getElementById('mp-analytics-deadlines');
+    if (deadlinesEl) {
+        const upcoming = requests
+            .filter(r => {
+                if (String(r.approval_status||'').toLowerCase()!=='approved') return false;
+                if (getRequestRemainingOpenings(r)<=0 || !r.target_hire_date) return false;
+                const daysLeft = Math.ceil((new Date(r.target_hire_date).getTime()-Date.now())/86400000);
+                return daysLeft >= 0 && daysLeft <= 30;
+            })
+            .sort((a,b) => new Date(a.target_hire_date)-new Date(b.target_hire_date));
+        if (upcoming.length === 0) {
+            deadlinesEl.innerHTML = '<div class="p-3 text-muted small">No upcoming deadlines in the next 30 days.</div>';
+        } else {
+            deadlinesEl.innerHTML = `<table class="table table-sm mb-0"><tbody>${upcoming.map(r => {
+                const daysLeft = Math.ceil((new Date(r.target_hire_date).getTime()-Date.now())/86400000);
+                const urgency = daysLeft <= 7 ? 'text-danger fw-bold' : daysLeft <= 14 ? 'text-warning fw-bold' : 'text-muted';
+                return `<tr>
+                    <td class="ps-3"><span class="small fw-semibold">${escapeHTML(r.request_code||'-')}</span></td>
+                    <td class="small">${escapeHTML(r.department||'-')} · ${escapeHTML(r.position||'-')}</td>
+                    <td class="small text-end pe-3 ${urgency}">${daysLeft}d left (${r.target_hire_date})</td>
+                </tr>`;
+            }).join('')}</tbody></table>`;
+        }
+    }
+}
+
 export function renderManpowerPlanning() {
     const tbody = document.getElementById('manpower-plan-body');
     if (!tbody) return;
@@ -768,6 +1044,9 @@ export function renderManpowerPlanning() {
     setText('mp-funnel-hires-completed', hiresCompleted);
     setText('mp-funnel-overdue-targets', overdueTargets);
 
+    renderManpowerFunnel(plans, requests, pipeline);
+    renderManpowerActionPanels(plans, requests, pipeline);
+
     if (metaEl) {
         metaEl.innerText = totalPlans > 0
             ? `${totalPlans} plan${totalPlans === 1 ? '' : 's'} loaded`
@@ -781,6 +1060,7 @@ export function renderManpowerPlanning() {
         tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4 fst-italic">No manpower plans yet.</td></tr>';
         renderHeadcountRequests();
         renderRecruitmentBoard();
+        switchManpowerTab(_mpActiveTab);
         return;
     }
 
@@ -829,6 +1109,7 @@ export function renderManpowerPlanning() {
 
     renderHeadcountRequests();
     renderRecruitmentBoard();
+    switchManpowerTab(_mpActiveTab);
 }
 
 function readHeadcountRequestForm() {
