@@ -1,12 +1,10 @@
-import { supabase, state, emit, debugError, execSupabase } from './runtime.js';
+import { state, emit, debugError } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 async function fetchConfig() {
     try {
-        const { data } = await execSupabase(
-            'Fetch competency config',
-            () => supabase.from('competency_config').select('position_name,competencies'),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.config.listCompetencies();
+        if (error) throw error;
 
         const config = {};
         (data || []).forEach(row => {
@@ -23,13 +21,9 @@ async function fetchConfig() {
 }
 
 async function saveConfig(posName, competencies) {
-    await execSupabase(
-        `Save competency config "${posName}"`,
-        () => supabase
-            .from('competency_config')
-            .upsert({ position_name: posName, competencies }, { onConflict: 'position_name' }),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.config.saveCompetencies(posName, competencies);
+    if (error) throw error;
+    
     state.appConfig[posName] = { competencies };
     emit('data:config', state.appConfig);
 }

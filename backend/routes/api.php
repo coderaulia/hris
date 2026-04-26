@@ -30,6 +30,20 @@ Route::prefix('v1')->group(function () {
         Route::get('/assessment-scores', [\App\Http\Controllers\Assessment\AssessmentController::class, 'scores']);
         Route::get('/assessment-history', [\App\Http\Controllers\Assessment\AssessmentController::class, 'history']);
 
-        // ... we'll add more module routes in Phase 3
+        // KPIs
+        Route::get('/kpis', [\App\Http\Controllers\KpiController::class, 'index']);
+        Route::get('/kpi-records', [\App\Http\Controllers\KpiController::class, 'records']);
+        Route::post('/kpi-records', [\App\Http\Controllers\KpiController::class, 'storeRecord']);
+        Route::get('/kpi-weight-profiles', [\App\Http\Controllers\KpiController::class, 'weightProfiles']);
+
+        // Performance Scores
+        Route::get('/performance-scores', [\App\Http\Controllers\PerformanceScoreController::class, 'index']);
+        Route::post('/performance-scores', [\App\Http\Controllers\PerformanceScoreController::class, 'store']);
+
+        // Competencies
+        Route::get('/competency-config', [\App\Http\Controllers\CompetencyController::class, 'index']);
+        Route::put('/competency-config/{position}', [\App\Http\Controllers\CompetencyController::class, 'update']);
+
+        // ... we'll add more module routes in Phase 4
     });
 });

@@ -1,5 +1,4 @@
 import {
-    supabase,
     state,
     emit,
     debugError,
@@ -11,6 +10,7 @@ import {
     execSupabase,
     fetchOptionalCollection,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 import {
     getKpiDefinitionForPeriod,
     getEmployeeKpiTarget,
@@ -124,11 +124,8 @@ async function getNextTargetVersionNo(employeeId, kpiId, period) {
 }
 async function fetchKpiDefinitions() {
     try {
-        const { data } = await execSupabase(
-            'Fetch KPI definitions',
-            () => supabase.from('kpi_definitions').select(KPI_DEFINITION_COLUMNS).order('category').order('name'),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.kpis.list();
+        if (error) throw error;
         state.kpiConfig = data || [];
         emit('data:kpiConfig', state.kpiConfig);
         return state.kpiConfig;
@@ -139,27 +136,12 @@ async function fetchKpiDefinitions() {
 }
 
 async function fetchKpiDefinitionVersions() {
-    return fetchOptionalCollection({
-        label: 'Fetch KPI definition versions',
-        table: 'kpi_definition_versions',
-        selectColumns: KPI_DEFINITION_VERSION_COLUMNS,
-        stateKey: 'kpiDefinitionVersions',
-        eventName: 'data:kpiDefinitionVersions',
-        orderBy: 'requested_at',
-        ascending: false,
-    });
+    // Phase 4 will handle versions if needed, for now return empty
+    return [];
 }
 
 async function fetchEmployeeKpiTargetVersions() {
-    return fetchOptionalCollection({
-        label: 'Fetch employee KPI target versions',
-        table: 'employee_kpi_target_versions',
-        selectColumns: EMPLOYEE_KPI_TARGET_VERSION_COLUMNS,
-        stateKey: 'employeeKpiTargetVersions',
-        eventName: 'data:employeeKpiTargetVersions',
-        orderBy: 'requested_at',
-        ascending: false,
-    });
+    return [];
 }
 
 async function saveKpiDefinition(kpi) {
@@ -660,15 +642,8 @@ async function upsertEmployeePerformanceScore(employeeId, period) {
     };
 
     try {
-        const { data } = await execSupabase(
-            `Upsert performance score for ${employeeId}/${period}`,
-            () => supabase
-                .from('employee_performance_scores')
-                .upsert(payload, { onConflict: 'employee_id,period,score_type' })
-                .select()
-                .single(),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.scores.save(payload);
+        if (error) throw error;
 
         const idx = state.employeePerformanceScores.findIndex(
             r => String(r.employee_id || '') === String(data.employee_id || '') && String(r.period || '') === String(data.period || '') && String(r.score_type || '') === String(data.score_type || '')
@@ -687,39 +662,42 @@ async function upsertEmployeePerformanceScore(employeeId, period) {
 }
 
 async function fetchKpiWeightProfiles() {
-    return fetchOptionalCollection({
-        label: 'Fetch KPI weight profiles',
-        table: 'kpi_weight_profiles',
-        selectColumns: KPI_WEIGHT_PROFILE_COLUMNS,
-        stateKey: 'kpiWeightProfiles',
-        eventName: 'data:kpiWeightProfiles',
-        orderBy: 'updated_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.kpis.listWeightProfiles();
+        if (error) throw error;
+        state.kpiWeightProfiles = data || [];
+        emit('data:kpiWeightProfiles', state.kpiWeightProfiles);
+        return state.kpiWeightProfiles;
+    } catch (error) {
+        debugError('Fetch weight profiles error:', error);
+        return [];
+    }
 }
 
 async function fetchKpiWeightItems() {
-    return fetchOptionalCollection({
-        label: 'Fetch KPI weight items',
-        table: 'kpi_weight_items',
-        selectColumns: KPI_WEIGHT_ITEM_COLUMNS,
-        stateKey: 'kpiWeightItems',
-        eventName: 'data:kpiWeightItems',
-        orderBy: 'updated_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.kpis.listWeightItems();
+        if (error) throw error;
+        state.kpiWeightItems = data || [];
+        emit('data:kpiWeightItems', state.kpiWeightItems);
+        return state.kpiWeightItems;
+    } catch (error) {
+        debugError('Fetch weight items error:', error);
+        return [];
+    }
 }
 
 async function fetchEmployeePerformanceScores() {
-    return fetchOptionalCollection({
-        label: 'Fetch employee performance scores',
-        table: 'employee_performance_scores',
-        selectColumns: EMPLOYEE_PERFORMANCE_SCORE_COLUMNS,
-        stateKey: 'employeePerformanceScores',
-        eventName: 'data:employeePerformanceScores',
-        orderBy: 'calculated_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.scores.list();
+        if (error) throw error;
+        state.employeePerformanceScores = data || [];
+        emit('data:employeePerformanceScores', state.employeePerformanceScores);
+        return state.employeePerformanceScores;
+    } catch (error) {
+        debugError('Fetch performance scores error:', error);
+        return [];
+    }
 }
 
 async function saveKpiWeightProfile(profile) {
@@ -769,15 +747,14 @@ async function saveKpiWeightItems(profileId, items = []) {
 
 async function fetchKpiRecords(filters = {}) {
     try {
-        let query = supabase.from('kpi_records').select(KPI_RECORD_COLUMNS);
-        if (filters.employee_id) query = query.eq('employee_id', filters.employee_id);
-        if (filters.period) query = query.eq('period', filters.period);
-        const { data } = await execSupabase(
-            'Fetch KPI records',
-            () => query.order('period', { ascending: false }),
-            { retries: 1 }
-        );
-        state.kpiRecords = data || [];
+        const { data, error } = await backend.kpis.listRecords();
+        if (error) throw error;
+        
+        let filtered = data || [];
+        if (filters.employee_id) filtered = filtered.filter(r => String(r.employee_id) === String(filters.employee_id));
+        if (filters.period) filtered = filtered.filter(r => String(r.period) === String(filters.period));
+
+        state.kpiRecords = filtered;
         emit('data:kpiRecords', state.kpiRecords);
         return state.kpiRecords;
     } catch (error) {

@@ -51,8 +51,6 @@ export const supabaseAdapter = {
             return await supabase.from('employee_assessment_history').select(columns);
         },
         save: async (payload) => {
-             // Supabase logic handles this via separate calls or RPC.
-             // For consistency with Laravel, we'll keep it simple or use RPC if exists.
              return await supabase.from('employee_assessments').upsert(payload);
         }
     },
@@ -68,6 +66,39 @@ export const supabaseAdapter = {
         },
         delete: async (id) => {
             return await supabase.from('employee_training_records').delete().eq('id', id);
+        }
+    },
+    kpis: {
+        list: async (columns = '*') => {
+            return await supabase.from('kpi_definitions').select(columns);
+        },
+        listRecords: async (columns = '*') => {
+            return await supabase.from('kpi_records').select(columns);
+        },
+        listWeightProfiles: async (columns = '*') => {
+            return await supabase.from('kpi_weight_profiles').select(columns);
+        },
+        listWeightItems: async (columns = '*') => {
+            return await supabase.from('kpi_weight_items').select(columns);
+        },
+        saveRecord: async (payload) => {
+            return await supabase.from('kpi_records').upsert(payload);
+        }
+    },
+    scores: {
+        list: async (columns = '*') => {
+            return await supabase.from('employee_performance_scores').select(columns);
+        },
+        save: async (payload) => {
+            return await supabase.from('employee_performance_scores').upsert(payload);
+        }
+    },
+    config: {
+        listCompetencies: async () => {
+            return await supabase.from('competency_config').select('*');
+        },
+        saveCompetencies: async (position, competencies) => {
+            return await supabase.from('competency_config').upsert({ position_name: position, competencies });
         }
     }
 };

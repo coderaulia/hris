@@ -31,7 +31,6 @@ async function fetchApi(endpoint, options = {}) {
         throw new Error(errorData.message || 'API request failed');
     }
 
-    // Handle 204 No Content
     if (response.status === 204) return null;
 
     return response.json();
@@ -65,7 +64,7 @@ export const laravelAdapter = {
                 const data = await fetchApi('/auth/me');
                 return { data: { session: { user: data.data } }, error: null };
             } catch (error) {
-                return { data: { session: null }, error: null }; // no session
+                return { data: { session: null }, error: null };
             }
         },
         onAuthStateChange: (callback) => {
@@ -215,6 +214,93 @@ export const laravelAdapter = {
                 return { error: null };
             } catch (error) {
                 return { error };
+            }
+        }
+    },
+    kpis: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/kpis');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listRecords: async () => {
+            try {
+                const data = await fetchApi('/kpi-records');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listWeightProfiles: async () => {
+            try {
+                const data = await fetchApi('/kpi-weight-profiles');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listWeightItems: async () => {
+             // In Laravel we might just include items in the profile response
+             // but if the frontend expects a separate list:
+             const data = await fetchApi('/kpi-weight-profiles');
+             const items = [];
+             data.data.forEach(p => { if(p.items) items.push(...p.items); });
+             return { data: items, error: null };
+        },
+        saveRecord: async (payload) => {
+            try {
+                const data = await fetchApi('/kpi-records', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    scores: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/performance-scores');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        save: async (payload) => {
+            try {
+                const data = await fetchApi('/performance-scores', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    config: {
+        listCompetencies: async () => {
+            try {
+                const data = await fetchApi('/competency-config');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveCompetencies: async (position, competencies) => {
+            try {
+                const data = await fetchApi(`/competency-config/${position}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ competencies })
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
             }
         }
     }
