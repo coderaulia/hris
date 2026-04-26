@@ -3,6 +3,7 @@
 // ==================================================
 
 import { supabase } from '../lib/supabase.js';
+import { backend } from '../lib/backend.js';
 import { normalizeAuthCallback } from '../lib/edge/auth.js';
 import { state, emit } from '../lib/store.js';
 import * as notify from '../lib/notify.js';
@@ -167,11 +168,16 @@ export function reconcileCurrentUserProfile() {
 }
 
 export async function signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await backend.auth.signIn(email, password);
     if (error) throw error;
 
-    const profile = await resolveProfileWithRetry(data.user);
-    const user = setCurrentUser(profile, data.user, { persist: Boolean(profile) });
+    const userPayload = data.session?.user || data.user;
+    
+    // In Laravel mode, the user payload is already the profile. 
+    // In Supabase mode, it's the auth user and we need to resolve the profile.
+    let profile = userPayload?.employee_id ? userPayload : await resolveProfileWithRetry(userPayload);
+    
+    const user = setCurrentUser(profile, userPayload, { persist: Boolean(profile) });
     if (!profile) {
         sessionStorage.removeItem('hr_user');
     }
@@ -179,7 +185,7 @@ export async function signIn(email, password) {
 }
 
 export async function signOut() {
-    await supabase.auth.signOut();
+    await backend.auth.signOut();
     state.currentUser = null;
     sessionStorage.removeItem('hr_user');
     emit('auth:logout');
@@ -187,10 +193,11 @@ export async function signOut() {
 }
 
 export async function restoreSession() {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await backend.auth.getSession();
     if (!session) return null;
 
     let profile = null;
+    const userPayload = session.user;
 
     if (isAuthCallbackRequest()) {
         try {
@@ -208,13 +215,13 @@ export async function restoreSession() {
                 clearAuthHash();
             }
         } catch {
-            profile = await resolveProfileWithRetry(session.user);
+            profile = userPayload?.employee_id ? userPayload : await resolveProfileWithRetry(userPayload);
         }
     } else {
-        profile = await resolveProfileWithRetry(session.user);
+        profile = userPayload?.employee_id ? userPayload : await resolveProfileWithRetry(userPayload);
     }
 
-    const user = setCurrentUser(profile, session.user, { persist: Boolean(profile) });
+    const user = setCurrentUser(profile, userPayload, { persist: Boolean(profile) });
     if (!profile) {
         sessionStorage.removeItem('hr_user');
     }
@@ -371,10 +378,10 @@ export async function requireRecentAuth(actionLabel = 'this action', maxAgeMs = 
     });
     if (password === null) return false;
 
-    const { error } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: String(password),
-    });
+    const { error } = await backend.auth.signIn(
+        user.email,
+        String(password)
+    );
     if (error) {
         await notify.error('Re-authentication failed: ' + error.message);
         return false;

@@ -13,6 +13,7 @@ import {
     mapLegacyEmployeeRow,
     execSupabase,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 import {
     getAssessmentHistory,
     getManagerAssessment,
@@ -75,21 +76,12 @@ async function fetchEmployees() {
     try {
         let employeeRows = [];
         try {
-            const result = await execSupabase(
-                'Fetch employees',
-                () => supabase.from('employees').select(EMPLOYEE_COLUMNS),
-                { retries: 1 }
-            );
-            employeeRows = result.data || [];
+            const { data, error } = await backend.employees.list();
+            if (error) throw error;
+            employeeRows = data || [];
         } catch (error) {
-            if (!isMissingColumnError(error)) throw error;
-
-            const fallbackResult = await execSupabase(
-                'Fetch employees (legacy columns)',
-                () => supabase.from('employees').select(LEGACY_EMPLOYEE_COLUMNS),
-                { retries: 1 }
-            );
-            employeeRows = fallbackResult.data || [];
+            debugError('Fetch employees error:', error);
+            // Fallback or handle missing columns if necessary via backend adapter
         }
 
         let normalizedTables = null;
@@ -417,23 +409,30 @@ async function saveEmployee(rec) {
     };
 
     try {
-        await execSupabase(
-            `Save employee "${hydrated.id}"`,
-            () => supabase
-                .from('employees')
-                .upsert(payload, { onConflict: 'employee_id' }),
-            { interactiveRetry: true, retries: 1 }
-        );
+        const isEdit = Boolean(state.db[hydrated.id]);
+        let response;
+        if (isEdit) {
+            response = await backend.employees.update(hydrated.id, payload);
+        } else {
+            response = await backend.employees.create(payload);
+        }
+        
+        if (response.error) {
+             throw response.error;
+        }
     } catch (error) {
         if (!isMissingColumnError(error)) throw error;
 
-        await execSupabase(
-            `Save employee "${hydrated.id}" (legacy columns)`,
-            () => supabase
-                .from('employees')
-                .upsert(basePayload, { onConflict: 'employee_id' }),
-            { interactiveRetry: true, retries: 1 }
-        );
+        // Fallback for missing columns
+        const isEdit = Boolean(state.db[hydrated.id]);
+        let response;
+        if (isEdit) {
+            response = await backend.employees.update(hydrated.id, basePayload);
+        } else {
+            response = await backend.employees.create(basePayload);
+        }
+        
+        if (response.error) throw response.error;
     }
 
     await syncEmployeeNormalizedRecords(hydrated);
@@ -443,14 +442,10 @@ async function saveEmployee(rec) {
 }
 
 async function deleteEmployee(id) {
-    await execSupabase(
-        `Delete employee "${id}"`,
-        () => supabase
-            .from('employees')
-            .delete()
-            .eq('employee_id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const response = await backend.employees.delete(id);
+    if (response.error) {
+        throw response.error;
+    }
 
     delete state.db[id];
     emit('data:employees', state.db);
