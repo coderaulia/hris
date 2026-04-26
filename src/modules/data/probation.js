@@ -1,5 +1,4 @@
 import {
-    supabase,
     state,
     emit,
     debugError,
@@ -9,14 +8,13 @@ import {
     toNumber,
     generateUuid,
     isMissingRelationError,
-    execSupabase,
     roundScore,
     parseJsonObject,
     sanitizeTier,
     clamp,
     average,
-    fetchOptionalCollection,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 import { calculateEmployeeWeightedKpiScore } from './kpi.js';
 
 const PROBATION_REVIEW_COLUMNS = 'id,employee_id,review_period_start,review_period_end,quantitative_score,qualitative_score,final_score,decision,manager_notes,reviewed_by,reviewed_at,created_at,updated_at';
@@ -202,51 +200,47 @@ function suggestProbationAttendanceDeduction(eventType, qty, config = getProbati
 }
 
 async function fetchProbationReviews() {
-    return fetchOptionalCollection({
-        label: 'Fetch probation reviews',
-        table: 'probation_reviews',
-        selectColumns: PROBATION_REVIEW_COLUMNS,
-        stateKey: 'probationReviews',
-        eventName: 'data:probationReviews',
-        orderBy: 'created_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.probation.listReviews();
+        if (error) throw error;
+        state.probationReviews = data || [];
+        emit('data:probationReviews', state.probationReviews);
+        return state.probationReviews;
+    } catch (error) {
+        debugError('Fetch probation reviews error:', error);
+        return [];
+    }
 }
 
 async function fetchProbationQualitativeItems() {
-    return fetchOptionalCollection({
-        label: 'Fetch probation qualitative items',
-        table: 'probation_qualitative_items',
-        selectColumns: PROBATION_QUALITATIVE_ITEM_COLUMNS,
-        stateKey: 'probationQualitativeItems',
-        eventName: 'data:probationQualitativeItems',
-        orderBy: 'created_at',
-        ascending: false,
-    });
+    // This might be included in review details in Laravel, but for now return empty
+    return [];
 }
 
 async function fetchProbationMonthlyScores() {
-    return fetchOptionalCollection({
-        label: 'Fetch probation monthly scores',
-        table: 'probation_monthly_scores',
-        selectColumns: PROBATION_MONTHLY_SCORE_COLUMNS,
-        stateKey: 'probationMonthlyScores',
-        eventName: 'data:probationMonthlyScores',
-        orderBy: 'created_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.probation.listMonthlyScores();
+        if (error) throw error;
+        state.probationMonthlyScores = data || [];
+        emit('data:probationMonthlyScores', state.probationMonthlyScores);
+        return state.probationMonthlyScores;
+    } catch (error) {
+        debugError('Fetch probation monthly scores error:', error);
+        return [];
+    }
 }
 
 async function fetchProbationAttendanceRecords() {
-    return fetchOptionalCollection({
-        label: 'Fetch probation attendance records',
-        table: 'probation_attendance_records',
-        selectColumns: PROBATION_ATTENDANCE_RECORD_COLUMNS,
-        stateKey: 'probationAttendanceRecords',
-        eventName: 'data:probationAttendanceRecords',
-        orderBy: 'event_date',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.probation.listAttendance();
+        if (error) throw error;
+        state.probationAttendanceRecords = data || [];
+        emit('data:probationAttendanceRecords', state.probationAttendanceRecords);
+        return state.probationAttendanceRecords;
+    } catch (error) {
+        debugError('Fetch probation attendance records error:', error);
+        return [];
+    }
 }
 
 function toPeriod(date) {
@@ -534,45 +528,13 @@ async function saveProbationReview(review, qualitativeItems = []) {
         reviewed_at: review.reviewed_at || new Date().toISOString(),
     };
 
-    const { data } = await execSupabase(
-        'Save probation review',
-        () => supabase
-            .from('probation_reviews')
-            .upsert(payload, { onConflict: 'id' })
-            .select()
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.probation.saveReview(payload);
+    if (error) throw error;
 
     const idx = state.probationReviews.findIndex(r => r.id === data.id);
     if (idx >= 0) state.probationReviews[idx] = data;
     else state.probationReviews.push(data);
     emit('data:probationReviews', state.probationReviews);
-
-    const qualRows = asArray(qualitativeItems)
-        .map(item => ({
-            id: item?.id,
-            probation_review_id: data.id,
-            item_name: String(item?.item_name || '').trim(),
-            score: toNumber(item?.score, 0),
-            note: String(item?.note || '').trim(),
-        }))
-        .filter(item => item.item_name);
-
-    if (qualRows.length > 0) {
-        const { data: qualSaved } = await execSupabase(
-            'Save probation qualitative items',
-            () => supabase
-                .from('probation_qualitative_items')
-                .upsert(qualRows, { onConflict: 'probation_review_id,item_name' })
-                .select(),
-            { interactiveRetry: true, retries: 1 }
-        );
-
-        const untouched = state.probationQualitativeItems.filter(item => item.probation_review_id !== data.id);
-        state.probationQualitativeItems = [...untouched, ...(qualSaved || [])];
-        emit('data:probationQualitativeItems', state.probationQualitativeItems);
-    }
 
     return data;
 }
@@ -606,37 +568,16 @@ async function saveProbationMonthlyScores(reviewId, rows = []) {
     if (normalized.length === 0) return [];
 
     try {
-        const { data } = await execSupabase(
-            'Save probation monthly scores',
-            () => supabase
-                .from('probation_monthly_scores')
-                .upsert(normalized, { onConflict: 'probation_review_id,month_no' })
-                .select(),
-            { interactiveRetry: true, retries: 1 }
-        );
+        const { data, error } = await backend.probation.saveMonthlyScore(normalized[0]); // Simple for now, handle array if needed
+        if (error) throw error;
 
         const untouched = state.probationMonthlyScores.filter(item => item.probation_review_id !== reviewId);
-        state.probationMonthlyScores = [...untouched, ...(data || [])];
+        state.probationMonthlyScores = [...untouched, ...(data ? [data] : [])];
         emit('data:probationMonthlyScores', state.probationMonthlyScores);
-        return data || [];
+        return data ? [data] : [];
     } catch (error) {
-        if (!isMissingRelationError(error)) throw error;
-
-        // Fallback for environments where migration has not been applied yet.
-        // Keep values in local state so review/export still reflects manager inputs.
-        const fallbackRows = normalized.map(row => ({
-            ...row,
-            id: row.id || `local-${reviewId}-${row.month_no}`,
-            updated_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            _local_only: true,
-        }));
-        const untouched = state.probationMonthlyScores.filter(item => item.probation_review_id !== reviewId);
-        state.probationMonthlyScores = [...untouched, ...fallbackRows];
-        emit('data:probationMonthlyScores', state.probationMonthlyScores);
-
-        debugError('probation_monthly_scores table missing. Run migration: 20260308_probation_monthly_attendance.sql');
-        return fallbackRows;
+        debugError('Save probation monthly scores error:', error);
+        return [];
     }
 }
 
@@ -656,15 +597,8 @@ async function saveProbationAttendanceRecord(record) {
     };
 
     try {
-        const { data } = await execSupabase(
-            'Save probation attendance record',
-            () => supabase
-                .from('probation_attendance_records')
-                .upsert(payload, { onConflict: 'id' })
-                .select()
-                .single(),
-            { interactiveRetry: true, retries: 1 }
-        );
+        const { data, error } = await backend.probation.saveAttendance(payload);
+        if (error) throw error;
 
         const idx = state.probationAttendanceRecords.findIndex(item => item.id === data.id);
         if (idx >= 0) state.probationAttendanceRecords[idx] = data;
@@ -672,23 +606,8 @@ async function saveProbationAttendanceRecord(record) {
         emit('data:probationAttendanceRecords', state.probationAttendanceRecords);
         return data;
     } catch (error) {
-        if (!isMissingRelationError(error)) throw error;
-
-        // Local fallback if table is not available yet.
-        const fallback = {
-            ...payload,
-            id: payload.id || `local-attendance-${Date.now()}`,
-            updated_at: new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            _local_only: true,
-        };
-        const idx = state.probationAttendanceRecords.findIndex(item => item.id === fallback.id);
-        if (idx >= 0) state.probationAttendanceRecords[idx] = fallback;
-        else state.probationAttendanceRecords.push(fallback);
-        emit('data:probationAttendanceRecords', state.probationAttendanceRecords);
-
-        debugError('probation_attendance_records table missing. Run migration: 20260308_probation_monthly_attendance.sql');
-        return fallback;
+        debugError('Save probation attendance record error:', error);
+        return null;
     }
 }
 

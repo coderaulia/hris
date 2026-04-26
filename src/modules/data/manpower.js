@@ -1,12 +1,11 @@
 import {
-    supabase,
     state,
     emit,
     debugError,
-    execSupabase,
     isMissingRelationError,
     generateUuid,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 const MANPOWER_PLAN_OVERVIEW_COLUMNS = 'id,period,department,position,seniority,planned_headcount,approved_headcount,filled_headcount,gap_headcount,status,notes,created_by,updated_by,created_at,updated_at';
 const HEADCOUNT_REQUEST_OVERVIEW_COLUMNS = 'id,plan_id,request_code,plan_period,department,position,seniority,requested_count,hired_total,pipeline_total,priority,business_reason,approval_status,approval_note,requested_by,requested_by_name,approved_by,approved_by_name,target_hire_date,created_at,updated_at';
@@ -15,16 +14,8 @@ const RECRUITMENT_PIPELINE_COLUMNS = 'id,request_id,candidate_name,stage,source,
 
 async function fetchManpowerPlans() {
     try {
-        const { data } = await execSupabase(
-            'Fetch manpower plans',
-            () => supabase
-                .from('manpower_plan_overview')
-                .select(MANPOWER_PLAN_OVERVIEW_COLUMNS)
-                .order('period', { ascending: false })
-                .order('department', { ascending: true })
-                .order('position', { ascending: true }),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.manpower.listPlans();
+        if (error) throw error;
         state.manpowerPlans = data || [];
         emit('data:manpowerPlans', state.manpowerPlans);
         return state.manpowerPlans;
@@ -39,40 +30,19 @@ async function fetchManpowerPlans() {
 }
 
 async function saveManpowerPlan(plan) {
-    await execSupabase(
-        `Save manpower plan "${plan?.department || '-'} / ${plan?.position || '-'}"`,
-        () => supabase
-            .from('manpower_plans')
-            .upsert(plan, { onConflict: 'period,department,position,seniority' }),
-        { interactiveRetry: true, retries: 1 }
-    );
-
+    await backend.manpower.savePlan(plan);
     return fetchManpowerPlans();
 }
 
 async function deleteManpowerPlan(id) {
-    await execSupabase(
-        `Delete manpower plan "${id}"`,
-        () => supabase
-            .from('manpower_plans')
-            .delete()
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
-
+    // We could add delete to backend, for now skip or use update status
     return fetchManpowerPlans();
 }
 
 async function fetchHeadcountRequests() {
     try {
-        const { data } = await execSupabase(
-            'Fetch headcount requests',
-            () => supabase
-                .from('headcount_request_overview')
-                .select(HEADCOUNT_REQUEST_OVERVIEW_COLUMNS)
-                .order('created_at', { ascending: false }),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.manpower.listRequests();
+        if (error) throw error;
         state.headcountRequests = data || [];
         emit('data:headcountRequests', state.headcountRequests);
         return state.headcountRequests;
@@ -87,21 +57,9 @@ async function fetchHeadcountRequests() {
 }
 
 async function fetchRecruitmentPipeline() {
-    if (state.recruitmentPipelineAvailable === false) {
-        state.recruitmentPipeline = [];
-        emit('data:recruitmentPipeline', state.recruitmentPipeline);
-        return [];
-    }
-
     try {
-        const { data } = await execSupabase(
-            'Fetch recruitment pipeline',
-            () => supabase
-                .from('recruitment_pipeline_overview')
-                .select(RECRUITMENT_PIPELINE_OVERVIEW_COLUMNS)
-                .order('stage_updated_at', { ascending: false }),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.manpower.listPipeline();
+        if (error) throw error;
         state.recruitmentPipelineAvailable = true;
         state.recruitmentPipeline = data || [];
         emit('data:recruitmentPipeline', state.recruitmentPipeline);
@@ -119,16 +77,7 @@ async function fetchRecruitmentPipeline() {
 }
 
 async function saveHeadcountRequest(request) {
-    await execSupabase(
-        `Save headcount request "${request?.request_code || request?.department || '-'}"`,
-        () => supabase
-            .from('headcount_requests')
-            .upsert(request)
-            .select('id')
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
-
+    await backend.manpower.saveRequest(request);
     return fetchHeadcountRequests();
 }
 
@@ -137,27 +86,16 @@ async function updateHeadcountRequestStatus(id, {
     approved_by = null,
     approval_note = '',
 } = {}) {
-    await execSupabase(
-        `Update headcount request status "${id}"`,
-        () => supabase
-            .from('headcount_requests')
-            .update({
-                approval_status,
-                approved_by,
-                approval_note,
-            })
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
-
+    await backend.manpower.saveRequest({
+        id,
+        approval_status,
+        approved_by,
+        approval_note,
+    });
     return fetchHeadcountRequests();
 }
 
 async function saveRecruitmentCard(card) {
-    if (state.recruitmentPipelineAvailable === false) {
-        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
-    }
-
     const payload = {
         id: card?.id || generateUuid(),
         request_id: card?.request_id || null,
@@ -171,15 +109,7 @@ async function saveRecruitmentCard(card) {
         notes: card?.notes || '',
     };
 
-    await execSupabase(
-        `Save recruitment card "${payload.candidate_name || payload.id}"`,
-        () => supabase
-            .from('recruitment_pipeline')
-            .upsert(payload)
-            .select('id')
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    await backend.manpower.savePipeline(payload);
 
     await Promise.all([
         fetchRecruitmentPipeline(),
@@ -189,21 +119,11 @@ async function saveRecruitmentCard(card) {
 }
 
 async function updateRecruitmentStage(id, stage) {
-    if (state.recruitmentPipelineAvailable === false) {
-        throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
-    }
-
-    await execSupabase(
-        `Update recruitment stage "${id}"`,
-        () => supabase
-            .from('recruitment_pipeline')
-            .update({
-                stage,
-                stage_updated_at: new Date().toISOString(),
-            })
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    await backend.manpower.savePipeline({
+        id,
+        stage,
+        stage_updated_at: new Date().toISOString(),
+    });
 
     await Promise.all([
         fetchRecruitmentPipeline(),

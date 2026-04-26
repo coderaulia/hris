@@ -1,12 +1,10 @@
 import {
-    supabase,
     state,
     emit,
-    execSupabase,
-    fetchOptionalCollection,
     generateUuid,
     isMissingRelationError,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 const HR_DOCUMENT_TEMPLATE_COLUMNS = [
     'id',
@@ -39,28 +37,30 @@ const HR_DOCUMENT_REFERENCE_OPTION_COLUMNS = [
     'updated_at',
 ].join(',');
 
-function fetchHrDocumentTemplates() {
-    return fetchOptionalCollection({
-        label: 'Fetch HR document templates',
-        table: 'hr_document_templates',
-        selectColumns: HR_DOCUMENT_TEMPLATE_COLUMNS,
-        stateKey: 'hrDocumentTemplates',
-        eventName: 'data:hrDocumentTemplates',
-        orderBy: 'updated_at',
-        ascending: false,
-    });
+async function fetchHrDocumentTemplates() {
+    try {
+        const { data, error } = await backend.documents.listTemplates();
+        if (error) throw error;
+        state.hrDocumentTemplates = data || [];
+        emit('data:hrDocumentTemplates', state.hrDocumentTemplates);
+        return state.hrDocumentTemplates;
+    } catch (error) {
+        debugError('Fetch HR document templates error:', error);
+        return [];
+    }
 }
 
-function fetchHrDocumentReferenceOptions() {
-    return fetchOptionalCollection({
-        label: 'Fetch HR document reference options',
-        table: 'hr_document_reference_options',
-        selectColumns: HR_DOCUMENT_REFERENCE_OPTION_COLUMNS,
-        stateKey: 'hrDocumentReferenceOptions',
-        eventName: 'data:hrDocumentReferenceOptions',
-        orderBy: 'sort_order',
-        ascending: true,
-    });
+async function fetchHrDocumentReferenceOptions() {
+    try {
+        const { data, error } = await backend.documents.listOptions();
+        if (error) throw error;
+        state.hrDocumentReferenceOptions = data || [];
+        emit('data:hrDocumentReferenceOptions', state.hrDocumentReferenceOptions);
+        return state.hrDocumentReferenceOptions;
+    } catch (error) {
+        debugError('Fetch HR document reference options error:', error);
+        return [];
+    }
 }
 
 async function saveHrDocumentTemplate(template = {}) {
@@ -91,16 +91,8 @@ async function saveHrDocumentTemplate(template = {}) {
     };
 
     try {
-        const { data } = await execSupabase(
-            `Save HR document template "${payload.template_name}"`,
-            () =>
-                supabase
-                    .from('hr_document_templates')
-                    .upsert(payload, { onConflict: 'id' })
-                    .select(HR_DOCUMENT_TEMPLATE_COLUMNS)
-                    .single(),
-            { interactiveRetry: true, retries: 1 }
-        );
+        const { data, error } = await backend.documents.saveTemplate(payload);
+        if (error) throw error;
 
         const nextTemplates = [
             ...(Array.isArray(state.hrDocumentTemplates) ? state.hrDocumentTemplates : []).filter(
@@ -115,13 +107,6 @@ async function saveHrDocumentTemplate(template = {}) {
         emit('data:hrDocumentTemplates', state.hrDocumentTemplates);
         return data;
     } catch (error) {
-        if (isMissingRelationError(error)) {
-            const migrationError = new Error(
-                'The hr_document_templates table is not available yet. Run the HR document foundation migration first.'
-            );
-            migrationError.code = 'HR_DOCUMENT_TEMPLATES_MISSING';
-            throw migrationError;
-        }
         throw error;
     }
 }
@@ -131,11 +116,8 @@ async function deleteHrDocumentTemplate(templateId) {
     if (!id) return;
 
     try {
-        await execSupabase(
-            `Delete HR document template "${id}"`,
-            () => supabase.from('hr_document_templates').delete().eq('id', id),
-            { interactiveRetry: true, retries: 1 }
-        );
+        const { error } = await backend.documents.deleteTemplate(id);
+        if (error) throw error;
 
         state.hrDocumentTemplates = (Array.isArray(state.hrDocumentTemplates)
             ? state.hrDocumentTemplates
@@ -143,13 +125,6 @@ async function deleteHrDocumentTemplate(templateId) {
         ).filter(item => String(item?.id || '') !== id);
         emit('data:hrDocumentTemplates', state.hrDocumentTemplates);
     } catch (error) {
-        if (isMissingRelationError(error)) {
-            const migrationError = new Error(
-                'The hr_document_templates table is not available yet. Run the HR document foundation migration first.'
-            );
-            migrationError.code = 'HR_DOCUMENT_TEMPLATES_MISSING';
-            throw migrationError;
-        }
         throw error;
     }
 }

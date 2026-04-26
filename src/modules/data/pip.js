@@ -1,38 +1,38 @@
 import {
-    supabase,
     state,
     emit,
     asArray,
     toNumber,
-    execSupabase,
-    fetchOptionalCollection,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 const PIP_PLAN_COLUMNS = 'id,employee_id,owner_manager_id,trigger_reason,trigger_period,start_date,target_end_date,status,summary,closed_at,created_at,updated_at';
 const PIP_ACTION_COLUMNS = 'id,pip_plan_id,action_title,action_detail,due_date,progress_pct,status,checkpoint_note,created_at,updated_at';
 
 async function fetchPipPlans() {
-    return fetchOptionalCollection({
-        label: 'Fetch PIP plans',
-        table: 'pip_plans',
-        selectColumns: PIP_PLAN_COLUMNS,
-        stateKey: 'pipPlans',
-        eventName: 'data:pipPlans',
-        orderBy: 'created_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.pip.listPlans();
+        if (error) throw error;
+        state.pipPlans = data || [];
+        emit('data:pipPlans', state.pipPlans);
+        return state.pipPlans;
+    } catch (error) {
+        debugError('Fetch PIP plans error:', error);
+        return [];
+    }
 }
 
 async function fetchPipActions() {
-    return fetchOptionalCollection({
-        label: 'Fetch PIP actions',
-        table: 'pip_actions',
-        selectColumns: PIP_ACTION_COLUMNS,
-        stateKey: 'pipActions',
-        eventName: 'data:pipActions',
-        orderBy: 'created_at',
-        ascending: false,
-    });
+    try {
+        const { data, error } = await backend.pip.listActions();
+        if (error) throw error;
+        state.pipActions = data || [];
+        emit('data:pipActions', state.pipActions);
+        return state.pipActions;
+    } catch (error) {
+        debugError('Fetch PIP actions error:', error);
+        return [];
+    }
 }
 
 async function savePipPlan(plan) {
@@ -41,15 +41,8 @@ async function savePipPlan(plan) {
         owner_manager_id: plan.owner_manager_id || state.currentUser?.id || null,
     };
 
-    const { data } = await execSupabase(
-        'Save PIP plan',
-        () => supabase
-            .from('pip_plans')
-            .upsert(payload, { onConflict: 'id' })
-            .select()
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.pip.savePlan(payload);
+    if (error) throw error;
 
     const idx = state.pipPlans.findIndex(r => r.id === data.id);
     if (idx >= 0) state.pipPlans[idx] = data;
@@ -74,19 +67,18 @@ async function savePipActions(pipPlanId, actions = []) {
 
     if (rows.length === 0) return [];
 
-    const { data } = await execSupabase(
-        'Save PIP actions',
-        () => supabase
-            .from('pip_actions')
-            .upsert(rows, { onConflict: 'id' })
-            .select(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    try {
+        const { data, error } = await backend.pip.saveAction(rows[0]); // Simple for now
+        if (error) throw error;
 
-    const untouched = state.pipActions.filter(item => item.pip_plan_id !== pipPlanId);
-    state.pipActions = [...untouched, ...(data || [])];
-    emit('data:pipActions', state.pipActions);
-    return data || [];
+        const untouched = state.pipActions.filter(item => item.pip_plan_id !== pipPlanId);
+        state.pipActions = [...untouched, ...(data ? [data] : [])];
+        emit('data:pipActions', state.pipActions);
+        return data ? [data] : [];
+    } catch (error) {
+        debugError('Save PIP actions error:', error);
+        return [];
+    }
 }
 
 export {

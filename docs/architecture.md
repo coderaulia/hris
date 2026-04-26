@@ -7,28 +7,31 @@ Last updated: 2026-04-17
 ```text
 Browser (Vite SPA)
 |
-|-- Supabase Auth              <- sign-in, session restore, sign-out, password flows
-|-- Supabase Postgres          <- live CRUD data, protected by grants + RLS
-|   |-- app_settings           <- branding, labels, runtime config
-|   |-- employees              <- employee identity, legal identity, SP state, signer metadata
-|   |-- competency_config      <- competency framework definitions
-|   |-- assessment tables      <- manager/self assessments and history
-|   |-- training tables        <- employee training records
-|   |-- kpi governance         <- KPI definitions, target versions, approvals, KPI records
-|   |-- probation / PIP        <- probation reviews, monthly scores, attendance, PIP plans
-|   |-- hr_document_templates  <- editable HR template definitions
-|   |-- hr_document_reference_options <- controlled HR/legal reference lists
-|   `-- admin_activity_log     <- audit trail
-|-- Supabase Edge Functions
-|   |-- auth-callbacks         <- callback normalization and profile resolution
-|   |-- admin-user-mutations   <- privileged user creation and role mutation
-|   |-- approval-notifications <- notification dispatch with dry-run fallback and provider-backed delivery
-|   `-- report-exports         <- binary PDF/XLSX generation + Storage signed URLs
-|-- Client HR Document Engine
-|   |-- `src/modules/documents.js`   <- setup UI, validation, A4 editor, template management
-|   `-- `src/lib/pdfTemplates.js`    <- client-side PDF renderer for HR documents
-`-- /healthz.json              <- static health check (no server needed)
+`-- Backend Adapter Router (`src/lib/backend.js`)
+    |-- Supabase Adapter (`src/lib/backends/supabase-adapter.js`)
+    |   |-- Supabase Auth
+    |   |-- Supabase Postgres (Direct CRUD via RLS)
+    |   `-- Supabase Edge Functions
+    `-- Laravel Adapter (`src/lib/backends/laravel-adapter.js`)
+        `-- Laravel API (`backend/` directory)
+            |-- Laravel Auth (Sanctum)
+            `-- PHP/Lumen API (Scoped via EmployeeScopeService)
 ```
+
+## Backend Architecture (Adapter Pattern)
+
+The application implements an **Adapter Pattern** to support multiple backend infrastructures. The `src/lib/backend.js` module acts as the primary interface, routing all data operations to either the `Supabase` or `Laravel` implementation based on the `VITE_BACKEND_TYPE` environment variable.
+
+### 1. Supabase Adapter (Default)
+- Uses the standard Supabase JS client.
+- Leverages Row Level Security (RLS) and Postgres Grants for security.
+- Communicates directly with Supabase Edge Functions for privileged operations.
+
+### 2. Laravel Adapter (Optional)
+- Communicates with a custom PHP/Lumen API located in the `backend/` directory.
+- Replicates RLS-like logic through a centralized `EmployeeScopeService` in PHP.
+- Uses Laravel Sanctum for API token-based authentication.
+- All frontend data modules (`employees.js`, `kpi.js`, etc.) consume this adapter transparently.
 
 ## Data Access Model
 
@@ -158,23 +161,14 @@ The module writes:
 
 ## Backend Boundary
 
-This app intentionally keeps normal CRUD browser-side through Supabase + RLS.
+This app supports two backend boundaries:
 
-Edge Functions are used only where the browser is the wrong boundary:
+1.  **Supabase Boundary**: Keeps normal CRUD browser-side through Supabase + RLS. Edge Functions are used only where the browser is the wrong boundary (auth callbacks, privileged mutations, notifications, exports).
+2.  **Laravel Boundary**: Uses the `backend/` PHP API as a secure proxy. The browser never talks to Postgres directly. Security is enforced via Laravel middleware and `EmployeeScopeService` which replicates the logic of Postgres RLS policies.
 
-- auth callback normalization
-- privileged auth / role mutation
-- notification dispatch
-- heavy export generation and Storage delivery
+HR documents intentionally remain client-side exports in both modes. The browser owns document setup, live preview, A4 template editing, and PDF generation.
 
-HR documents intentionally remain client-side exports in this iteration. The browser owns:
-
-- document setup
-- live preview
-- A4 template editing
-- PDF generation
-
-The app is not moving toward a general backend CRUD proxy.
+The app supports a dual-stack approach, allowing legacy Supabase deployments and custom Laravel deployments to share the same frontend codebase.
 
 ## Known Constraints
 

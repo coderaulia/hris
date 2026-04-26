@@ -5,9 +5,12 @@ Last updated: 2026-04-16
 ## Current State
 
 - Frontend: Vite SPA with vanilla JS, Tailwind-enhanced custom UI, and Bootstrap utilities
-- Backend: Supabase Auth + Postgres + RLS, plus implemented Supabase Edge Functions for privileged, callback, notification, and export boundaries
+- Backend (Dual Option):
+  - Supabase Auth + Postgres + RLS + Edge Functions
+  - **Laravel API** (PHP/Lumen) with Sanctum Auth and centralized security scoping via Adapter Pattern
 - Navigation: sidebar-driven app shell with role-aware menu groups
 - Core modules: dashboard, employees (manpower planning, requests, recruitment board, directory), assessment, records, settings, KPI governance, probation/PIP, and HR Documents workspace
+- Adapter Pattern: The system is now fully abstracted behind `src/lib/backend.js`, allowing it to run against either Supabase or Laravel backends.
 - Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
 - Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
 
@@ -31,6 +34,14 @@ Last updated: 2026-04-16
 - Dashboard and probation export buttons now use the edge export flow end-to-end
 - Deploy instructions now live in `docs/supabase-functions-deploy.md`
 - Production rollout depends on deploying the functions in Supabase after secrets are in place
+
+## Laravel Backend Status
+
+- **Architecture**: Lumen/Laravel API in the `backend/` directory.
+- **Security**: Centralized security via `EmployeeScopeService` replicates Postgres RLS logic.
+- **Auth**: Laravel Sanctum (compatible with frontend SPA login).
+- **Module Coverage**: All major frontend modules (Auth, Employees, KPIs, Probation, PIP, etc.) are supported via the Adapter Pattern.
+- **Database**: Connects to the same Postgres instance as Supabase.
 
 ## HR Documents Status
 

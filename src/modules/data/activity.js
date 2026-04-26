@@ -1,16 +1,10 @@
-import { supabase, state, emit, debugError, execSupabase } from './runtime.js';
+import { state, emit, debugError } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 async function fetchActivityLogs(limit = 100) {
     try {
-        const { data } = await execSupabase(
-            'Load activity log',
-            () => supabase
-                .from('admin_activity_log')
-                .select('id,actor_employee_id,action,details,created_at')
-                .order('created_at', { ascending: false })
-                .limit(limit),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.activity.list();
+        if (error) throw error;
         state.activityLogs = data || [];
         emit('data:activityLogs', state.activityLogs);
         return state.activityLogs;
@@ -32,18 +26,14 @@ async function logActivity({
     if (!actorId || !action) return;
 
     try {
-        await execSupabase(
-            'Write activity log',
-            () => supabase.from('admin_activity_log').insert({
-                actor_employee_id: actorId,
-                actor_role: state.currentUser?.role || null,
-                action,
-                entity_type: entityType,
-                entity_id: entityId ? String(entityId) : null,
-                details: details || {},
-            }),
-            { retries: 0 }
-        );
+        await backend.activity.log({
+            actor_employee_id: actorId,
+            actor_role: state.currentUser?.role || null,
+            action,
+            entity_type: entityType,
+            entity_id: entityId ? String(entityId) : null,
+            details: details || {},
+        });
     } catch (error) {
         debugError('Log activity error:', error);
     }

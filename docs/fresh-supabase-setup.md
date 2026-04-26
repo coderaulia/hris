@@ -86,4 +86,12 @@ Before using the app locally or in production:
 
 1. Copy [.env.example](/D:/web/hris/.env.example) to `.env`
 2. Fill in `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`
-3. Deploy Edge Functions using [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md) if you need managed users, auth callback normalization, notifications, or server-side exports
+3. Deploy Edge Functions using [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md) if you need managed users, auth callback normalization, notifications, or server-side exports.
+
+## Alternative: Laravel Backend
+
+If you prefer using a PHP-based API instead of Supabase Edge Functions, you can use the **Laravel Backend** located in the `backend/` directory.
+
+- The Laravel backend connects to the same Supabase Postgres instance.
+- It provides a centralized security layer (`EmployeeScopeService`) and replaces the need for some Edge Functions.
+- To use it, follow the setup instructions in [backend/README.md](/D:/web/hris/backend/README.md) and set `VITE_BACKEND_TYPE=laravel` in your `.env`.

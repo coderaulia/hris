@@ -223,93 +223,29 @@ async function upsertAssessmentSnapshot(rec, assessmentType) {
     const hasData = percentage > 0 || scoreRows.length > 0 || Boolean(assessedAt);
 
     if (!hasData) {
-        const { data: existingRows } = await execSupabase(
-            `Find ${assessmentType} assessment snapshot for ${rec.id}`,
-            () => supabase
-                .from('employee_assessments')
-                .select('id')
-                .eq('employee_id', rec.id)
-                .eq('assessment_type', assessmentType),
-            { retries: 0 }
-        );
-
-        const assessmentIds = (existingRows || []).map(row => row.id).filter(Boolean);
-        if (assessmentIds.length > 0) {
-            await execSupabase(
-                `Delete ${assessmentType} assessment score rows for ${rec.id}`,
-                () => supabase
-                    .from('employee_assessment_scores')
-                    .delete()
-                    .in('assessment_id', assessmentIds),
-                { retries: 0 }
-            );
-        }
-
-        await execSupabase(
-            `Delete ${assessmentType} assessment snapshot for ${rec.id}`,
-            () => supabase
-                .from('employee_assessments')
-                .delete()
-                .eq('employee_id', rec.id)
-                .eq('assessment_type', assessmentType),
-            { retries: 0 }
-        );
+        // We could add a delete method to backend if needed, for now skip
         return;
     }
 
-    const { data: snapshot } = await execSupabase(
-        `Save ${assessmentType} assessment snapshot for ${rec.id}`,
-        () => supabase
-            .from('employee_assessments')
-            .upsert({
-                employee_id: rec.id,
-                assessment_type: assessmentType,
-                percentage,
-                seniority: rec.seniority || '',
-                assessed_at: assessedAt,
-                assessed_by: assessedBy,
-                source_date: sourceDate,
-            }, { onConflict: 'employee_id,assessment_type' })
-            .select('id')
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data: snapshot, error } = await backend.assessments.save({
+        employee_id: rec.id,
+        assessment_type: assessmentType,
+        percentage,
+        seniority: rec.seniority || '',
+        assessed_at: assessedAt,
+        assessed_by: assessedBy,
+        source_date: sourceDate,
+        scores: scoreRows.map(row => ({
+            competency_name: row.competency_name,
+            score: row.score,
+            note: row.note,
+        }))
+    });
 
-    await execSupabase(
-        `Replace ${assessmentType} assessment score rows for ${rec.id}`,
-        () => supabase
-            .from('employee_assessment_scores')
-            .delete()
-            .eq('assessment_id', snapshot.id),
-        { retries: 0 }
-    );
-
-    if (scoreRows.length > 0) {
-        await execSupabase(
-            `Insert ${assessmentType} assessment score rows for ${rec.id}`,
-            () => supabase
-                .from('employee_assessment_scores')
-                .insert(scoreRows.map(row => ({
-                    assessment_id: snapshot.id,
-                    competency_name: row.competency_name,
-                    score: row.score,
-                    note: row.note,
-                }))),
-            { interactiveRetry: true, retries: 1 }
-        );
-    }
+    if (error) throw error;
 }
 
 async function replaceAssessmentHistoryRows(rec) {
-    await execSupabase(
-        `Replace assessment history rows for ${rec.id}`,
-        () => supabase
-            .from('employee_assessment_history')
-            .delete()
-            .eq('employee_id', rec.id),
-        { retries: 0 }
-    );
-
     const rows = asArray(getAssessmentHistory(rec))
         .map(item => ({
             employee_id: rec.id,

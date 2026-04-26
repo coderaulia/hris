@@ -243,8 +243,6 @@ export const laravelAdapter = {
             }
         },
         listWeightItems: async () => {
-             // In Laravel we might just include items in the profile response
-             // but if the frontend expects a separate list:
              const data = await fetchApi('/kpi-weight-profiles');
              const items = [];
              data.data.forEach(p => { if(p.items) items.push(...p.items); });
@@ -301,6 +299,222 @@ export const laravelAdapter = {
                 return { data: data.data, error: null };
             } catch (error) {
                 return { data: null, error };
+            }
+        }
+    },
+    activity: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/activity-logs');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        log: async (payload) => {
+            try {
+                const data = await fetchApi('/activity-logs', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    manpower: {
+        listPlans: async () => {
+            try {
+                const data = await fetchApi('/manpower-plans');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listRequests: async () => {
+            try {
+                const data = await fetchApi('/headcount-requests');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listPipeline: async () => {
+            try {
+                const data = await fetchApi('/recruitment-pipeline');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        savePlan: async (payload) => {
+            try {
+                const data = await fetchApi('/manpower-plans', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveRequest: async (payload) => {
+            try {
+                const data = await fetchApi('/headcount-requests', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        savePipeline: async (payload) => {
+            try {
+                const data = await fetchApi('/recruitment-pipeline', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    probation: {
+        listReviews: async () => {
+            try {
+                const data = await fetchApi('/probation-reviews');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listMonthlyScores: async () => {
+            try {
+                const data = await fetchApi('/probation-monthly-scores');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listAttendance: async () => {
+            try {
+                const data = await fetchApi('/probation-attendance-records');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveReview: async (payload) => {
+            try {
+                const data = await fetchApi('/probation-reviews', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveMonthlyScore: async (payload) => {
+            try {
+                const data = await fetchApi('/probation-monthly-scores', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveAttendance: async (payload) => {
+            try {
+                const data = await fetchApi('/probation-attendance-records', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    pip: {
+        listPlans: async () => {
+            try {
+                const data = await fetchApi('/pip-plans');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listActions: async () => {
+            try {
+                const data = await fetchApi('/pip-actions');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        savePlan: async (payload) => {
+            try {
+                const data = await fetchApi('/pip-plans', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveAction: async (payload) => {
+            try {
+                const data = await fetchApi('/pip-actions', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    documents: {
+        listTemplates: async () => {
+            try {
+                const data = await fetchApi('/hr-document-templates');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listOptions: async () => {
+            try {
+                const data = await fetchApi('/hr-document-options');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveTemplate: async (payload) => {
+            try {
+                const data = await fetchApi('/hr-document-templates', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        deleteTemplate: async (id) => {
+            try {
+                await fetchApi(`/hr-document-templates/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
             }
         }
     }

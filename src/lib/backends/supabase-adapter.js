@@ -100,5 +100,81 @@ export const supabaseAdapter = {
         saveCompetencies: async (position, competencies) => {
             return await supabase.from('competency_config').upsert({ position_name: position, competencies });
         }
+    },
+    activity: {
+        list: async () => {
+            return await supabase.from('admin_activity_log').select('*').order('created_at', { ascending: false }).limit(100);
+        },
+        log: async (payload) => {
+            return await supabase.from('admin_activity_log').insert(payload);
+        }
+    },
+    manpower: {
+        listPlans: async () => {
+            return await supabase.from('manpower_plan_overview').select('*');
+        },
+        listRequests: async () => {
+            return await supabase.from('headcount_request_overview').select('*');
+        },
+        listPipeline: async () => {
+            return await supabase.from('recruitment_pipeline_overview').select('*');
+        },
+        savePlan: async (payload) => {
+            return await supabase.from('manpower_plans').upsert(payload);
+        },
+        saveRequest: async (payload) => {
+            return await supabase.from('headcount_requests').upsert(payload);
+        },
+        savePipeline: async (payload) => {
+            return await supabase.from('recruitment_pipeline').upsert(payload);
+        }
+    },
+    probation: {
+        listReviews: async () => {
+            return await supabase.from('probation_reviews').select('*');
+        },
+        listMonthlyScores: async () => {
+            return await supabase.from('probation_monthly_scores').select('*');
+        },
+        listAttendance: async () => {
+            return await supabase.from('probation_attendance_records').select('*');
+        },
+        saveReview: async (payload) => {
+            return await supabase.from('probation_reviews').upsert(payload);
+        },
+        saveMonthlyScore: async (payload) => {
+            return await supabase.from('probation_monthly_scores').upsert(payload);
+        },
+        saveAttendance: async (payload) => {
+            return await supabase.from('probation_attendance_records').upsert(payload);
+        }
+    },
+    pip: {
+        listPlans: async () => {
+            return await supabase.from('pip_plans').select('*');
+        },
+        listActions: async () => {
+            return await supabase.from('pip_actions').select('*');
+        },
+        savePlan: async (payload) => {
+            return await supabase.from('pip_plans').upsert(payload);
+        },
+        saveAction: async (payload) => {
+            return await supabase.from('pip_actions').upsert(payload);
+        }
+    },
+    documents: {
+        listTemplates: async () => {
+            return await supabase.from('hr_document_templates').select('*');
+        },
+        listOptions: async () => {
+            return await supabase.from('hr_document_reference_options').select('*');
+        },
+        saveTemplate: async (payload) => {
+            return await supabase.from('hr_document_templates').upsert(payload);
+        },
+        deleteTemplate: async (id) => {
+            return await supabase.from('hr_document_templates').delete().eq('id', id);
+        }
     }
 };

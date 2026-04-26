@@ -1,58 +1,59 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# HR Performance Suite - Laravel Backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+This is the optional Laravel-based API for the HR Performance Suite. It serves as a secure proxy and business logic layer, alternative to direct Supabase interactions.
 
-## About Laravel
+## Setup
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+1. **Prerequisites**: PHP 8.2+, Composer, PostgreSQL.
+2. **Install Dependencies**:
+   ```bash
+   composer install
+   ```
+3. **Environment**:
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+4. **Database Configuration**:
+   Update `.env` with your PostgreSQL credentials. If using the local Supabase stack, the port is usually `54322`.
+5. **Migrations**:
+   ```bash
+   php artisan migrate
+   ```
+6. **Serve**:
+   ```bash
+   php artisan serve
+   ```
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Key Architecture
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 1. Adapter Pattern
+The frontend communicates with this API via the `laravel-adapter.js`. To enable this, set `VITE_BACKEND_TYPE=laravel` in your frontend `.env`.
 
-## Learning Laravel
+### 2. Security Scoping (RLS Replication)
+Security is enforced via `App\Services\Employee\EmployeeScopeService`. This service replicates the logic of Supabase RLS policies:
+- **Manager Scope**: Filters queries to show only subordinates or department data.
+- **HR Scope**: Allows broader access to employee and document records.
+- **Self Scope**: Restricts users to their own records.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Controllers use this service to automatically apply these constraints to Eloquent queries.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 3. Authentication
+Uses **Laravel Sanctum**. The API provides:
+- `/api/v1/auth/login`: Issues a personal access token.
+- `/api/v1/auth/me`: Returns the current employee profile.
+- `/api/v1/auth/logout`: Revokes the current token.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### 4. Resource Serialization
+All API responses use Laravel `Http\Resources` to ensure key names match the Supabase table columns (e.g., `employee_id`, `created_at`). This allows the frontend to consume data without modification.
 
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
-```
-
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
-
-## Contributing
-
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
-
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Module Coverage
+- **Auth**: Sanctum-based login/logout.
+- **Employees**: Full CRUD with profile management and training records.
+- **Assessments**: Competency assessments and history.
+- **KPIs**: Definitions, records, and weight profiles.
+- **Performance**: Calculated scores and competency config.
+- **Probation**: Reviews, monthly scores, and attendance.
+- **PIP**: Performance improvement plans and actions.
+- **HR Documents**: Template management and reference options.
+- **Activity Log**: Audit trail for admin actions.
