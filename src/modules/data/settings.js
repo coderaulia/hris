@@ -1,20 +1,16 @@
 import {
-    supabase,
     state,
     emit,
     debugError,
-    execSupabase,
     writeSettingsCache,
     readSettingsCache,
 } from './runtime.js';
+import { backend } from '../../lib/backend.js';
 
 async function fetchSettings() {
     try {
-        const { data } = await execSupabase(
-            'Fetch settings',
-            () => supabase.from('app_settings').select('key,value'),
-            { retries: 1 }
-        );
+        const { data, error } = await backend.settings.list();
+        if (error) throw error;
 
         const settings = {};
         (data || []).forEach(row => {
@@ -34,13 +30,9 @@ async function fetchSettings() {
 }
 
 async function saveSetting(key, value) {
-    await execSupabase(
-        `Save setting "${key}"`,
-        () => supabase
-            .from('app_settings')
-            .upsert({ key, value }, { onConflict: 'key' }),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.settings.update(key, value);
+    if (error) throw error;
+    
     state.appSettings[key] = value;
     writeSettingsCache(state.appSettings);
     emit('data:settings', state.appSettings);

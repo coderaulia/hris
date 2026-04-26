@@ -87,10 +87,10 @@ async function fetchEmployees() {
         let normalizedTables = null;
         try {
             const [assessmentsRes, assessmentScoresRes, assessmentHistoryRes, trainingRes] = await Promise.all([
-                execSupabase('Fetch assessments', () => supabase.from('employee_assessments').select(EMPLOYEE_ASSESSMENT_COLUMNS), { retries: 1 }),
-                execSupabase('Fetch assessment scores', () => supabase.from('employee_assessment_scores').select(EMPLOYEE_ASSESSMENT_SCORE_COLUMNS), { retries: 1 }),
-                execSupabase('Fetch assessment history', () => supabase.from('employee_assessment_history').select(EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS), { retries: 1 }),
-                execSupabase('Fetch training records', () => supabase.from('employee_training_records').select(EMPLOYEE_TRAINING_RECORD_COLUMNS), { retries: 1 }),
+                backend.assessments.list(EMPLOYEE_ASSESSMENT_COLUMNS),
+                backend.assessments.listScores(EMPLOYEE_ASSESSMENT_SCORE_COLUMNS),
+                backend.assessments.listHistory(EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS),
+                backend.training.list(EMPLOYEE_TRAINING_RECORD_COLUMNS),
             ]);
 
             normalizedTables = {

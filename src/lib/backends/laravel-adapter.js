@@ -69,9 +69,28 @@ export const laravelAdapter = {
             }
         },
         onAuthStateChange: (callback) => {
-            // Stub for compatibility. Laravel handles auth via token so realtime state change isn't broadcasted natively
-            // In a real SPA, we trigger the callback manually when login/logout happens
             return { data: { subscription: { unsubscribe: () => {} } } };
+        }
+    },
+    settings: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/settings');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        update: async (key, value) => {
+            try {
+                const data = await fetchApi(`/settings/${key}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ value })
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
         }
     },
     employees: {
@@ -116,6 +135,83 @@ export const laravelAdapter = {
         delete: async (id) => {
             try {
                 await fetchApi(`/employees/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
+            }
+        }
+    },
+    assessments: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/assessments');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listScores: async () => {
+            try {
+                const data = await fetchApi('/assessment-scores');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listHistory: async () => {
+            try {
+                const data = await fetchApi('/assessment-history');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        save: async (payload) => {
+            try {
+                const data = await fetchApi('/assessments', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        }
+    },
+    training: {
+        list: async () => {
+            try {
+                const data = await fetchApi('/training-records');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        create: async (payload) => {
+            try {
+                const data = await fetchApi('/training-records', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        update: async (id, payload) => {
+            try {
+                const data = await fetchApi(`/training-records/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        delete: async (id) => {
+            try {
+                await fetchApi(`/training-records/${id}`, { method: 'DELETE' });
                 return { error: null };
             } catch (error) {
                 return { error };
