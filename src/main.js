@@ -234,6 +234,7 @@ const {
 ]);
 
 const {
+	switchManpowerTab,
 	renderEmployeeManager,
 	renderManpowerPlanning,
 	renderHeadcountRequests,

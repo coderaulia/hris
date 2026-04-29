@@ -11,6 +11,7 @@ export const CANONICAL_MIGRATION_CHAIN = Object.freeze([
     'migrations/20260409_drop_legacy_employee_assessment_columns.sql',
     'migrations/20260409_manpower_planning.sql',
     'migrations/20260409_dashboard_server_views.sql',
+    'migrations/20260417_hr_documents_foundation.sql',
 ]);
 
 function assertFilesExist(repoRoot, relativePaths) {
