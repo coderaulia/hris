@@ -7,12 +7,38 @@ import {
 	deleteHrDocumentTemplate,
 	fetchHrDocumentReferenceOptions,
 	fetchHrDocumentTemplates,
+	fetchHrPayrollRecords,
 	saveHrDocumentTemplate,
+	saveHrPayrollRecords,
 } from "./data/hr-documents.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
+const CURRENT_PERIOD = TODAY_ISO.slice(0, 7);
 const FALLBACK_CONTRACT_TYPES = ["PKWT", "PKWTT", "PKHL"];
 const FALLBACK_WARNING_LEVELS = ["SP1", "SP2", "SP3"];
+const PAYROLL_CSV_COLUMNS = [
+	"employee_id",
+	"payroll_period",
+	"payroll_cutoff_start",
+	"payroll_cutoff_end",
+	"basic_salary",
+	"overtime",
+	"commission",
+	"bonus",
+	"pph21",
+	"bpjs_kes",
+	"bpjs_tk",
+	"other_deduction",
+	"bpjs_kes_company",
+	"bpjs_tk_company",
+	"ptkp",
+	"npwp",
+	"nik_number",
+	"grade_level",
+	"job_position",
+	"organization",
+	"notes",
+];
 const TEMPLATE_VARIABLE_TOKENS = [
 	"{{company_name}}",
 	"{{employee_name}}",
@@ -47,8 +73,9 @@ const documentsDraft = {
 	templateId: "",
 	fields: {},
 	payroll: {
-		earnings: [{ name: "Tunjangan", amount: "" }],
-		deductions: [{ name: "PPh21", amount: "" }],
+		earnings: [],
+		deductions: [],
+		companyBenefits: [],
 	},
 };
 
@@ -81,10 +108,29 @@ function normalizeNumber(value) {
 	return Number.isFinite(num) ? num : 0;
 }
 
+function parsePayrollAmount(value) {
+	const raw = String(value ?? "").trim();
+	if (!raw) return 0;
+	const normalized = raw.replace(/[^\d-]/g, "");
+	const num = Number(normalized);
+	return Number.isFinite(num) ? num : 0;
+}
+
+function formatPlainNumber(value) {
+	const num = Number(value);
+	return Number.isFinite(num) ? String(num) : "0";
+}
+
 function formatCurrencyId(value) {
 	const num = Number(value);
 	if (!Number.isFinite(num)) return "IDR 0";
 	return `IDR ${num.toLocaleString("id-ID")}`;
+}
+
+function formatPayslipAmount(value) {
+	const num = Number(value);
+	if (!Number.isFinite(num)) return "0";
+	return num.toLocaleString("id-ID");
 }
 
 function formatDateLong(value) {
@@ -107,6 +153,17 @@ function formatMonthLabel(value) {
 	return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 
+function formatDateShort(value) {
+	if (!value) return "-";
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return escapeHTML(String(value));
+	return date.toLocaleDateString("en-GB", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
+}
+
 function formatMultiline(value) {
 	return escapeHTML(String(value || "")).replace(/\n/g, "<br>");
 }
@@ -127,6 +184,127 @@ function slugify(value, fallback = "manual-subject") {
 			.replace(/[^a-z0-9]+/g, "-")
 			.replace(/^-+|-+$/g, "") || fallback
 	);
+}
+
+function normalizeCsvHeader(value) {
+	return String(value || "")
+		.trim()
+		.toLowerCase()
+		.replace(/[\s/.-]+/g, "_")
+		.replace(/[^a-z0-9_]/g, "");
+}
+
+function parseCsvRows(text) {
+	const rows = [];
+	let row = [];
+	let cell = "";
+	let inQuotes = false;
+	const raw = String(text || "");
+
+	for (let i = 0; i < raw.length; i += 1) {
+		const ch = raw[i];
+		const next = raw[i + 1];
+		if (ch === '"' && inQuotes && next === '"') {
+			cell += '"';
+			i += 1;
+		} else if (ch === '"') {
+			inQuotes = !inQuotes;
+		} else if (ch === "," && !inQuotes) {
+			row.push(cell);
+			cell = "";
+		} else if ((ch === "\n" || ch === "\r") && !inQuotes) {
+			if (ch === "\r" && next === "\n") i += 1;
+			row.push(cell);
+			if (row.some((value) => String(value || "").trim())) rows.push(row);
+			row = [];
+			cell = "";
+		} else {
+			cell += ch;
+		}
+	}
+
+	row.push(cell);
+	if (row.some((value) => String(value || "").trim())) rows.push(row);
+	if (rows.length === 0) return [];
+
+	const headers = rows[0].map(normalizeCsvHeader);
+	return rows.slice(1).map((values) => {
+		const entry = {};
+		headers.forEach((header, index) => {
+			if (header) entry[header] = String(values[index] || "").trim();
+		});
+		return entry;
+	});
+}
+
+function getCsvValue(row, aliases = []) {
+	for (const alias of aliases) {
+		const key = normalizeCsvHeader(alias);
+		if (row[key] !== undefined) return row[key];
+	}
+	return "";
+}
+
+function normalizePayrollPeriod(value) {
+	const raw = String(value || "").trim();
+	if (/^\d{4}-\d{2}$/.test(raw)) return raw;
+	const parsed = new Date(raw);
+	if (!Number.isNaN(parsed.getTime())) {
+		return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+	}
+	return raw;
+}
+
+function normalizePayrollDate(value) {
+	const raw = String(value || "").trim();
+	if (!raw) return "";
+	if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+	const parsed = new Date(raw);
+	return Number.isNaN(parsed.getTime()) ? raw : parsed.toISOString().slice(0, 10);
+}
+
+function payrollRecordFromCsvRow(row) {
+	const value = (...aliases) => getCsvValue(row, aliases);
+	const numberValue = (...aliases) => parsePayrollAmount(value(...aliases));
+	return {
+		employee_id: value("employee_id", "employee id", "id", "id_name", "id/name"),
+		payroll_period: normalizePayrollPeriod(value("payroll_period", "period", "bulan", "month")),
+		payroll_cutoff_start: normalizePayrollDate(
+			value("payroll_cutoff_start", "cutoff_start", "payroll cutoff start"),
+		),
+		payroll_cutoff_end: normalizePayrollDate(
+			value("payroll_cutoff_end", "cutoff_end", "payroll cutoff end"),
+		),
+		basic_salary: numberValue("basic_salary", "basic salary", "basic salary gross", "gaji pokok"),
+		overtime: numberValue("overtime", "lembur"),
+		commission: numberValue("commission", "komisi"),
+		bonus: numberValue("bonus"),
+		pph21: numberValue("pph21", "pph 21", "pph"),
+		bpjs_kes: numberValue("bpjs_kes", "bpjs kes", "bpjs kesehatan"),
+		bpjs_tk: numberValue("bpjs_tk", "bpjstk", "bpjs tk", "bpjs ketenagakerjaan"),
+		other_deduction: numberValue(
+			"other_deduction",
+			"other additional deduction",
+			"other deduction",
+		),
+		bpjs_kes_company: numberValue(
+			"bpjs_kes_company",
+			"bpjs kes company side",
+			"bpjs kesehatan company",
+		),
+		bpjs_tk_company: numberValue(
+			"bpjs_tk_company",
+			"bpjstk company side",
+			"bpjs tk company",
+		),
+		ptkp: value("ptkp"),
+		npwp: value("npwp"),
+		nik_number: value("nik_number", "nik"),
+		grade_level: value("grade_level", "grade / level", "grade", "level"),
+		job_position: value("job_position", "job position", "position"),
+		organization: value("organization", "organisation", "department"),
+		notes: value("notes", "note"),
+	};
 }
 
 function parseValidityToDate(baseDate, validityPeriod) {
@@ -221,6 +399,87 @@ function getSelectedSubject() {
 	}
 
 	return state.db?.[documentsDraft.employeeId] || null;
+}
+
+function getPayrollRecord(employeeId = documentsDraft.employeeId, period = documentsDraft.fields.period) {
+	const targetEmployeeId = String(employeeId || "").trim();
+	const targetPeriod = String(period || "").trim();
+	if (!targetEmployeeId || !targetPeriod) return null;
+	return (
+		(Array.isArray(state.hrPayrollRecords) ? state.hrPayrollRecords : []).find(
+			(record) =>
+				String(record?.employee_id || "") === targetEmployeeId &&
+				String(record?.payroll_period || "") === targetPeriod,
+		) || null
+	);
+}
+
+function payrollRowsFromRecord(record = {}) {
+	return {
+		earnings: [
+			{ name: "Lembur", amount: formatPlainNumber(record.overtime) },
+			{ name: "Commission", amount: formatPlainNumber(record.commission) },
+			{ name: "Bonus", amount: formatPlainNumber(record.bonus) },
+		],
+		deductions: [
+			{ name: "PPh21", amount: formatPlainNumber(record.pph21) },
+			{ name: "BPJS Kes", amount: formatPlainNumber(record.bpjs_kes) },
+			{ name: "BPJSTK", amount: formatPlainNumber(record.bpjs_tk) },
+			{
+				name: "Other additional deduction",
+				amount: formatPlainNumber(record.other_deduction),
+			},
+		],
+		companyBenefits: [
+			{
+				name: "BPJS Kes company side",
+				amount: formatPlainNumber(record.bpjs_kes_company),
+			},
+			{
+				name: "BPJSTK company side",
+				amount: formatPlainNumber(record.bpjs_tk_company),
+			},
+		],
+	};
+}
+
+function applyPayrollRecord(record = getPayrollRecord()) {
+	if (!record) return false;
+	const subject = getSelectedSubject() || {};
+	documentsDraft.fields = {
+		...documentsDraft.fields,
+		period: String(record.payroll_period || documentsDraft.fields.period || CURRENT_PERIOD),
+		payroll_cutoff_start: String(record.payroll_cutoff_start || ""),
+		payroll_cutoff_end: String(record.payroll_cutoff_end || ""),
+		basic_salary: formatPlainNumber(record.basic_salary),
+		grade_level: String(record.grade_level || subject.job_level || ""),
+		ptkp: String(record.ptkp || ""),
+		npwp: String(record.npwp || ""),
+		nik_number: String(record.nik_number || subject.nik_number || ""),
+		job_position: String(record.job_position || subject.position || ""),
+		organization: String(record.organization || subject.department || ""),
+	};
+	documentsDraft.payroll = payrollRowsFromRecord(record);
+	return true;
+}
+
+function hydratePayslipDefaultsFromSubject() {
+	if (documentsDraft.documentType !== "payslip") return;
+	const subject = getSelectedSubject() || {};
+	if (!documentsDraft.fields.period) documentsDraft.fields.period = CURRENT_PERIOD;
+	if (!documentsDraft.fields.pay_date) documentsDraft.fields.pay_date = TODAY_ISO;
+	if (!documentsDraft.fields.job_position) {
+		documentsDraft.fields.job_position = String(subject.position || "");
+	}
+	if (!documentsDraft.fields.organization) {
+		documentsDraft.fields.organization = String(subject.department || "");
+	}
+	if (!documentsDraft.fields.grade_level) {
+		documentsDraft.fields.grade_level = String(subject.job_level || "");
+	}
+	if (!documentsDraft.fields.nik_number) {
+		documentsDraft.fields.nik_number = String(subject.nik_number || "");
+	}
 }
 
 function getDocumentConfig(type = documentsDraft.documentType) {
@@ -396,6 +655,7 @@ function getDocumentConfig(type = documentsDraft.documentType) {
 					label: "Payroll Period",
 					type: "month",
 					required: true,
+					defaultValue: CURRENT_PERIOD,
 				},
 				{
 					key: "pay_date",
@@ -403,6 +663,56 @@ function getDocumentConfig(type = documentsDraft.documentType) {
 					type: "date",
 					required: true,
 					defaultValue: TODAY_ISO,
+				},
+				{
+					key: "payroll_cutoff_start",
+					label: "Cutoff Start",
+					type: "date",
+					required: false,
+				},
+				{
+					key: "payroll_cutoff_end",
+					label: "Cutoff End",
+					type: "date",
+					required: false,
+				},
+				{
+					key: "grade_level",
+					label: "Grade / Level",
+					type: "text",
+					required: false,
+					placeholder: "e.g. Lead/D1",
+				},
+				{
+					key: "ptkp",
+					label: "PTKP",
+					type: "text",
+					required: false,
+					placeholder: "e.g. TK/0",
+				},
+				{
+					key: "npwp",
+					label: "NPWP",
+					type: "text",
+					required: false,
+				},
+				{
+					key: "nik_number",
+					label: "NIK",
+					type: "text",
+					required: false,
+				},
+				{
+					key: "job_position",
+					label: "Job Position",
+					type: "text",
+					required: false,
+				},
+				{
+					key: "organization",
+					label: "Organization",
+					type: "text",
+					required: false,
 				},
 				{
 					key: "basic_salary",
@@ -723,8 +1033,21 @@ function getTemplate(type = documentsDraft.documentType) {
 
 function resetPayrollRows() {
 	documentsDraft.payroll = {
-		earnings: [{ name: "Tunjangan", amount: "" }],
-		deductions: [{ name: "PPh21", amount: "" }],
+		earnings: [
+			{ name: "Lembur", amount: "0" },
+			{ name: "Commission", amount: "0" },
+			{ name: "Bonus", amount: "0" },
+		],
+		deductions: [
+			{ name: "PPh21", amount: "0" },
+			{ name: "BPJS Kes", amount: "0" },
+			{ name: "BPJSTK", amount: "0" },
+			{ name: "Other additional deduction", amount: "0" },
+		],
+		companyBenefits: [
+			{ name: "BPJS Kes company side", amount: "0" },
+			{ name: "BPJSTK company side", amount: "0" },
+		],
 	};
 }
 
@@ -736,6 +1059,10 @@ function ensureTemplateDefaults() {
 		if (field.defaultValue === undefined) return;
 		documentsDraft.fields[field.key] = String(field.defaultValue);
 	});
+	hydratePayslipDefaultsFromSubject();
+	if (documentsDraft.documentType === "payslip") {
+		applyPayrollRecord();
+	}
 
 	if (!documentsDraft.signerId) {
 		const fallbackSigner = getSelectedSigner();
@@ -933,6 +1260,7 @@ async function ensureHrDocumentCollectionsLoaded() {
 	templateCollectionsPromise = Promise.allSettled([
 		fetchHrDocumentTemplates(),
 		fetchHrDocumentReferenceOptions(),
+		fetchHrPayrollRecords(),
 	]).finally(() => {
 		templateCollectionsLoaded = true;
 		templateCollectionsPromise = null;
@@ -1360,7 +1688,7 @@ function renderFieldControl(field) {
 function renderPayrollRows() {
 	if (documentsDraft.documentType !== "payslip") return "";
 
-	const renderGroup = (title, rows, rowType, addLabel) => `
+	const renderGroup = (title, rows, rowType, addLabel, options = {}) => `
 		<div class="documents-payroll-group">
 			<div class="d-flex justify-content-between align-items-center mb-2">
 				<div class="small fw-bold text-muted text-uppercase">${escapeHTML(title)}</div>
@@ -1375,7 +1703,7 @@ function renderPayrollRows() {
 									<input type="text" class="form-control" data-doc-payroll-name="${escapeHTML(`${rowType}:${index}`)}" value="${escapeHTML(row.name || "")}" placeholder="Component name">
 								</div>
 								<div class="col-4">
-									<input type="number" class="form-control" data-doc-payroll-amount="${escapeHTML(`${rowType}:${index}`)}" value="${escapeHTML(String(row.amount || ""))}" placeholder="0">
+									<input type="number" class="form-control" data-doc-payroll-amount="${escapeHTML(`${rowType}:${index}`)}" value="${escapeHTML(row.amount === 0 ? "0" : String(row.amount || ""))}" placeholder="0">
 								</div>
 								<div class="col-1">
 									<button type="button" class="btn btn-outline-danger btn-sm w-100" data-doc-payroll-remove="${escapeHTML(`${rowType}:${index}`)}">-</button>
@@ -1384,15 +1712,128 @@ function renderPayrollRows() {
 					)
 					.join("")}
 			</div>
+			${options.note ? `<div class="small text-muted mt-2">${escapeHTML(options.note)}</div>` : ""}
 		</div>
 	`;
 
 	return `
 		<div class="documents-payroll-editor vstack gap-3">
-			${renderGroup("Allowance / Earnings", documentsDraft.payroll.earnings, "earnings", "Add Row")}
+			${renderGroup("Salary + THP Earnings", documentsDraft.payroll.earnings, "earnings", "Add Row")}
 			${renderGroup("Deductions", documentsDraft.payroll.deductions, "deductions", "Add Row")}
+			${renderGroup("Company-side Benefits", documentsDraft.payroll.companyBenefits || [], "companyBenefits", "Add Row", {
+				note: "Shown on payslip notes only; not included in take-home pay.",
+			})}
 		</div>
 	`;
+}
+
+function getPayrollRowCollection(type) {
+	if (type === "deductions") return documentsDraft.payroll.deductions;
+	if (type === "companyBenefits") {
+		if (!Array.isArray(documentsDraft.payroll.companyBenefits)) {
+			documentsDraft.payroll.companyBenefits = [];
+		}
+		return documentsDraft.payroll.companyBenefits;
+	}
+	return documentsDraft.payroll.earnings;
+}
+
+function renderPayrollRecordStatus() {
+	const section = document.getElementById("doc-payroll-data-section");
+	const statusEl = document.getElementById("doc-payroll-record-status");
+	if (!section || !statusEl) return;
+
+	const isPayslip = documentsDraft.documentType === "payslip";
+	section.classList.toggle("d-none", !isPayslip);
+	if (!isPayslip) return;
+
+	const period = String(documentsDraft.fields.period || "").trim();
+	const employeeId = String(documentsDraft.employeeId || "").trim();
+	const records = Array.isArray(state.hrPayrollRecords) ? state.hrPayrollRecords : [];
+	const record = getPayrollRecord(employeeId, period);
+
+	if (record) {
+		statusEl.innerHTML = `
+			<div class="documents-payroll-status-row">
+				<span class="badge bg-success-subtle text-success border">Matched</span>
+				<span>${escapeHTML(record.employee_id)} / ${escapeHTML(record.payroll_period)}</span>
+				<span class="text-muted">Basic ${escapeHTML(formatCurrencyId(record.basic_salary))}</span>
+			</div>
+		`;
+		return;
+	}
+
+	if (!employeeId || !period) {
+		statusEl.innerHTML = `<div class="small text-muted">Select employee and payroll period.</div>`;
+		return;
+	}
+
+	statusEl.innerHTML = `
+		<div class="documents-payroll-status-row">
+			<span class="badge bg-warning-subtle text-warning border">No row</span>
+			<span>${escapeHTML(employeeId)} / ${escapeHTML(period)}</span>
+			<span class="text-muted">${records.length} imported row${records.length === 1 ? "" : "s"}</span>
+		</div>
+	`;
+}
+
+function downloadPayrollCsvTemplate() {
+	const example = {
+		employee_id: documentsDraft.employeeId || "250801",
+		payroll_period: documentsDraft.fields.period || CURRENT_PERIOD,
+		payroll_cutoff_start: `${CURRENT_PERIOD}-26`,
+		payroll_cutoff_end: `${CURRENT_PERIOD}-25`,
+		basic_salary: "10000000",
+		overtime: "0",
+		commission: "0",
+		bonus: "0",
+		pph21: "0",
+		bpjs_kes: "0",
+		bpjs_tk: "0",
+		other_deduction: "0",
+		bpjs_kes_company: "185674",
+		bpjs_tk_company: "312000",
+		ptkp: "TK/0",
+		npwp: "61.823.892.7-004.000",
+		nik_number: "",
+		grade_level: "Lead/D1",
+		job_position: "",
+		organization: "",
+		notes: "",
+	};
+	const csv = [
+		PAYROLL_CSV_COLUMNS.join(","),
+		PAYROLL_CSV_COLUMNS.map((key) => `"${String(example[key] || "").replace(/"/g, '""')}"`).join(","),
+	].join("\n");
+	const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `payroll-import-template-${CURRENT_PERIOD}.csv`;
+	document.body.appendChild(a);
+	a.click();
+	document.body.removeChild(a);
+	URL.revokeObjectURL(url);
+}
+
+async function importPayrollCsvFile(file) {
+	if (!file) return;
+	const text = await file.text();
+	const rows = parseCsvRows(text)
+		.map(payrollRecordFromCsvRow)
+		.filter((record) => record.employee_id && record.payroll_period);
+	if (rows.length === 0) {
+		await notify.warn("No valid payroll rows found in CSV.");
+		return;
+	}
+
+	const saved = await saveHrPayrollRecords(rows);
+	await fetchHrPayrollRecords();
+	if (documentsDraft.documentType === "payslip") {
+		applyPayrollRecord();
+		rerenderDocumentWorkspace();
+	}
+	await notify.success(`${saved.length || rows.length} payroll row(s) imported.`);
 }
 
 function renderDynamicFields() {
@@ -1426,6 +1867,12 @@ function renderDynamicFields() {
 				renderDynamicFields();
 			}
 
+			if (documentsDraft.documentType === "payslip" && key === "period") {
+				applyPayrollRecord();
+				renderPayrollRecordStatus();
+				renderDynamicFields();
+			}
+
 			renderPreview();
 			refreshValidationState();
 		});
@@ -1434,8 +1881,7 @@ function renderDynamicFields() {
 	container.querySelectorAll("[data-doc-payroll-add]").forEach((button) => {
 		button.addEventListener("click", (event) => {
 			const type = String(event.currentTarget?.dataset?.docPayrollAdd || "");
-			const targetRows =
-				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			const targetRows = getPayrollRowCollection(type);
 			targetRows.push({ name: "", amount: "" });
 			renderDynamicFields();
 			refreshValidationState();
@@ -1449,8 +1895,7 @@ function renderDynamicFields() {
 				event.currentTarget?.dataset?.docPayrollRemove || "",
 			).split(":");
 			const index = Number(rawIndex);
-			const targetRows =
-				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			const targetRows = getPayrollRowCollection(type);
 			targetRows.splice(index, 1);
 			if (targetRows.length === 0) targetRows.push({ name: "", amount: "" });
 			renderDynamicFields();
@@ -1465,8 +1910,7 @@ function renderDynamicFields() {
 				event.currentTarget?.dataset?.docPayrollName || "",
 			).split(":");
 			const index = Number(rawIndex);
-			const targetRows =
-				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			const targetRows = getPayrollRowCollection(type);
 			if (targetRows[index]) targetRows[index].name = String(event.currentTarget?.value || "");
 			renderPreview();
 			refreshValidationState();
@@ -1479,8 +1923,7 @@ function renderDynamicFields() {
 				event.currentTarget?.dataset?.docPayrollAmount || "",
 			).split(":");
 			const index = Number(rawIndex);
-			const targetRows =
-				type === "deductions" ? documentsDraft.payroll.deductions : documentsDraft.payroll.earnings;
+			const targetRows = getPayrollRowCollection(type);
 			if (targetRows[index]) targetRows[index].amount = String(event.currentTarget?.value || "");
 			renderPreview();
 			refreshValidationState();
@@ -1518,6 +1961,12 @@ function buildPreviewContext() {
 				amount: normalizeNumber(row?.amount),
 			}))
 			.filter((row) => row.name || row.amount),
+		companyBenefits: (documentsDraft.payroll.companyBenefits || [])
+			.map((row) => ({
+				name: String(row?.name || "").trim(),
+				amount: normalizeNumber(row?.amount),
+			}))
+			.filter((row) => row.name || row.amount),
 	};
 
 	const totals = {
@@ -1525,6 +1974,7 @@ function buildPreviewContext() {
 			normalizeNumber(values.basic_salary) +
 			payroll.earnings.reduce((sum, row) => sum + row.amount, 0),
 		totalDeductions: payroll.deductions.reduce((sum, row) => sum + row.amount, 0),
+		totalCompanyBenefits: payroll.companyBenefits.reduce((sum, row) => sum + row.amount, 0),
 	};
 	totals.netPay = totals.totalEarnings - totals.totalDeductions;
 
@@ -1532,6 +1982,10 @@ function buildPreviewContext() {
 	Object.entries(values).forEach(([key, value]) => {
 		if (key === "period") {
 			formatted[`${key}_month`] = formatMonthLabel(value);
+			return;
+		}
+		if (key === "payroll_cutoff_start" || key === "payroll_cutoff_end") {
+			formatted[key] = formatDateShort(value);
 			return;
 		}
 		if (key.includes("date") || key.includes("day")) {
@@ -1561,6 +2015,7 @@ function buildPreviewContext() {
 		formatted,
 		payroll,
 		totals,
+		salaryRecord: getPayrollRecord(),
 		companyName: escapeHTML(
 			String(state.appSettings?.company_name || "").trim() || "Company",
 		),
@@ -1705,6 +2160,12 @@ function buildTemplateVariables(ctx) {
 		salary_in_words: escapeHTML(
 			`${numberToBahasaWords(ctx.numbers.basic_salary || 0).replace(/\s+/g, " ").trim()} rupiah`,
 		),
+		payroll_period: ctx.formatted.period_month || "-",
+		payroll_cutoff_start: ctx.formatted.payroll_cutoff_start || "-",
+		payroll_cutoff_end: ctx.formatted.payroll_cutoff_end || "-",
+		grade_level: ctx.formatted.grade_level || "-",
+		ptkp: ctx.formatted.ptkp || "-",
+		npwp: ctx.formatted.npwp || "-",
 		warning_level: ctx.formatted.warning_level || "-",
 		last_working_day: ctx.formatted.last_working_day || "-",
 		termination_reason: formatMultiline(ctx.values.termination_reason || ""),
@@ -1785,25 +2246,60 @@ function renderTemplatePreview(ctx) {
 		case "payslip":
 			return `
 				<div class="documents-preview-block">
-					<p><strong>Employee:</strong> ${ctx.subjectName}</p>
-					<p><strong>Position:</strong> ${ctx.subjectPosition}</p>
-					<p><strong>Period:</strong> ${ctx.formatted.period_month}</p>
-					<p><strong>Pay Date:</strong> ${ctx.formatted.pay_date}</p>
+					<div class="documents-payslip-title-row">
+						<div>
+							<p><strong>${ctx.subjectName}</strong></p>
+							<p class="mb-0">ID / Name: ${escapeHTML(String(ctx.subject.id || "-"))} / ${ctx.subjectName}</p>
+						</div>
+						<div class="documents-payslip-confidential">CONFIDENTIAL</div>
+					</div>
+					<div class="documents-payslip-meta-grid">
+						<div>
+							<div><span>Payroll cut off</span><strong>${ctx.formatted.payroll_cutoff_start} - ${ctx.formatted.payroll_cutoff_end}</strong></div>
+							<div><span>Job position</span><strong>${escapeHTML(ctx.values.job_position || ctx.subject.position || "-")}</strong></div>
+							<div><span>Organization</span><strong>${escapeHTML(ctx.values.organization || ctx.subject.department || "-")}</strong></div>
+						</div>
+						<div>
+							<div><span>Grade / Level</span><strong>${ctx.formatted.grade_level || "-"}</strong></div>
+							<div><span>PTKP</span><strong>${ctx.formatted.ptkp || "-"}</strong></div>
+							<div><span>NPWP</span><strong>${ctx.formatted.npwp || "-"}</strong></div>
+							<div><span>NIK</span><strong>${ctx.formatted.nik_number || ctx.subjectNik}</strong></div>
+						</div>
+					</div>
 				</div>
 				<div class="documents-preview-block">
-					<div class="documents-preview-watermark small text-uppercase text-muted">Confidential Document</div>
+					<div class="documents-payslip-grid">
+						<table class="table table-sm documents-preview-table mb-0">
+							<thead><tr><th colspan="2">Salary + Tunjangan THP</th></tr></thead>
+							<tbody>
+								<tr><td>Basic Salary (gross)</td><td class="text-end">${formatPayslipAmount(ctx.numbers.basic_salary)}</td></tr>
+								${ctx.payroll.earnings.map((row) => `<tr><td>${escapeHTML(row.name || "Allowance")}</td><td class="text-end">${formatPayslipAmount(row.amount)}</td></tr>`).join("")}
+								<tr class="fw-semibold"><td>Total salary + tunjangan THP</td><td class="text-end">${formatPayslipAmount(ctx.totals.totalEarnings)}</td></tr>
+							</tbody>
+						</table>
+						<table class="table table-sm documents-preview-table mb-0">
+							<thead><tr><th colspan="2">Potongan / Deductions</th></tr></thead>
+							<tbody>
+								${ctx.payroll.deductions.map((row) => `<tr><td>${escapeHTML(row.name || "Deduction")}</td><td class="text-end">${formatPayslipAmount(row.amount)}</td></tr>`).join("")}
+								<tr class="fw-semibold"><td>Total deductions</td><td class="text-end">${formatPayslipAmount(ctx.totals.totalDeductions)}</td></tr>
+							</tbody>
+						</table>
+					</div>
+				</div>
+				<div class="documents-preview-block">
 					<table class="table table-sm documents-preview-table mb-0">
+						<thead><tr><th colspan="2">Tunjangan Note Only (Company Side)</th></tr></thead>
 						<tbody>
-							<tr><td>Basic Salary</td><td class="text-end">${ctx.formatted.basic_salary_currency}</td></tr>
-							${ctx.payroll.earnings.map((row) => `<tr><td>${escapeHTML(row.name || "Allowance")}</td><td class="text-end">${formatCurrencyId(row.amount)}</td></tr>`).join("")}
-							<tr class="fw-semibold"><td>Total Earnings</td><td class="text-end">${formatCurrencyId(ctx.totals.totalEarnings)}</td></tr>
-							${ctx.payroll.deductions.map((row) => `<tr><td>${escapeHTML(row.name || "Deduction")}</td><td class="text-end">(${formatCurrencyId(row.amount)})</td></tr>`).join("")}
-							<tr class="fw-semibold"><td>Total Deductions</td><td class="text-end">(${formatCurrencyId(ctx.totals.totalDeductions)})</td></tr>
-							<tr class="fw-bold"><td>Net Pay</td><td class="text-end">${formatCurrencyId(ctx.totals.netPay)}</td></tr>
+							${ctx.payroll.companyBenefits.map((row) => `<tr><td>${escapeHTML(row.name || "Benefit")}</td><td class="text-end">${formatPayslipAmount(row.amount)}</td></tr>`).join("")}
+							<tr class="fw-semibold"><td>Total note-only benefits</td><td class="text-end">${formatPayslipAmount(ctx.totals.totalCompanyBenefits)}</td></tr>
 						</tbody>
 					</table>
 				</div>
-				${renderSignatureBlock(ctx)}
+				<div class="documents-payslip-thp">
+					<span>Take Home Pay Salary</span>
+					<strong>${formatCurrencyId(ctx.totals.netPay).replace("IDR", "Rp")}</strong>
+				</div>
+				<div class="text-end small text-muted">Digitally signed by ${ctx.signerName}</div>
 			`;
 		case "warning_letter":
 			return `
@@ -1993,6 +2489,8 @@ function setControlsDisabled(disabled) {
 		"doc-signer-role-override",
 		"doc-download-btn",
 		"doc-reset-btn",
+		"doc-payroll-template-btn",
+		"doc-payroll-import-btn",
 	].forEach((id) => {
 		const el = document.getElementById(id);
 		if (el) el.disabled = Boolean(disabled);
@@ -2018,6 +2516,7 @@ function rerenderDocumentWorkspace() {
 	renderSubjectSourceSection();
 	renderSignerSummary();
 	renderDynamicFields();
+	renderPayrollRecordStatus();
 	renderPreview();
 	refreshValidationState();
 }
@@ -2033,10 +2532,17 @@ function bindSetupHandlers() {
 	const signerRoleInput = document.getElementById("doc-signer-role-override");
 	const downloadBtn = document.getElementById("doc-download-btn");
 	const resetBtn = document.getElementById("doc-reset-btn");
+	const payrollTemplateBtn = document.getElementById("doc-payroll-template-btn");
+	const payrollImportBtn = document.getElementById("doc-payroll-import-btn");
+	const payrollImportInput = document.getElementById("doc-payroll-import-input");
 
 	if (employeeSelect) {
 		employeeSelect.onchange = (event) => {
 			documentsDraft.employeeId = String(event.target?.value || "");
+			hydratePayslipDefaultsFromSubject();
+			applyPayrollRecord();
+			renderDynamicFields();
+			renderPayrollRecordStatus();
 			renderPreview();
 			refreshValidationState();
 		};
@@ -2067,6 +2573,7 @@ function bindSetupHandlers() {
 				resetPayrollRows();
 			}
 			ensureTemplateDefaults();
+			applyPayrollRecord();
 			syncTemplateEditorWithSelection(true);
 			rerenderDocumentWorkspace();
 		};
@@ -2143,8 +2650,14 @@ function bindSetupHandlers() {
 					employee: {
 						id: context.subject.id,
 						name: context.subject.name,
+						legal_name: context.subject.legal_name,
 						position: context.subject.position,
 						department: context.subject.department,
+						job_level: context.subject.job_level,
+						nik_number: context.subject.nik_number,
+						place_of_birth: context.subject.place_of_birth,
+						date_of_birth: context.subject.date_of_birth,
+						address: context.subject.address,
 					},
 					values: exportValues,
 					branding: {
@@ -2249,6 +2762,26 @@ function bindSetupHandlers() {
 
 	if (resetBtn) {
 		resetBtn.onclick = () => resetDocumentsWorkspace();
+	}
+
+	if (payrollTemplateBtn) {
+		payrollTemplateBtn.onclick = () => downloadPayrollCsvTemplate();
+	}
+
+	if (payrollImportBtn && payrollImportInput) {
+		payrollImportBtn.onclick = () => payrollImportInput.click();
+		payrollImportInput.onchange = async (event) => {
+			const file = event.target?.files?.[0];
+			event.target.value = "";
+			try {
+				await importPayrollCsvFile(file);
+			} catch (error) {
+				await notify.error(
+					`Failed to import payroll data: ${error?.message || String(error)}`,
+					"Import Failed",
+				);
+			}
+		};
 	}
 }
 

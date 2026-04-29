@@ -170,6 +170,14 @@ export const supabaseAdapter = {
         listOptions: async () => {
             return await supabase.from('hr_document_reference_options').select('*');
         },
+        listPayrollRecords: async () => {
+            return await supabase.from('hr_payroll_records').select('*');
+        },
+        savePayrollRecords: async (payloads) => {
+            return await supabase.from('hr_payroll_records').upsert(payloads, {
+                onConflict: 'employee_id,payroll_period'
+            }).select('*');
+        },
         saveTemplate: async (payload) => {
             return await supabase.from('hr_document_templates').upsert(payload);
         },

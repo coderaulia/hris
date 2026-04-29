@@ -498,6 +498,25 @@ export const laravelAdapter = {
                 return { data: null, error };
             }
         },
+        listPayrollRecords: async () => {
+            try {
+                const data = await fetchApi('/hr-payroll-records');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        savePayrollRecords: async (payloads) => {
+            try {
+                const data = await fetchApi('/hr-payroll-records/import', {
+                    method: 'POST',
+                    body: JSON.stringify({ records: payloads })
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
         saveTemplate: async (payload) => {
             try {
                 const data = await fetchApi('/hr-document-templates', {

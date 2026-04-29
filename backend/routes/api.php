@@ -73,5 +73,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/hr-document-templates', [\App\Http\Controllers\HrDocumentController::class, 'storeTemplate']);
         Route::delete('/hr-document-templates/{id}', [\App\Http\Controllers\HrDocumentController::class, 'deleteTemplate']);
         Route::get('/hr-document-options', [\App\Http\Controllers\HrDocumentController::class, 'options']);
+        Route::get('/hr-payroll-records', [\App\Http\Controllers\HrDocumentController::class, 'payrollRecords']);
+        Route::post('/hr-payroll-records/import', [\App\Http\Controllers\HrDocumentController::class, 'importPayrollRecords']);
     });
 });

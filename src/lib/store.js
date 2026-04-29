@@ -6,6 +6,7 @@ export const state = {
     db: {},           // Employee database { id: { ...record } }
     hrDocumentTemplates: [],
     hrDocumentReferenceOptions: [],
+    hrPayrollRecords: [],
     appConfig: {},    // Competency config { positionName: { competencies: [...] } }
     kpiConfig: [],    // KPI definitions
     kpiDefinitionVersions: [],

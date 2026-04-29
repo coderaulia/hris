@@ -159,24 +159,23 @@ const NAVIGATION_GROUPS = Object.freeze([
 	},
 	{
 		id: "nav-group-documents",
-		label: "HR Tools",
+		label: "Documents",
 		icon: "bi-file-earmark-text",
 		roles: ["superadmin", "hr"],
-		endpoints: ["employees", "app_settings"],
+		endpoints: ["employees", "app_settings", "hr_payroll_records"],
 		children: [
 			{
 				id: "nav-documents-workspace",
 				modules: ["core"],
 				label: "HR Documents",
 				description: "Generate letters, contracts, and payslips",
-				badge: "Phase 3",
 				roles: ["superadmin", "hr"],
 				tabId: "tab-documents",
 				navId: "nav-documents",
 				tabOptions: {},
 				contentTitle: "HR Documents",
 				contentDescription:
-					"Generate standardized HR documents from employee data with live preview.",
+					"Generate standardized HR documents and payslips from employee data.",
 			},
 		],
 	},

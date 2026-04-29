@@ -1491,6 +1491,74 @@ body,
   padding-top: 4px;
 }
 
+.documents-payroll-status {
+  min-height: 30px;
+}
+
+.documents-payroll-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+.documents-payslip-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.documents-payslip-confidential {
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.documents-payslip-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.documents-payslip-meta-grid div div {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 0.82rem;
+}
+
+.documents-payslip-meta-grid span {
+  color: #475569;
+}
+
+.documents-payslip-meta-grid strong {
+  font-weight: 500;
+}
+
+.documents-payslip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.documents-payslip-thp {
+  border-top: 3px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  gap: 28px;
+  margin-top: 22px;
+  padding-top: 12px;
+  font-size: 1.25rem;
+}
+
+.documents-payslip-thp strong {
+  font-size: 1.35rem;
+}
+
 .documents-preview-watermark {
   margin-bottom: 10px;
   letter-spacing: 1px;
@@ -1513,6 +1581,7 @@ body,
 
 [data-bs-theme="dark"] .documents-preview-meta,
 [data-bs-theme="dark"] .documents-preview-table td,
+[data-bs-theme="dark"] .documents-preview-table th,
 [data-bs-theme="dark"] .documents-preview-signer-summary,
 [data-bs-theme="dark"] .documents-template-meta {
   border-color: #334155;
@@ -1530,6 +1599,7 @@ body,
 [data-bs-theme="dark"] .documents-preview-empty,
 [data-bs-theme="dark"] .documents-preview-app,
 [data-bs-theme="dark"] .documents-preview-footer,
+[data-bs-theme="dark"] .documents-payslip-meta-grid span,
 [data-bs-theme="dark"] .documents-preview-fields .text-muted {
   color: #94a3b8 !important;
 }
@@ -1549,5 +1619,16 @@ body,
 
   .documents-template-actions {
     flex-direction: column;
+  }
+
+  .documents-payslip-meta-grid,
+  .documents-payslip-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .documents-payslip-thp {
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 1rem;
   }
 }

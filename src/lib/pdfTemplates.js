@@ -23,6 +23,25 @@ function toCurrency(value) {
 	return `IDR ${normalizeNumber(value).toLocaleString("id-ID")}`;
 }
 
+function toRupiah(value) {
+	return `Rp ${normalizeNumber(value).toLocaleString("id-ID")}`;
+}
+
+function toPayslipAmount(value) {
+	return normalizeNumber(value).toLocaleString("id-ID");
+}
+
+function toShortDateLabel(value) {
+	if (!value) return "-";
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return asText(value);
+	return date.toLocaleDateString("en-GB", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
+}
+
 function toDateLabel(value) {
 	if (!value) return "-";
 	const date = new Date(value);
@@ -157,6 +176,12 @@ function buildTemplateVariables({ employee = {}, values = {}, branding = {}, sig
 		work_location: asText(values.work_location),
 		basic_salary: toCurrency(values.basic_salary),
 		salary_in_words: `${numberToBahasaWords(values.basic_salary).replace(/\s+/g, " ").trim()} rupiah`,
+		payroll_period: toMonthLabel(values.period),
+		payroll_cutoff_start: toShortDateLabel(values.payroll_cutoff_start),
+		payroll_cutoff_end: toShortDateLabel(values.payroll_cutoff_end),
+		grade_level: asText(values.grade_level),
+		ptkp: asText(values.ptkp),
+		npwp: asText(values.npwp),
 		warning_level: asText(values.warning_level),
 		last_working_day: toDateLabel(values.last_working_day),
 		termination_reason: asText(values.termination_reason, ""),
@@ -501,30 +526,119 @@ function buildPayslip(doc, employee, values, signer, template, options = {}) {
 	});
 
 	y = renderTemplateBody(doc, template, { employee, values, branding: values.branding, signer }, y);
-	y = drawBodyText(doc, [
-		`Position: ${asText(employee.position)}`,
-		`Department: ${asText(employee.department)}`,
-	], { startY: y });
 
 	const basic = normalizeNumber(values.basic_salary);
 	const earningsRows = Array.isArray(options.payroll?.earnings) ? options.payroll.earnings : [];
 	const deductionRows = Array.isArray(options.payroll?.deductions) ? options.payroll.deductions : [];
+	const companyBenefitRows = Array.isArray(options.payroll?.companyBenefits)
+		? options.payroll.companyBenefits
+		: [];
 	const totalAllowances = earningsRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);
 	const totalDeductions = deductionRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);
+	const totalCompanyBenefits = companyBenefitRows.reduce((sum, row) => sum + normalizeNumber(row.amount), 0);
 	const gross = basic + totalAllowances;
 	const net = gross - totalDeductions;
 
-	const rows = [
-		{ label: "Basic Salary", amount: toCurrency(basic) },
-		...earningsRows.map((row) => ({ label: asText(row.name, "Allowance"), amount: toCurrency(row.amount) })),
-		{ label: "Total Earnings", amount: toCurrency(gross) },
-		...deductionRows.map((row) => ({ label: asText(row.name, "Deduction"), amount: `(${toCurrency(row.amount)})` })),
-		{ label: "Total Deductions", amount: `(${toCurrency(totalDeductions)})` },
-		{ label: "Net Pay", amount: toCurrency(net) },
+	doc.setFont("helvetica", "normal");
+	doc.setFontSize(9);
+	const leftMeta = [
+		["Payroll cut off", `${toShortDateLabel(values.payroll_cutoff_start)} - ${toShortDateLabel(values.payroll_cutoff_end)}`],
+		["ID / Name", `${asText(employee.id)} / ${asText(employee.name)}`],
+		["Job position", asText(values.job_position || employee.position)],
+		["Organization", asText(values.organization || employee.department)],
 	];
+	const rightMeta = [
+		["Grade / Level", asText(values.grade_level || employee.job_level)],
+		["PTKP", asText(values.ptkp)],
+		["NPWP", asText(values.npwp)],
+		["NIK", asText(values.nik_number || employee.nik_number)],
+	];
+	leftMeta.forEach(([label, value], index) => {
+		doc.text(`${label}`, PAGE.marginX, y + index * 5);
+		doc.text(`: ${value}`, PAGE.marginX + 34, y + index * 5);
+	});
+	rightMeta.forEach(([label, value], index) => {
+		doc.text(`${label}`, 112, y + index * 5);
+		doc.text(`: ${value}`, 144, y + index * 5);
+	});
+	y += 25;
 
-	y = drawPayslipTable(doc, rows, { startY: y + 2 });
-	drawSignatureBlock(doc, signer, { startY: y + 4 });
+	const maxMainRows = Math.max(earningsRows.length + 1, deductionRows.length);
+	const mainRows = [];
+	for (let i = 0; i < maxMainRows; i += 1) {
+		const earning =
+			i === 0
+				? { name: "Basic Salary (gross)", amount: basic }
+				: earningsRows[i - 1] || { name: "", amount: "" };
+		const deduction = deductionRows[i] || { name: "", amount: "" };
+		mainRows.push([
+			asText(earning.name, ""),
+			earning.name ? toPayslipAmount(earning.amount) : "",
+			asText(deduction.name, ""),
+			deduction.name ? toPayslipAmount(deduction.amount) : "",
+		]);
+	}
+	mainRows.push([
+		"Total salary + tunjangan THP",
+		toPayslipAmount(gross),
+		"Total deductions",
+		toPayslipAmount(totalDeductions),
+	]);
+
+	autoTable(doc, {
+		startY: y,
+		margin: { left: PAGE.marginX, right: PAGE.marginX },
+		theme: "grid",
+		head: [["Salary + Tunjangan THP", "", "Potongan / Deductions", ""]],
+		body: mainRows,
+		headStyles: { fillColor: [248, 250, 252], textColor: 20, fontStyle: "bold" },
+		bodyStyles: { fontSize: 9, cellPadding: 2 },
+		columnStyles: {
+			0: { cellWidth: 62 },
+			1: { halign: "right", cellWidth: 25 },
+			2: { cellWidth: 62 },
+			3: { halign: "right", cellWidth: 25 },
+		},
+	});
+	y = (doc.lastAutoTable?.finalY || y) + 8;
+
+	autoTable(doc, {
+		startY: y,
+		margin: { left: PAGE.marginX, right: PAGE.marginX },
+		theme: "grid",
+		head: [["Tunjangan Note Only (Company Side)", ""]],
+		body: [
+			...companyBenefitRows.map((row) => [
+				asText(row.name, "Benefit"),
+				toPayslipAmount(row.amount),
+			]),
+			["Total note-only benefits", toPayslipAmount(totalCompanyBenefits)],
+		],
+		headStyles: { fillColor: [248, 250, 252], textColor: 20, fontStyle: "bold" },
+		bodyStyles: { fontSize: 9, cellPadding: 2 },
+		columnStyles: {
+			0: { cellWidth: 130 },
+			1: { halign: "right", cellWidth: 44 },
+		},
+	});
+	y = (doc.lastAutoTable?.finalY || y) + 14;
+
+	y = ensureSpace(doc, y, 24);
+	doc.setDrawColor(226, 232, 240);
+	doc.setLineWidth(0.8);
+	doc.line(PAGE.marginX + 58, y, PAGE.width - PAGE.marginX, y);
+	y += 9;
+	doc.setFont("helvetica", "normal");
+	doc.setFontSize(16);
+	doc.text("Take Home Pay Salary", PAGE.marginX + 58, y);
+	doc.setFont("helvetica", "bold");
+	doc.text(toRupiah(net), PAGE.width - PAGE.marginX, y, { align: "right" });
+	y += 16;
+	doc.setFont("helvetica", "normal");
+	doc.setFontSize(8);
+	doc.text(`Digitally signed by ${asText(signer.name, "HR")}`, PAGE.width - PAGE.marginX, y, {
+		align: "right",
+	});
 }
 
 export async function generateHrDocumentPdf({

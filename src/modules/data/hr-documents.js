@@ -63,6 +63,80 @@ async function fetchHrDocumentReferenceOptions() {
     }
 }
 
+async function fetchHrPayrollRecords() {
+    try {
+        const { data, error } = await backend.documents.listPayrollRecords();
+        if (error) throw error;
+        state.hrPayrollRecords = data || [];
+        emit('data:hrPayrollRecords', state.hrPayrollRecords);
+        return state.hrPayrollRecords;
+    } catch (error) {
+        if (!isMissingRelationError(error)) {
+            debugError('Fetch HR payroll records error:', error);
+        }
+        state.hrPayrollRecords = [];
+        emit('data:hrPayrollRecords', state.hrPayrollRecords);
+        return [];
+    }
+}
+
+async function saveHrPayrollRecords(records = []) {
+    const payloads = (Array.isArray(records) ? records : [])
+        .map(record => {
+            const payload = {
+                employee_id: String(record?.employee_id || '').trim(),
+                payroll_period: String(record?.payroll_period || '').trim(),
+                payroll_cutoff_start: String(record?.payroll_cutoff_start || '').trim() || null,
+                payroll_cutoff_end: String(record?.payroll_cutoff_end || '').trim() || null,
+                grade_level: String(record?.grade_level || '').trim() || null,
+                ptkp: String(record?.ptkp || '').trim() || null,
+                npwp: String(record?.npwp || '').trim() || null,
+                nik_number: String(record?.nik_number || '').trim() || null,
+                job_position: String(record?.job_position || '').trim() || null,
+                organization: String(record?.organization || '').trim() || null,
+                basic_salary: Number(record?.basic_salary || 0),
+                overtime: Number(record?.overtime || 0),
+                commission: Number(record?.commission || 0),
+                bonus: Number(record?.bonus || 0),
+                pph21: Number(record?.pph21 || 0),
+                bpjs_kes: Number(record?.bpjs_kes || 0),
+                bpjs_tk: Number(record?.bpjs_tk || 0),
+                other_deduction: Number(record?.other_deduction || 0),
+                bpjs_kes_company: Number(record?.bpjs_kes_company || 0),
+                bpjs_tk_company: Number(record?.bpjs_tk_company || 0),
+                notes: String(record?.notes || '').trim() || null,
+            };
+            if (record?.id) payload.id = String(record.id);
+            return payload;
+        })
+        .filter(record => record.employee_id && record.payroll_period);
+
+    if (payloads.length === 0) return [];
+
+    const { data, error } = await backend.documents.savePayrollRecords(payloads);
+    if (error) throw error;
+
+    const saved = Array.isArray(data) ? data : payloads;
+    const nextRecords = [
+        ...(Array.isArray(state.hrPayrollRecords) ? state.hrPayrollRecords : []),
+    ];
+    saved.forEach(record => {
+        const index = nextRecords.findIndex(item =>
+            String(item?.employee_id || '') === String(record?.employee_id || '') &&
+            String(item?.payroll_period || '') === String(record?.payroll_period || '')
+        );
+        if (index >= 0) nextRecords[index] = record;
+        else nextRecords.push(record);
+    });
+
+    state.hrPayrollRecords = nextRecords.sort((a, b) =>
+        String(b?.payroll_period || '').localeCompare(String(a?.payroll_period || '')) ||
+        String(a?.employee_id || '').localeCompare(String(b?.employee_id || ''))
+    );
+    emit('data:hrPayrollRecords', state.hrPayrollRecords);
+    return saved;
+}
+
 async function saveHrDocumentTemplate(template = {}) {
     const payload = {
         id: String(template?.id || generateUuid()),
@@ -132,6 +206,8 @@ async function deleteHrDocumentTemplate(templateId) {
 export {
     fetchHrDocumentTemplates,
     fetchHrDocumentReferenceOptions,
+    fetchHrPayrollRecords,
+    saveHrPayrollRecords,
     saveHrDocumentTemplate,
     deleteHrDocumentTemplate,
 };
