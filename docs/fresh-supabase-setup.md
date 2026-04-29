@@ -27,13 +27,15 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 9. [20260409_manpower_planning.sql](/D:/web/hris/migrations/20260409_manpower_planning.sql)
 10. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
 11. [20260417_hr_documents_foundation.sql](/D:/web/hris/migrations/20260417_hr_documents_foundation.sql)
-12. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+12. [20260429_hr_payroll_records.sql](/D:/web/hris/migrations/20260429_hr_payroll_records.sql)
+13. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
 
 ## Migration Notes
 
 - The main [migrations](/D:/web/hris/migrations) folder now contains only the active upgrade chain.
 - Older split migrations and one-off repair/bootstrap helpers were moved to [migrations/archive](/D:/web/hris/migrations/archive).
 - `20260409_drop_legacy_employee_assessment_columns.sql` stays in the fresh path because the frontend now expects assessment and training data from normalized tables, not the old mirror columns on `employees`.
+- `20260429_hr_payroll_records.sql` adds reusable employee/month payroll rows for HR Documents payslip CSV import.
 - Local bootstrap and QA audit scripts now use this same canonical chain directly, so the documented order and automation are locked together.
 
 ## What The Seed Includes

@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-04-17
+Last updated: 2026-04-29
 
 ## High-Level Diagram
 
@@ -92,9 +92,10 @@ superadmin
 6. Add frontend env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_AUTH_REDIRECT_URL`.
 7. Add Edge Function secrets: `URL`, `ANON_KEY`, `SERVICE_ROLE_KEY`, and the function-specific secrets.
 8. Apply [migrations/20260417_hr_documents_foundation.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260417_hr_documents_foundation.sql:1) if HR template persistence should be active.
-9. Deploy Edge Functions.
-10. Deploy the static build to Hostinger.
-11. Verify login, profile resolution, dashboard/probation exports, and HR document preview/PDF/template CRUD behavior.
+9. Apply [migrations/20260429_hr_payroll_records.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260429_hr_payroll_records.sql:1) if payslip CSV import should persist reusable payroll rows.
+10. Deploy Edge Functions.
+11. Deploy the static build to Hostinger.
+12. Verify login, profile resolution, dashboard/probation exports, HR document preview/PDF/template CRUD behavior, and payslip CSV import.
 
 ## Module Boundaries
 
@@ -107,7 +108,7 @@ superadmin
 | Training | `employee_training_records` | Per-employee training log |
 | KPI | `kpi_definitions`, `kpi_definition_versions`, `employee_kpi_target_versions`, `kpi_records` | Governance and monthly performance |
 | Probation / PIP | `probation_reviews`, `probation_monthly_scores`, `probation_attendance_records`, `pip_plans`, `pip_actions` | Performance follow-up and compliance flow |
-| HR Documents | `employees`, `app_settings`, `hr_document_templates`, `hr_document_reference_options`, `admin_activity_log`, `src/lib/pdfTemplates.js` | Client-side template-driven document generation, A4 editing, PDF export, audit logging |
+| HR Documents | `employees`, `app_settings`, `hr_document_templates`, `hr_document_reference_options`, `hr_payroll_records`, `admin_activity_log`, `src/lib/pdfTemplates.js` | Client-side template-driven document generation, payslip payroll import, A4 editing, PDF export, audit logging |
 | Dashboard | Cross-module read models | Aggregated summaries and export entry points |
 | Edge Functions | Mixed | Callback handling, privileged mutations, notifications, exports |
 
@@ -125,6 +126,7 @@ Handled in `src/modules/documents.js`:
 - signer selection
 - dynamic field rendering
 - payroll row editing
+- payroll CSV template download/import
 - validation state
 
 ### Template Layer
@@ -155,6 +157,7 @@ Both consume placeholder-driven template content so the preview and exported doc
 
 The module writes:
 
+- imported payslip rows into `hr_payroll_records` for reusable employee/month payroll data
 - `document.generate` activity entries for exported documents
 - `document_template.save` and `document_template.delete` activity entries for template management
 - employee SP state updates on warning letter generation when supported by schema

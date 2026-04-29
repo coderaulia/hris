@@ -119,6 +119,12 @@ For custom VPS deployments (Ubuntu, Nginx, Docker), see [docs/cloud-vps-deployme
 ## Supporting docs
 
 - [Fresh Supabase setup](/D:/web/hris/docs/fresh-supabase-setup.md)
+- [Tech stack](/D:/web/hris/docs/tech-stack.md)
+- [Database schema](/D:/web/hris/docs/db-schema.md)
+- [API endpoints](/D:/web/hris/docs/api-endpoints.md)
+- [Coding standards](/D:/web/hris/docs/coding-standards.md)
+- [Environment guide](/D:/web/hris/docs/env-guide.md)
+- [Git workflow](/D:/web/hris/docs/git-workflow.md)
 - [Supabase functions deploy](/D:/web/hris/docs/supabase-functions-deploy.md)
 - [Hostinger deployment](/D:/web/hris/docs/hostinger-github-autodeploy.md)
 - [Cloud / VPS deployment](/D:/web/hris/docs/cloud-vps-deployment.md)

@@ -1,7 +1,17 @@
 # Commit Logs
 
-Last updated: 2026-04-17  
+Last updated: 2026-04-29  
 Current baseline on `main`: active working branch
+
+## 2026-04-29
+
+Manpower planning Phase 3 is now documented as complete for the current implementation. The remaining active bug in that area was recruitment-card deletion bypassing the backend adapter. That has been fixed by adding adapter-level `deletePipeline` support for Supabase and Laravel plus a Laravel `DELETE /api/v1/recruitment-pipeline/{id}` route.
+
+The documentation process has also been aligned with `claude.md`. The repo now has the missing process documents for tech stack, schema, API endpoints, coding standards, environment variables, git workflow, commit log, and agent log. These docs make the current mismatch explicit: older work has happened directly on `main`, while the process reference expects branch-per-task and rollback-script discipline for future work.
+
+HR Documents documentation was refreshed for the new reusable payroll import path. The active migration chain now includes `20260429_hr_payroll_records.sql`, and the setup/testing docs call out payroll CSV import verification for payslip generation.
+
+## 2026-04-17
 
 Recent work continued beyond deployment stability and export hardening into a much more capable HR Documents module. The app already had the role-gated `HR Tools > HR Documents` tab, live preview, and PDF export for offer letters, employment contracts, payslips, warning letters, and termination letters. That foundation has now been extended into a template-driven document workspace with DB-backed template records, schema compatibility fallbacks, richer employee legal identity fields, and document branding support for logo, watermark, and footer text.
 

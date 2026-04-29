@@ -3,6 +3,7 @@ import {
     emit,
     generateUuid,
     isMissingRelationError,
+    debugError,
 } from './runtime.js';
 import { backend } from '../../lib/backend.js';
 

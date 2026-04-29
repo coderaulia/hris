@@ -1,6 +1,6 @@
 # HR Documents Testing Plan
 
-Updated: 2026-04-17
+Updated: 2026-04-29
 
 ## Goal
 
@@ -10,6 +10,7 @@ Validate the HR Documents workspace end to end across:
 - contract-type-specific employment contracts
 - A4 template editing and template management
 - payroll breakdown and confidentiality treatment
+- payroll CSV import and reusable payslip rows
 - warning letter persistence and employee SP flagging
 - termination logging and legal metadata
 - signature placeholders for digital sign and wet sign workflows
@@ -19,6 +20,7 @@ This testing plan assumes the current implementation in:
 
 - `src/modules/documents.js`
 - `src/lib/pdfTemplates.js`
+- `src/modules/data/hr-documents.js`
 - `tests/hr-documents.spec.js`
 
 ## Preconditions
@@ -29,6 +31,7 @@ Before running the full plan:
 2. The environment has valid Supabase credentials for the Playwright/API tests.
 3. For full schema coverage, run:
    - `migrations/20260417_hr_documents_foundation.sql`
+   - `migrations/20260429_hr_payroll_records.sql`
 4. Seed or confirm these users exist:
    - `superadmin@demo.local`
    - `hr@demo.local`
@@ -142,6 +145,16 @@ Verify:
 - `manager` and `employee` cannot use the module
 - direct tab switching does not bypass access control
 
+### I. Payroll CSV Import
+
+Verify:
+
+- CSV template download includes `employee_id`, `payroll_period`, salary, deduction, tax, BPJS, identity, and notes columns
+- importing a row for an existing employee stores or updates one `hr_payroll_records` row for that employee/month
+- selecting the same employee and payroll period hydrates the payslip setup fields and payroll rows
+- imported company-side benefit rows appear in payslip notes but do not change take-home pay
+- invalid or empty CSV rows show a warning instead of saving blank records
+
 ## Release Checklist
 
 Release only when all of the following are true:
@@ -151,7 +164,9 @@ Release only when all of the following are true:
 3. Manual QA confirms preview/PDF layout is acceptable on desktop and mobile-sized viewports.
 4. HR/legal review signs off on the default Indonesian template pack.
 5. Template management is verified in an environment where `hr_document_templates` exists.
-6. The Supabase project has the Phase 1 migration applied if production should use DB-backed templates and SP persistence.
+6. Payroll CSV import is verified in an environment where `hr_payroll_records` exists.
+7. The Supabase project has the HR document foundation migration applied if production should use DB-backed templates and SP persistence.
+8. The Supabase project has the payroll records migration applied if production should use reusable payslip rows.
 
 ## Known Compatibility Note
 
@@ -159,9 +174,11 @@ The code now has fallback behavior for environments that have not yet applied th
 
 - employee fetch/save falls back to the legacy employee schema
 - missing HR template/reference tables do not block the UI
+- missing payroll records table does not block manual payslip editing
 
 That fallback is useful for development continuity, but production should still apply the migration so:
 
 - SP persistence is stored in the database
 - template save/delete and reusable template selection are available from `hr_document_templates`
 - reference options are available from `hr_document_reference_options`
+- payroll CSV import persists to `hr_payroll_records`
