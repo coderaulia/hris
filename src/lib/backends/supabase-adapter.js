@@ -127,6 +127,9 @@ export const supabaseAdapter = {
         },
         savePipeline: async (payload) => {
             return await supabase.from('recruitment_pipeline').upsert(payload);
+        },
+        deletePipeline: async (id) => {
+            return await supabase.from('recruitment_pipeline').delete().eq('id', id);
         }
     },
     probation: {

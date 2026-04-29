@@ -47,4 +47,10 @@ class ManpowerController extends Controller
         $pipe = RecruitmentPipeline::updateOrCreate(['id' => $request->id], $request->all());
         return new RecruitmentPipelineResource($pipe);
     }
+
+    public function deletePipeline($id)
+    {
+        RecruitmentPipeline::destroy($id);
+        return response()->noContent();
+    }
 }

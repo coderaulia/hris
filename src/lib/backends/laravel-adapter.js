@@ -380,6 +380,14 @@ export const laravelAdapter = {
             } catch (error) {
                 return { data: null, error };
             }
+        },
+        deletePipeline: async (id) => {
+            try {
+                await fetchApi(`/recruitment-pipeline/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
+            }
         }
     },
     probation: {

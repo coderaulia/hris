@@ -55,6 +55,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/headcount-requests', [\App\Http\Controllers\ManpowerController::class, 'storeRequest']);
         Route::get('/recruitment-pipeline', [\App\Http\Controllers\ManpowerController::class, 'pipeline']);
         Route::post('/recruitment-pipeline', [\App\Http\Controllers\ManpowerController::class, 'storePipeline']);
+        Route::delete('/recruitment-pipeline/{id}', [\App\Http\Controllers\ManpowerController::class, 'deletePipeline']);
 
         // Probation
         Route::get('/probation-reviews', [\App\Http\Controllers\ProbationController::class, 'reviews']);

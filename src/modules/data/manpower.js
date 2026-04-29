@@ -137,14 +137,8 @@ async function deleteRecruitmentCard(id) {
         throw new Error('Recruitment board is not available yet. Run migration 20260409_manpower_planning.sql first.');
     }
 
-    await execSupabase(
-        `Delete recruitment card "${id}"`,
-        () => supabase
-            .from('recruitment_pipeline')
-            .delete()
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.manpower.deletePipeline(id);
+    if (error) throw error;
 
     await Promise.all([
         fetchRecruitmentPipeline(),
