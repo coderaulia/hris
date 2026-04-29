@@ -180,7 +180,7 @@ The manpower workspace should stop reading like two admin tables and start readi
 ## Current Blockers
 
 - No active Phase 3 implementation blocker remains after routing recruitment-card deletion through the backend adapter.
-- The main remaining blocker is documentation/process alignment: `claude.md` references process docs that are not present in this repo (`docs/tech-stack.md`, `docs/db-schema.md`, `docs/api-endpoints.md`, `docs/coding-standards.md`, `docs/env-guide.md`, `docs/git-workflow.md`, `commit-log.md`, and `agents.md`).
+- Documentation/process alignment is mostly complete. `claude.md` now points to lean session docs and existing process references.
 - The next product improvements are optional enhancements: drag-and-drop movement, compact table fallback, analytics export, department filter, trend charts, and aggregate summary views.
 
 ## Permissions

@@ -3,11 +3,13 @@
 Last updated: 2026-04-29  
 Current baseline on `main`: active working branch
 
+This file is a lean session log. Update it at the end of a work session or when the user asks, not after every commit.
+
 ## 2026-04-29
 
-Manpower planning Phase 3 is now documented as complete for the current implementation. The remaining active bug in that area was recruitment-card deletion bypassing the backend adapter. That has been fixed by adding adapter-level `deletePipeline` support for Supabase and Laravel plus a Laravel `DELETE /api/v1/recruitment-pipeline/{id}` route.
+Manpower planning Phase 3 is documented as complete for the current implementation. Recruitment-card deletion now goes through the backend adapter with Supabase/Laravel support and Laravel `DELETE /api/v1/recruitment-pipeline/{id}`.
 
-The documentation process has also been aligned with `claude.md`. The repo now has the missing process documents for tech stack, schema, API endpoints, coding standards, environment variables, git workflow, commit log, and agent log. These docs make the current mismatch explicit: older work has happened directly on `main`, while the process reference expects branch-per-task and rollback-script discipline for future work.
+The documentation process is aligned with `claude.md` around lean session updates. `docs/commit-logs.md`, `agents.md`, and `docs/project-status.md` should be updated at session end or on request, not after every commit.
 
 HR Documents documentation was refreshed for the new reusable payroll import path. The active migration chain now includes `20260429_hr_payroll_records.sql`, and the setup/testing docs call out payroll CSV import verification for payslip generation.
 

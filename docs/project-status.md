@@ -13,7 +13,7 @@ Last updated: 2026-04-29
 - Adapter Pattern: The system is now fully abstracted behind `src/lib/backend.js`, allowing it to run against either Supabase or Laravel backends.
 - Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
 - Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
-- Process docs now exist for the `claude.md` workflow: tech stack, schema, API endpoints, coding standards, env guide, git workflow, commit log, and agent log.
+- Process docs now exist for the `claude.md` workflow: tech stack, schema, API endpoints, coding standards, env guide, git workflow, session commit log, and agent handoff.
 
 ## Security Baseline
 
@@ -68,19 +68,9 @@ Last updated: 2026-04-29
 - Approval notifications still require production provider secrets before live delivery works
 - Large chart and vendor chunks still exist, although heavy KPI/probation exports are offloaded to edge functions
 - Payroll import stores reusable rows per employee/month, but manual QA still needs to verify CSV import against production-like employee IDs and payslip PDF output.
-- `claude.md` expects branch-per-task and rollback-script discipline; this repo now documents the expectation, but prior local work has been committed directly on `main` and existing migrations do not include paired rollback scripts.
+- `claude.md` expects branch-per-task and rollback-script discipline; the repo documents that expectation, but prior local work has been committed directly on `main` and existing migrations do not include paired rollback scripts.
 
-## Completed On 2026-04-29
+## Recent Milestones
 
-- Manpower recruitment-card deletion now routes through Supabase/Laravel backend adapters instead of a direct Supabase call inside the data module.
-- Laravel API now exposes `DELETE /api/v1/recruitment-pipeline/{id}`.
-- Manpower planning docs now reflect Phase 3A/3B/3C completion and list only optional future improvements.
-- Documentation process alignment added:
-  - `docs/tech-stack.md`
-  - `docs/db-schema.md`
-  - `docs/api-endpoints.md`
-  - `docs/coding-standards.md`
-  - `docs/env-guide.md`
-  - `docs/git-workflow.md`
-  - `commit-log.md`
-  - `agents.md`
+- 2026-04-29: Manpower recruitment-card deletion now routes through Supabase/Laravel backend adapters.
+- 2026-04-29: Documentation process was aligned around lean session updates in `docs/commit-logs.md`, `agents.md`, and this status file.

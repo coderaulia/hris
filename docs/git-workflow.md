@@ -34,13 +34,18 @@ Pick the checks that match the change:
 - PHP syntax: `php -l <file>`
 - Browser behavior: focused Playwright spec
 
-## Documentation Before Commit
+## Documentation Timing
 
-When a change affects behavior, update:
+Do not update session/status docs after every commit. Update them at the end of the work session, when the user asks, or when leaving them stale would mislead the next agent.
+
+Session/status docs:
 
 - `docs/project-status.md`
-- `commit-log.md`
+- `docs/commit-logs.md`
 - `agents.md`
+
+Reference docs should be updated in the same working unit when code changes affect them:
+
 - `docs/api-endpoints.md` for route changes
 - `docs/db-schema.md` for schema changes
 - the relevant feature plan/status doc

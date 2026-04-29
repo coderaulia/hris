@@ -19,9 +19,25 @@ docs/tech-stack.md → docs/project-status.md → docs/db-schema.md → docs/api
 
 ---
 
-## On First Prompt — Auto-Output Before Coding
+## Documentation Timing
 
-**commit-log.md**
+Do not update `docs/commit-logs.md`, `agents.md`, or `docs/project-status.md` after every commit.
+
+Update those files only:
+
+- at the end of a work session
+- when the user explicitly asks for documentation/status updates
+- when a process or schema change would make the current docs misleading
+
+Keep these docs lean. They are handoff/status docs, not exhaustive transcripts.
+
+---
+
+## On First Prompt — Internal Planning Before Coding
+
+Do not auto-write these sections unless the user asks. Keep the shape below as a planning checklist.
+
+**docs/commit-logs.md**
 [YYYY-MM-DD] — [name]
 
 Status: 🔄 in progress
@@ -40,7 +56,7 @@ Approach: [ordered steps]
 Risks: [schema? env? migration?]
 Output: [files]
 
-**project-status.md** → append:
+**project-status.md** → append only for meaningful active work:
 
 🔄 [name] — started [YYYY-MM-DD]
 
@@ -48,9 +64,11 @@ Output: [files]
 
 ## On Task Complete — Update Docs
 
-1. commit-log.md → mark `[x]`, status `✅ done`
-2. agents.md → append outcome + files changed
-3. project-status.md → move to Completed
+At the end of the session, or when the user asks:
+
+1. docs/commit-logs.md → add a short session summary
+2. agents.md → add a concise handoff note
+3. project-status.md → update only current state, blockers, or completed milestones
 4. api-endpoints.md → add new routes
 5. db-schema.md → add new tables/columns
 

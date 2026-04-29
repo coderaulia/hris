@@ -41,8 +41,10 @@ When code changes affect behavior, also update the relevant docs:
 - `docs/project-status.md`
 - `docs/api-endpoints.md` for route changes
 - `docs/db-schema.md` for table/view/column changes
-- `docs/commit-logs.md` or `commit-log.md` for implementation history
+- `docs/commit-logs.md` for lean session history
 - feature plan docs such as `docs/manpower-planning-plan.md`
+
+Do not update `docs/commit-logs.md`, `agents.md`, or `docs/project-status.md` after every commit. Update them at session end or when the user asks.
 
 ## Verification
 

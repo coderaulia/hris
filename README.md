@@ -128,5 +128,5 @@ For custom VPS deployments (Ubuntu, Nginx, Docker), see [docs/cloud-vps-deployme
 - [Supabase functions deploy](/D:/web/hris/docs/supabase-functions-deploy.md)
 - [Hostinger deployment](/D:/web/hris/docs/hostinger-github-autodeploy.md)
 - [Cloud / VPS deployment](/D:/web/hris/docs/cloud-vps-deployment.md)
-- [Architecture](/D:/web/hris/docs/architecture.md)
+- [Architecture map](/D:/web/hris/docs/architecture.md)
 - [Project status](/D:/web/hris/docs/project-status.md)
