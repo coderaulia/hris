@@ -130,3 +130,7 @@ For custom VPS deployments (Ubuntu, Nginx, Docker), see [docs/cloud-vps-deployme
 - [Cloud / VPS deployment](/D:/web/hris/docs/cloud-vps-deployment.md)
 - [Architecture map](/D:/web/hris/docs/architecture.md)
 - [Project status](/D:/web/hris/docs/project-status.md)
+
+## Licenses
+
+This is not an open source project, every kind of use must have a permission from Vanaila Digital.
