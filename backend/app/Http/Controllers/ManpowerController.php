@@ -29,6 +29,9 @@ class ManpowerController extends Controller
 
     public function storePlan(Request $request)
     {
+        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
+            abort(403, 'Insufficient permissions.');
+        }
         $plan = ManpowerPlan::updateOrCreate(
             ['period' => $request->period, 'department' => $request->department, 'position' => $request->position, 'seniority' => $request->seniority],
             $request->all()
@@ -38,18 +41,27 @@ class ManpowerController extends Controller
 
     public function storeRequest(Request $request)
     {
+        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
+            abort(403, 'Insufficient permissions.');
+        }
         $req = HeadcountRequest::updateOrCreate(['id' => $request->id], $request->all());
         return new HeadcountRequestResource($req);
     }
 
     public function storePipeline(Request $request)
     {
+        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
+            abort(403, 'Insufficient permissions.');
+        }
         $pipe = RecruitmentPipeline::updateOrCreate(['id' => $request->id], $request->all());
         return new RecruitmentPipelineResource($pipe);
     }
 
     public function deletePipeline($id)
     {
+        if (!in_array(request()->user()->role, ['superadmin', 'manager'])) {
+            abort(403, 'Insufficient permissions.');
+        }
         RecruitmentPipeline::destroy($id);
         return response()->noContent();
     }

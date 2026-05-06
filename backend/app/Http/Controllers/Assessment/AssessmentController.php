@@ -39,30 +39,15 @@ class AssessmentController extends Controller
 
     public function scores()
     {
-        // For efficiency, we might want to filter this by assessment_id or employee_id
-        // but the current frontend fetches ALL scores and filters in JS.
-        // We'll mimic that but filter by accessible assessments.
-        $user = request()->user();
-        $query = EmployeeAssessmentScore::query();
-
-        if ($user->role !== 'superadmin') {
-             $query->whereIn('assessment_id', function($sub) use ($user) {
-                 $sub->select('id')
-                     ->from('employee_assessments');
-                 
-                 // Reuse scoping logic or join
-             });
-             // Simplified scoping for now: join with assessments
-             $query->join('employee_assessments', 'employee_assessment_scores.assessment_id', '=', 'employee_assessments.id');
-             // ... actually easier to just return all for now if user is superadmin/manager
-        }
-
-        return AssessmentScoreResource::collection(EmployeeAssessmentScore::all());
+        $accessibleIds = EmployeeScopeService::scopeQuery(EmployeeAssessment::query())->pluck('id');
+        $scores = EmployeeAssessmentScore::whereIn('assessment_id', $accessibleIds)->get();
+        return AssessmentScoreResource::collection($scores);
     }
 
     public function history()
     {
-        return AssessmentHistoryResource::collection(EmployeeAssessmentHistory::all());
+        $query = EmployeeScopeService::scopeQuery(EmployeeAssessmentHistory::query());
+        return AssessmentHistoryResource::collection($query->get());
     }
 
     public function store(Request $request)
