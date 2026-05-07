@@ -9,26 +9,26 @@ This document captures the current code flaws and missing features found during 
 - `npm run build`: passed
 - `npm run qa:hardening`: passed
 - `npx playwright test tests/backend-adapter.spec.js`: passed
+- `composer test` in `backend/`: passed
+- PHP syntax check for touched Laravel controllers/services: passed
 - `npx playwright test tests/auth.spec.js --max-failures=1`: failed
 - Full Playwright suite: started but stopped after several minutes without useful progress output, so it is inconclusive
 
-## High Priority Findings
+## Resolved Findings
 
 ### Laravel API scoping gaps
 
-Several authenticated Laravel endpoints still return broad data instead of applying employee/manager/role scoping consistently:
+Fixed locally on 2026-05-07:
 
-- `backend/app/Http/Controllers/Assessment/AssessmentController.php`
-  - `scores()` returns all `EmployeeAssessmentScore` rows.
-  - `history()` returns all `EmployeeAssessmentHistory` rows.
-- `backend/app/Http/Controllers/ManpowerController.php`
-  - `plans()`, `requests()`, and `pipeline()` return all rows.
-- `backend/app/Http/Controllers/ProbationController.php`
-  - `reviews()`, `monthlyScores()`, and `attendanceRecords()` return all rows.
-- `backend/app/Http/Controllers/PipController.php`
-  - `index()` and `actions()` return all rows.
+- `backend/app/Services/EmployeeScopeService.php` now handles `hr` and director operational scope in addition to employee/manager/superadmin access.
+- `backend/app/Http/Controllers/Assessment/AssessmentController.php` scopes score and history reads.
+- `backend/app/Http/Controllers/ManpowerController.php` scopes plan, request, and pipeline reads and guards write/delete actions by role.
+- `backend/app/Http/Controllers/ProbationController.php` scopes review, monthly score, and attendance reads and guards writes by role plus employee scope.
+- `backend/app/Http/Controllers/PipController.php` scopes plan/action reads and guards writes by role plus employee scope.
 
-Note: remote branch `origin/chore/cleanup-legacy-unused-docs` contains a commit named `fix: enforce authorization scoping on assessment, probation, pip, and manpower controllers`, so review/merge that work before re-implementing the same fix locally.
+Note: the remote `origin/chore/cleanup-legacy-unused-docs` scoping commit was reviewed, but only the relevant controller behavior was ported locally; unrelated legacy deletions/docs changes were not pulled into this fix.
+
+## High Priority Findings
 
 ### Laravel adapter is not feature-complete
 
@@ -96,7 +96,7 @@ These are known product gaps confirmed by the current docs and code shape:
 
 ## Suggested Fix Order
 
-1. Merge or port the remote Laravel authorization scoping fix.
+1. Done - port and extend the remote Laravel authorization scoping fix.
 2. Close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
 3. Fix probation and PIP bulk-save behavior.
 4. Decide whether assessment is default product scope, then align module config and tests.
