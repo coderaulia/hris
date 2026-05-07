@@ -16,6 +16,7 @@ class KpiRecord extends Model
     {
         return [
             'value' => 'float',
+            'target_snapshot' => 'float',
             'submitted_at' => 'datetime',
         ];
     }

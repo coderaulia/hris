@@ -8,9 +8,10 @@ This document captures the current code flaws and missing features found during 
 
 - `npm run build`: passed
 - `npm run qa:hardening`: passed
-- `npx playwright test tests/backend-adapter.spec.js`: passed
+- `npx playwright test tests/backend-adapter.spec.js`: passed, including KPI governance adapter routes
 - `composer test` in `backend/`: passed
 - PHP syntax check for touched Laravel controllers/services: passed
+- `php artisan route:list --path=api/v1` in `backend/`: passed
 - `npx playwright test tests/auth.spec.js --max-failures=1`: failed
 - Full Playwright suite: started but stopped after several minutes without useful progress output, so it is inconclusive
 
@@ -28,21 +29,19 @@ Fixed locally on 2026-05-07:
 
 Note: the remote `origin/chore/cleanup-legacy-unused-docs` scoping commit was reviewed, but only the relevant controller behavior was ported locally; unrelated legacy deletions/docs changes were not pulled into this fix.
 
-## High Priority Findings
-
 ### Laravel adapter is not feature-complete
 
-The docs describe the app as fully abstracted behind `src/lib/backend.js`, but several feature data paths still call Supabase directly. Laravel mode does not expose matching routes for these flows yet.
+Fixed locally on 2026-05-07:
 
-Affected KPI flows in `src/modules/data/kpi.js` include:
+- `src/modules/data/kpi.js` now routes KPI governance operations through `backend.kpis.*` instead of calling Supabase directly.
+- `src/lib/backends/supabase-adapter.js` and `src/lib/backends/laravel-adapter.js` now expose matching methods for KPI definition, definition version, employee target version, weight profile/item, KPI record save, and KPI record delete flows.
+- `backend/app/Http/Controllers/KpiController.php` now exposes Laravel routes for KPI definition create/delete, definition version list/create/decision, target version list/create/decision, weight profile/item saves, and KPI record delete.
+- Added Laravel models/resources for `kpi_definition_versions` and `employee_kpi_target_versions`.
+- `tests/backend-adapter.spec.js` now verifies Laravel KPI governance adapter routing.
 
-- KPI definition version creation and decision updates
-- KPI definition deletion
-- employee KPI target version creation and approval decisions
-- KPI weight profile and item saves
-- KPI record deletion
+## High Priority Findings
 
-The Laravel API currently exposes only basic KPI list, KPI record save/list, weight profile list, and performance score routes in `backend/routes/api.php`.
+No remaining high priority code findings from this audit batch.
 
 ## Medium Priority Findings
 
@@ -97,7 +96,7 @@ These are known product gaps confirmed by the current docs and code shape:
 ## Suggested Fix Order
 
 1. Done - port and extend the remote Laravel authorization scoping fix.
-2. Close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
+2. Done - close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
 3. Fix probation and PIP bulk-save behavior.
 4. Decide whether assessment is default product scope, then align module config and tests.
 5. Add real backend feature tests for scoped reads/writes.

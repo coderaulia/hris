@@ -32,9 +32,20 @@ Route::prefix('v1')->group(function () {
 
         // KPIs
         Route::get('/kpis', [\App\Http\Controllers\KpiController::class, 'index']);
+        Route::post('/kpis', [\App\Http\Controllers\KpiController::class, 'storeDefinition']);
+        Route::delete('/kpis/{id}', [\App\Http\Controllers\KpiController::class, 'deleteDefinition']);
+        Route::get('/kpi-definition-versions', [\App\Http\Controllers\KpiController::class, 'definitionVersions']);
+        Route::post('/kpi-definition-versions', [\App\Http\Controllers\KpiController::class, 'storeDefinitionVersion']);
+        Route::patch('/kpi-definition-versions/{id}', [\App\Http\Controllers\KpiController::class, 'updateDefinitionVersion']);
+        Route::get('/employee-kpi-target-versions', [\App\Http\Controllers\KpiController::class, 'targetVersions']);
+        Route::post('/employee-kpi-target-versions', [\App\Http\Controllers\KpiController::class, 'storeTargetVersion']);
+        Route::patch('/employee-kpi-target-versions/{id}', [\App\Http\Controllers\KpiController::class, 'updateTargetVersion']);
         Route::get('/kpi-records', [\App\Http\Controllers\KpiController::class, 'records']);
         Route::post('/kpi-records', [\App\Http\Controllers\KpiController::class, 'storeRecord']);
+        Route::delete('/kpi-records/{id}', [\App\Http\Controllers\KpiController::class, 'deleteRecord']);
         Route::get('/kpi-weight-profiles', [\App\Http\Controllers\KpiController::class, 'weightProfiles']);
+        Route::post('/kpi-weight-profiles', [\App\Http\Controllers\KpiController::class, 'storeWeightProfile']);
+        Route::post('/kpi-weight-profiles/{profileId}/items', [\App\Http\Controllers\KpiController::class, 'storeWeightItems']);
 
         // Performance Scores
         Route::get('/performance-scores', [\App\Http\Controllers\PerformanceScoreController::class, 'index']);
