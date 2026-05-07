@@ -4,8 +4,19 @@ import { loginAs } from './support/app.js';
 test('login resolves the correct manager role', async ({ page }) => {
     await loginAs(page, 'manager');
 
+    const assessmentEnabled = await page.evaluate(async () => {
+        const { isModuleEnabled } = await import('./src/config/app-modules.js');
+        return isModuleEnabled('assessment');
+    });
+    const nav = page.locator('#sidebar-nav-groups');
+
     await expect(page.locator('#user-role-badge')).toContainText(/manager/i);
-    await expect(page.locator('#sidebar-nav-groups')).toContainText('Assessment Queue');
+    await expect(nav).toContainText('KPI Input');
+    if (assessmentEnabled) {
+        await expect(nav).toContainText('Assessment Queue');
+    } else {
+        await expect(nav).not.toContainText('Assessment Queue');
+    }
 });
 
 test('auth callback redirect is normalized without losing the active session', async ({ page }) => {

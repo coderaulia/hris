@@ -8,11 +8,11 @@ This document captures the current code flaws and missing features found during 
 
 - `npm run build`: passed
 - `npm run qa:hardening`: passed
-- `npx playwright test tests/backend-adapter.spec.js`: passed, including KPI governance adapter routes
+- `npx playwright test tests/backend-adapter.spec.js`: passed, including KPI governance adapter routes and probation/PIP multi-row helper coverage
+- `npx playwright test tests/auth.spec.js --max-failures=1`: passed
 - `composer test` in `backend/`: passed
 - PHP syntax check for touched Laravel controllers/services: passed
 - `php artisan route:list --path=api/v1` in `backend/`: passed
-- `npx playwright test tests/auth.spec.js --max-failures=1`: failed
 - Full Playwright suite: started but stopped after several minutes without useful progress output, so it is inconclusive
 
 ## Resolved Findings
@@ -39,37 +39,27 @@ Fixed locally on 2026-05-07:
 - Added Laravel models/resources for `kpi_definition_versions` and `employee_kpi_target_versions`.
 - `tests/backend-adapter.spec.js` now verifies Laravel KPI governance adapter routing.
 
+### Multi-row save paths only persist the first row
+
+Fixed locally on 2026-05-07:
+
+- `src/modules/data/probation.js` now saves every normalized probation monthly score row instead of only `normalized[0]`, then refreshes the review's saved monthly score state with all saved rows.
+- `src/modules/data/pip.js` now saves every prepared PIP action row instead of only `rows[0]`, generates client-side UUIDs for new action rows, and imports `debugError` for its existing error path.
+- `tests/backend-adapter.spec.js` now verifies the Laravel adapter path receives all three probation monthly score rows and both generated PIP action rows.
+
+### Default module config and tests disagree
+
+Fixed locally on 2026-05-07:
+
+- `tests/auth.spec.js` now treats `assessment` as optional per `docs/module-system.md` and `src/config/app-modules.js`.
+- The manager login test verifies required default navigation via `KPI Input`.
+- The test now expects `Assessment Queue` only when `assessment` is enabled through module configuration, and verifies it is hidden otherwise.
+
 ## High Priority Findings
 
 No remaining high priority code findings from this audit batch.
 
 ## Medium Priority Findings
-
-### Multi-row save paths only persist the first row
-
-Two data helpers normalize arrays but send only the first row to the backend:
-
-- `src/modules/data/probation.js`: `saveProbationMonthlyScores()` calls `backend.probation.saveMonthlyScore(normalized[0])`.
-- `src/modules/data/pip.js`: `savePipActions()` calls `backend.pip.saveAction(rows[0])`.
-
-Impact:
-
-- Probation month 2/3 score rows can be dropped.
-- Additional PIP action rows can be dropped.
-
-### Default module config and tests disagree
-
-`src/config/app-modules.js` requires only `core`, `dashboard`, `employees`, and `kpi` by default. `Assessment Queue` is gated behind the optional `assessment` module in `src/config/module-navigation.js`.
-
-Current failing test:
-
-- `tests/auth.spec.js` expects manager navigation to contain `Assessment Queue`.
-
-Fix options:
-
-- Enable `assessment` for the relevant test environment, or
-- Update the test expectation to match the default module set, or
-- Make `assessment` a required module if it is truly part of the core product.
 
 ### Backend test coverage is placeholder-only
 
@@ -97,7 +87,7 @@ These are known product gaps confirmed by the current docs and code shape:
 
 1. Done - port and extend the remote Laravel authorization scoping fix.
 2. Done - close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
-3. Fix probation and PIP bulk-save behavior.
-4. Decide whether assessment is default product scope, then align module config and tests.
+3. Done - fix probation and PIP bulk-save behavior.
+4. Done - align the auth test with optional assessment module scope.
 5. Add real backend feature tests for scoped reads/writes.
 6. Continue missing-feature work from HR document archive and e-signature workflows.

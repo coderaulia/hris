@@ -1,8 +1,10 @@
 import {
     state,
     emit,
+    debugError,
     asArray,
     toNumber,
+    generateUuid,
 } from './runtime.js';
 import { backend } from '../../lib/backend.js';
 
@@ -54,7 +56,7 @@ async function savePipPlan(plan) {
 async function savePipActions(pipPlanId, actions = []) {
     const rows = asArray(actions)
         .map(item => ({
-            id: item?.id,
+            id: item?.id || generateUuid(),
             pip_plan_id: pipPlanId,
             action_title: String(item?.action_title || '').trim(),
             action_detail: String(item?.action_detail || '').trim(),
@@ -68,13 +70,18 @@ async function savePipActions(pipPlanId, actions = []) {
     if (rows.length === 0) return [];
 
     try {
-        const { data, error } = await backend.pip.saveAction(rows[0]); // Simple for now
-        if (error) throw error;
+        const savedRows = [];
+        for (const row of rows) {
+            const { data, error } = await backend.pip.saveAction(row);
+            if (error) throw error;
+            if (Array.isArray(data)) savedRows.push(...data);
+            else savedRows.push(data || row);
+        }
 
         const untouched = state.pipActions.filter(item => item.pip_plan_id !== pipPlanId);
-        state.pipActions = [...untouched, ...(data ? [data] : [])];
+        state.pipActions = [...untouched, ...savedRows];
         emit('data:pipActions', state.pipActions);
-        return data ? [data] : [];
+        return savedRows;
     } catch (error) {
         debugError('Save PIP actions error:', error);
         return [];

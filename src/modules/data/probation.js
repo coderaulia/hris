@@ -568,13 +568,18 @@ async function saveProbationMonthlyScores(reviewId, rows = []) {
     if (normalized.length === 0) return [];
 
     try {
-        const { data, error } = await backend.probation.saveMonthlyScore(normalized[0]); // Simple for now, handle array if needed
-        if (error) throw error;
+        const savedRows = [];
+        for (const row of normalized) {
+            const { data, error } = await backend.probation.saveMonthlyScore(row);
+            if (error) throw error;
+            if (Array.isArray(data)) savedRows.push(...data);
+            else savedRows.push(data || row);
+        }
 
         const untouched = state.probationMonthlyScores.filter(item => item.probation_review_id !== reviewId);
-        state.probationMonthlyScores = [...untouched, ...(data ? [data] : [])];
+        state.probationMonthlyScores = [...untouched, ...savedRows];
         emit('data:probationMonthlyScores', state.probationMonthlyScores);
-        return data ? [data] : [];
+        return savedRows;
     } catch (error) {
         debugError('Save probation monthly scores error:', error);
         return [];
