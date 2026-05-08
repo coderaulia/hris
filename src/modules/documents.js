@@ -2819,10 +2819,17 @@ function bindSetupHandlers() {
 				doc.save(filename);
 				try {
 					const pdfBlob = doc.output("blob");
-					await saveHrDocumentArchive(
+					const savedArchive = await saveHrDocumentArchive(
 						buildArchivePayload(context, filename, pdfBlob?.size || 0),
+						{ fileBlob: pdfBlob },
 					);
 					renderDocumentArchiveList();
+					if (savedArchive?._uploadError) {
+						await notify.warn(
+							`Archive metadata saved, but file upload failed: ${savedArchive._uploadError}`,
+							"Archive File Not Stored",
+						);
+					}
 				} catch (archiveError) {
 					await notify.warn(
 						`PDF downloaded, but archive save failed: ${archiveError?.message || String(archiveError)}`,

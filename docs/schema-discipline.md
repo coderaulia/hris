@@ -55,6 +55,7 @@ That creates drift between environments and makes deployments non-deterministic.
    - `migrations/20260417_hr_documents_foundation.sql`
    - `migrations/20260429_hr_payroll_records.sql`
    - `migrations/20260508_hr_document_archives.sql`
+   - `migrations/20260508_hr_document_archive_storage.sql`
 
 This is the only supported database bootstrap path.
 

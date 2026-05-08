@@ -36,6 +36,39 @@ async function fetchApi(endpoint, options = {}) {
     return response.json();
 }
 
+async function fetchMultipartApi(endpoint, formData, options = {}) {
+    const headers = {
+        'Accept': 'application/json',
+        ...options.headers,
+    };
+
+    const token = getToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        method: options.method || 'POST',
+        headers,
+        body: formData,
+    });
+
+    if (!response.ok) {
+        let errorData;
+        try {
+            errorData = await response.json();
+        } catch {
+            errorData = { message: response.statusText };
+        }
+        throw new Error(errorData.message || 'API request failed');
+    }
+
+    if (response.status === 204) return null;
+
+    return response.json();
+}
+
 export const laravelAdapter = {
     auth: {
         signIn: async (email, password) => {
@@ -671,6 +704,17 @@ export const laravelAdapter = {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        uploadArchiveFile: async (id, payload = {}) => {
+            try {
+                const formData = new FormData();
+                formData.append('file', payload.file, payload.filename || 'document.pdf');
+                formData.append('storage_path', payload.path || '');
+                const data = await fetchMultipartApi(`/hr-document-archives/${id}/file`, formData);
                 return { data: data.data, error: null };
             } catch (error) {
                 return { data: null, error };

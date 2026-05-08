@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Employee;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\BuildsHrisTestSchema;
 use Tests\TestCase;
@@ -39,6 +41,15 @@ class HrDocumentArchiveTest extends TestCase
         ])->assertOk()->json('data');
 
         $this->assertSame('pending_signature', $archive['signature_status']);
+
+        Storage::fake('local');
+        $storedArchive = $this->post("/api/v1/hr-document-archives/{$archive['id']}/file", [
+            'file' => UploadedFile::fake()->create('employment-contract-emp-1.pdf', 24, 'application/pdf'),
+        ])->assertOk()->json('data');
+
+        $this->assertSame('stored', $storedArchive['storage_status']);
+        $this->assertNotEmpty($storedArchive['storage_path']);
+        Storage::disk('local')->assertExists($storedArchive['storage_path']);
 
         $companySigned = $this->postJson("/api/v1/hr-document-archives/{$archive['id']}/signature", [
             'signer_type' => 'company',

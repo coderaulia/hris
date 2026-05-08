@@ -1,5 +1,7 @@
 import { supabase } from '../supabase.js';
 
+const HR_DOCUMENT_ARCHIVE_BUCKET = import.meta.env.VITE_HR_DOCUMENT_ARCHIVE_BUCKET || 'hr-document-archives';
+
 export const supabaseAdapter = {
     auth: {
         signIn: async (email, password) => {
@@ -266,6 +268,31 @@ export const supabaseAdapter = {
                 .upsert(payload, { onConflict: 'id' })
                 .select()
                 .single();
+        },
+        uploadArchiveFile: async (_id, payload = {}) => {
+            const file = payload.file;
+            if (!file) return { data: null, error: new Error('Archive file is required.') };
+
+            const path = String(payload.path || '').trim();
+            if (!path) return { data: null, error: new Error('Archive storage path is required.') };
+
+            const { data, error } = await supabase.storage
+                .from(HR_DOCUMENT_ARCHIVE_BUCKET)
+                .upload(path, file, {
+                    contentType: payload.contentType || 'application/pdf',
+                    upsert: true,
+                });
+
+            if (error) return { data: null, error };
+
+            return {
+                data: {
+                    ...data,
+                    storage_path: data?.path || path,
+                    file_size_bytes: file.size || 0,
+                },
+                error: null,
+            };
         },
         signArchive: async (id, payload) => {
             const { data: current, error: fetchError } = await supabase

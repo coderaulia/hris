@@ -1,6 +1,6 @@
 # HR Documents Testing Plan
 
-Updated: 2026-04-29
+Updated: 2026-05-08
 
 ## Goal
 
@@ -14,6 +14,7 @@ Validate the HR Documents workspace end to end across:
 - warning letter persistence and employee SP flagging
 - termination logging and legal metadata
 - signature placeholders for digital sign and wet sign workflows
+- generated PDF archive storage and internal signature status
 - role-based access control
 
 This testing plan assumes the current implementation in:
@@ -32,6 +33,8 @@ Before running the full plan:
 3. For full schema coverage, run:
    - `migrations/20260417_hr_documents_foundation.sql`
    - `migrations/20260429_hr_payroll_records.sql`
+   - `migrations/20260508_hr_document_archives.sql`
+   - `migrations/20260508_hr_document_archive_storage.sql`
 4. Seed or confirm these users exist:
    - `superadmin@demo.local`
    - `hr@demo.local`
@@ -155,6 +158,17 @@ Verify:
 - imported company-side benefit rows appear in payslip notes but do not change take-home pay
 - invalid or empty CSV rows show a warning instead of saving blank records
 
+### J. Archive and Signature Status
+
+Verify:
+
+- PDF export creates a row in `hr_document_archives`
+- successful Supabase mode exports set `storage_status` to `stored`
+- the archive row has a private `storage_path` under `hr-documents/...`
+- offer letters and contracts require recipient signature status
+- company and recipient sign actions move the archive to `signed`
+- if file upload fails, the PDF still downloads and archive metadata remains available
+
 ## Release Checklist
 
 Release only when all of the following are true:
@@ -167,6 +181,7 @@ Release only when all of the following are true:
 6. Payroll CSV import is verified in an environment where `hr_payroll_records` exists.
 7. The Supabase project has the HR document foundation migration applied if production should use DB-backed templates and SP persistence.
 8. The Supabase project has the payroll records migration applied if production should use reusable payslip rows.
+9. The Supabase project has the HR document archive and archive-storage migrations applied if production should retain generated PDFs.
 
 ## Known Compatibility Note
 
@@ -182,3 +197,5 @@ That fallback is useful for development continuity, but production should still 
 - template save/delete and reusable template selection are available from `hr_document_templates`
 - reference options are available from `hr_document_reference_options`
 - payroll CSV import persists to `hr_payroll_records`
+- generated PDF archive metadata persists to `hr_document_archives`
+- archive file upload uses the private `hr-document-archives` Storage bucket

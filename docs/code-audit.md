@@ -6,14 +6,12 @@ This document captures the current code flaws and missing features found during 
 
 ## Verification Snapshot
 
-- `npm run build`: passed
-- `npm run qa:hardening`: passed
-- `npx playwright test tests/backend-adapter.spec.js`: passed, including KPI governance adapter routes
-- `composer test` in `backend/`: passed
-- PHP syntax check for touched Laravel controllers/services: passed
-- `php artisan route:list --path=api/v1` in `backend/`: passed
-- `npx playwright test tests/auth.spec.js --max-failures=1`: failed
-- Full Playwright suite: started but stopped after several minutes without useful progress output, so it is inconclusive
+- `npm run build`: passed on 2026-05-08
+- `npm run qa:hardening`: passed on 2026-05-08
+- `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including KPI governance and HR document archive adapter routes
+- Laravel feature tests were added, but `php` and `composer` were not available on PATH in the local shell for this verification pass
+- `npx playwright test tests/auth.spec.js --max-failures=1`: previously failed at login with invalid seeded manager credentials before reaching the navigation assertion
+- Full Playwright suite remains inconclusive from the prior audit batch
 
 ## Resolved Findings
 
@@ -76,15 +74,16 @@ Remaining backend test gaps:
 Fixed locally on 2026-05-08:
 
 - Added `migrations/20260508_hr_document_archives.sql` for generated-document archive metadata, storage path status, and company/recipient signature workflow state.
+- Added `migrations/20260508_hr_document_archive_storage.sql` for the private `hr-document-archives` Supabase Storage bucket and file policies.
 - Added Supabase and Laravel adapter methods for listing/saving archives and updating signature status.
-- Added Laravel archive endpoints and resources for `/hr-document-archives` and `/hr-document-archives/{id}/signature`.
-- The HR Documents workspace now saves archive metadata after PDF export and shows recent archives with internal company/recipient sign actions.
+- Added Supabase/Laravel archive file upload methods so generated PDFs can be stored after export.
+- Added Laravel archive endpoints and resources for `/hr-document-archives`, `/hr-document-archives/{id}/file`, and `/hr-document-archives/{id}/signature`.
+- The HR Documents workspace now saves archive metadata plus the PDF file after export and shows recent archives with internal company/recipient sign actions.
 
 ## Missing Features
 
 These are known product gaps confirmed by the current docs and code shape:
 
-- Private file-bucket storage for archived generated HR document PDFs (archive metadata now exists)
 - External e-signature delivery/provider workflow for generated documents (internal sign status now exists)
 - Production notification provider configuration for live outbound delivery
 - Production-like payroll import QA with real employee IDs and payslip PDF verification
@@ -98,4 +97,4 @@ These are known product gaps confirmed by the current docs and code shape:
 3. Done - fix probation and PIP bulk-save behavior.
 4. Done - make assessment part of default product scope and align module config/tests.
 5. Done - add real backend feature tests for scoped reads/writes and HR document archive/signature behavior.
-6. In progress - add HR document archive metadata and internal signature status flow; private file storage and external e-sign delivery remain open.
+6. Done - add HR document archive metadata, private PDF storage, and internal signature status flow; external e-sign delivery remains tracked as a remaining missing feature.

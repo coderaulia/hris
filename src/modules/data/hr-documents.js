@@ -98,6 +98,15 @@ async function fetchHrDocumentArchives() {
     }
 }
 
+function sanitizeArchivePathToken(value, fallback = 'document') {
+    return String(value || fallback)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 120) || fallback;
+}
+
 async function saveHrPayrollRecords(records = []) {
     const payloads = (Array.isArray(records) ? records : [])
         .map(record => {
@@ -155,15 +164,22 @@ async function saveHrPayrollRecords(records = []) {
     return saved;
 }
 
-async function saveHrDocumentArchive(archive = {}) {
+async function saveHrDocumentArchive(archive = {}, options = {}) {
+    const archiveId = String(archive?.id || generateUuid());
+    const filename = String(archive?.filename || '').trim();
+    const subjectToken = sanitizeArchivePathToken(archive?.employee_id || archive?.subject_name, 'manual-subject');
+    const filenameToken = sanitizeArchivePathToken(filename, 'document.pdf');
+    const storagePath = String(archive?.storage_path || `hr-documents/${subjectToken}/${archiveId}/${filenameToken}`);
+    let uploadError = null;
+
     const payload = {
-        id: String(archive?.id || generateUuid()),
+        id: archiveId,
         document_type: String(archive?.document_type || '').trim(),
         employee_id: String(archive?.employee_id || '').trim() || null,
         subject_name: String(archive?.subject_name || '').trim(),
         subject_mode: String(archive?.subject_mode || 'employee').trim() || 'employee',
         template_id: String(archive?.template_id || '').trim() || null,
-        filename: String(archive?.filename || '').trim(),
+        filename,
         mime_type: String(archive?.mime_type || 'application/pdf').trim() || 'application/pdf',
         file_size_bytes: Math.max(0, Math.round(Number(archive?.file_size_bytes || 0))),
         storage_status: String(archive?.storage_status || 'metadata_only').trim() || 'metadata_only',
@@ -184,10 +200,36 @@ async function saveHrDocumentArchive(archive = {}) {
 
     if (!payload.document_type || !payload.subject_name || !payload.filename) return null;
 
+    if (options?.fileBlob && typeof backend.documents.uploadArchiveFile === 'function') {
+        try {
+            const { data, error } = await backend.documents.uploadArchiveFile(payload.id, {
+                path: storagePath,
+                file: options.fileBlob,
+                filename: payload.filename,
+                contentType: payload.mime_type,
+            });
+            if (error) throw error;
+            payload.storage_status = 'stored';
+            payload.storage_path = data?.storage_path || data?.path || storagePath;
+            payload.file_size_bytes = Math.max(
+                payload.file_size_bytes,
+                Math.round(Number(data?.file_size_bytes || options.fileBlob.size || 0))
+            );
+        } catch (error) {
+            uploadError = error;
+            payload.storage_status = 'metadata_only';
+            payload.storage_path = null;
+            payload.signature_note = payload.signature_note || `Archive file upload failed: ${error?.message || String(error)}`;
+        }
+    }
+
     const { data, error } = await backend.documents.saveArchive(payload);
     if (error) throw error;
 
     const saved = data || payload;
+    if (uploadError) {
+        saved._uploadError = uploadError?.message || String(uploadError);
+    }
     const nextArchives = [
         saved,
         ...(Array.isArray(state.hrDocumentArchives) ? state.hrDocumentArchives : []).filter(

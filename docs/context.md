@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-04-17
+Last updated: 2026-05-08
 
 ## What This Is
 
@@ -14,7 +14,7 @@ Last updated: 2026-04-17
 | Auth | Supabase Auth (browser-side) |
 | Database | Supabase Postgres + RLS |
 | Client SDK | `@supabase/supabase-js` |
-| Exports | Mixed: Edge `report-exports` for KPI/probation files, client-side `jspdf` templates for HR document generation |
+| Exports | Mixed: Edge `report-exports` for KPI/probation files, client-side `jspdf` templates for HR document generation plus archive storage |
 | Hosting | Hostinger (static files) |
 | Health check | `/healthz.json` (static file) |
 
@@ -78,6 +78,8 @@ The HR Documents workspace is now a configurable HR document module, not only a 
 - payroll earning/deduction breakdown rows
 - warning-letter SP persistence
 - termination audit metadata
+- generated-document archive records and private PDF storage
+- internal company/recipient signature status workflow
 - signature placeholders for both digital-sign placement and wet-sign printing
 
 Primary implementation files:
@@ -87,11 +89,12 @@ Primary implementation files:
 - `src/modules/data/hr-documents.js`
 - `src/components/tab-documents.html`
 - `src/styles/main.css`
+- `migrations/20260508_hr_document_archives.sql`
+- `migrations/20260508_hr_document_archive_storage.sql`
 - `tests/hr-documents.spec.js`
 
 ## What Does NOT Exist Yet
 
 - Custom backend server (optional, not planned on main)
-- Persistent archive table for generated HR document files
-- Full e-signature workflow or approval-sign sequence for generated HR documents
+- External e-signature provider delivery for generated HR documents
 - Full end-to-end coverage across every module/path (smoke coverage exists, including `tests/hr-documents.spec.js`)

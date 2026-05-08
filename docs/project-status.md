@@ -53,6 +53,7 @@ Last updated: 2026-05-08
   - runtime access guardrails + validation feedback
   - payslip payroll CSV template download/import backed by `hr_payroll_records`
   - generated-document archive records backed by `hr_document_archives`
+  - private PDF file storage for generated-document archive records
   - company/recipient signature status tracking for generated documents
 - PDF engine `src/lib/pdfTemplates.js` now generates:
   - offer letter, employment contract, payslip, warning letter, termination letter
@@ -64,11 +65,13 @@ Last updated: 2026-05-08
   - Laravel exposes `/hr-payroll-records` and `/hr-payroll-records/import`
 - Document archive metadata is implemented for both Supabase and Laravel adapter paths:
   - Supabase uses `migrations/20260508_hr_document_archives.sql`
-  - Laravel exposes `/hr-document-archives` and `/hr-document-archives/{id}/signature`
+  - Supabase stores archive PDFs in private Storage bucket `hr-document-archives`
+  - Laravel exposes `/hr-document-archives`, `/hr-document-archives/{id}/file`, and `/hr-document-archives/{id}/signature`
+  - Laravel stores archive PDFs through `/hr-document-archives/{id}/file` using `HR_DOCUMENT_ARCHIVE_DISK`
 
 ## Current Gaps
 
-- HR documents still download client-side; archive records persist metadata and signature state, but private file-bucket upload is not wired yet
+- HR documents still download client-side, but archive records now also store the generated PDF in private storage when upload succeeds
 - Full external e-signature delivery is not implemented yet; current support is an internal approval/sign status sequence
 - Approval notifications still require production provider secrets before live delivery works
 - Large chart and vendor chunks still exist, although heavy KPI/probation exports are offloaded to edge functions

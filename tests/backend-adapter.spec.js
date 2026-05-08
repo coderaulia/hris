@@ -162,6 +162,22 @@ test.describe('Backend Adapter Routing', () => {
             });
         });
 
+        await page.route('**/api/v1/hr-document-archives/ARCH-1/file', async route => {
+            expect(route.request().method()).toBe('POST');
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: {
+                        id: 'ARCH-1',
+                        storage_status: 'stored',
+                        storage_path: 'hr-documents/emp-1/ARCH-1/payslip.pdf',
+                        file_size_bytes: 7,
+                    }
+                })
+            });
+        });
+
         const result = await page.evaluate(async () => {
             const { backend } = await import('./src/lib/backend.js');
             const list = await backend.documents.listArchives();
@@ -169,6 +185,12 @@ test.describe('Backend Adapter Routing', () => {
                 document_type: 'payslip',
                 subject_name: 'Employee One',
                 filename: 'payslip.pdf',
+            });
+            const uploaded = await backend.documents.uploadArchiveFile('ARCH-1', {
+                path: 'hr-documents/emp-1/ARCH-1/payslip.pdf',
+                file: new Blob(['pdfdata'], { type: 'application/pdf' }),
+                filename: 'payslip.pdf',
+                contentType: 'application/pdf',
             });
             const signed = await backend.documents.signArchive('ARCH-1', {
                 signer_type: 'company',
@@ -178,10 +200,12 @@ test.describe('Backend Adapter Routing', () => {
             return {
                 listCount: list.data.length,
                 archiveId: archive.data.id,
+                uploadStatus: uploaded.data.storage_status,
                 signedStatus: signed.data.signature_status,
                 methods: [
                     'listArchives',
                     'saveArchive',
+                    'uploadArchiveFile',
                     'signArchive',
                 ].every(method => typeof backend.documents[method] === 'function'),
             };
@@ -189,6 +213,7 @@ test.describe('Backend Adapter Routing', () => {
 
         expect(result.listCount).toBe(0);
         expect(result.archiveId).toBe('ARCH-1');
+        expect(result.uploadStatus).toBe('stored');
         expect(result.signedStatus).toBe('signed');
         expect(result.methods).toBe(true);
     });

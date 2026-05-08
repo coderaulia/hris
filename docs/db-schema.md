@@ -64,6 +64,7 @@ Current optional aggregate views not yet created: `manpower_funnel_summary`, `ma
 
 `hr_payroll_records` is created by `migrations/20260429_hr_payroll_records.sql` and is unique by `(employee_id, payroll_period)`.
 `hr_document_archives` is created by `migrations/20260508_hr_document_archives.sql` and tracks generated PDF metadata, storage path status, and company/recipient signing state.
+Archived HR document PDFs are stored in the private Supabase Storage bucket `hr-document-archives`, created by `migrations/20260508_hr_document_archive_storage.sql`.
 
 ## Schema Safety Rules
 

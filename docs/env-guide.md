@@ -1,6 +1,6 @@
 # Environment Guide
 
-Updated: 2026-04-29
+Updated: 2026-05-08
 
 Use `.env.example` as the source template. Never commit real `.env` secrets.
 
@@ -18,6 +18,7 @@ Use `.env.example` as the source template. Never commit real `.env` secrets.
 | `VITE_BACKEND_TYPE` | Optional | `supabase` by default; set `laravel` for API mode |
 | `VITE_BACKEND_MODE` | Optional | Backward-compatible backend mode alias |
 | `VITE_LARAVEL_API_URL` | Laravel mode | Laravel API base URL, for example `http://localhost:8000/api/v1` |
+| `VITE_HR_DOCUMENT_ARCHIVE_BUCKET` | Optional | Supabase Storage bucket for archived HR document PDFs, defaults to `hr-document-archives` |
 
 ## Supabase Edge Function Secrets
 
@@ -56,6 +57,7 @@ Laravel variables live in `backend/.env` and follow Laravel conventions:
 - `DB_DATABASE`
 - `DB_USERNAME`
 - `DB_PASSWORD`
+- `HR_DOCUMENT_ARCHIVE_DISK` for Laravel archive PDF storage; defaults to `local`
 
 ## Safety Notes
 

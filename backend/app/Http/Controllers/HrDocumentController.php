@@ -12,6 +12,7 @@ use App\Models\HrDocumentTemplate;
 use App\Models\HrPayrollRecord;
 use App\Services\EmployeeScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class HrDocumentController extends Controller
 {
@@ -133,6 +134,52 @@ class HrDocumentController extends Controller
         $archive->save();
 
         return new HrDocumentArchiveResource($archive);
+    }
+
+    public function uploadArchiveFile(Request $request, string $id)
+    {
+        $this->abortUnlessCanManageDocuments($request);
+
+        $validated = $request->validate([
+            'file' => 'required|file|mimetypes:application/pdf|max:20480',
+            'storage_path' => 'nullable|string',
+        ]);
+
+        $file = $validated['file'];
+        $filename = preg_replace('/[^A-Za-z0-9._-]+/', '-', $file->getClientOriginalName() ?: 'document.pdf');
+        $filename = trim($filename, '-') ?: 'document.pdf';
+        $path = trim((string) ($validated['storage_path'] ?? ''), '/');
+        if ($path === '') {
+            $path = "hr-documents/{$id}/{$filename}";
+        }
+        $path = str_replace(['..', '\\'], '-', $path);
+        $path = preg_replace('/[^A-Za-z0-9\/._-]+/', '-', $path);
+        $path = trim($path, '/') ?: "hr-documents/{$id}/{$filename}";
+
+        $disk = config('filesystems.hr_document_archive_disk', env('HR_DOCUMENT_ARCHIVE_DISK', 'local'));
+        Storage::disk($disk)->put($path, file_get_contents($file->getRealPath()));
+
+        $archive = HrDocumentArchive::find($id);
+        if ($archive) {
+            $archive->update([
+                'storage_status' => 'stored',
+                'storage_path' => $path,
+                'file_size_bytes' => $file->getSize() ?: $archive->file_size_bytes,
+                'mime_type' => $file->getMimeType() ?: 'application/pdf',
+            ]);
+
+            return new HrDocumentArchiveResource($archive);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => $id,
+                'storage_status' => 'stored',
+                'storage_path' => $path,
+                'file_size_bytes' => $file->getSize() ?: 0,
+                'mime_type' => $file->getMimeType() ?: 'application/pdf',
+            ],
+        ]);
     }
 
     public function importPayrollRecords(Request $request)
