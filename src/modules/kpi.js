@@ -18,6 +18,10 @@ import {
 import { logActivity } from './data/activity.js';
 import { saveSetting } from './data/settings.js';
 import {
+    requestKpiDefinitionNotification,
+    requestKpiTargetNotification,
+} from '../lib/edge/notifications.js';
+import {
     getEmployeeKpiTarget,
     getKpiRecordTarget,
     getKpiDefinitionForPeriod,
@@ -55,6 +59,20 @@ function formatKpiStatusBadge(status) {
     if (key === 'pending') return '<span class="badge bg-warning text-dark ms-2">Pending Approval</span>';
     if (key === 'rejected') return '<span class="badge bg-danger ms-2">Rejected</span>';
     return '<span class="badge bg-success-subtle text-success border ms-2">Approved</span>';
+}
+
+async function sendApprovalNotification(requester, contextLabel) {
+    try {
+        const result = await requester();
+        if (result?.delivered === false && result?.provider === 'unconfigured') {
+            debugError(`${contextLabel} notification skipped: email provider is not configured.`);
+        }
+        return result;
+    } catch (error) {
+        debugError(`${contextLabel} notification failed:`, error);
+        await notify.warn(`${contextLabel} saved, but notification delivery failed: ${error.message}`);
+        return null;
+    }
 }
 
 function isDefinitionActive(kpi, period = '') {
@@ -382,6 +400,10 @@ export async function approveKpiDefinitionVersion(versionId) {
     }
     await decideKpiDefinitionVersion(versionId, 'approved');
     await logActivity({ action: 'kpi.definition.approve', entityType: 'kpi_definition_version', entityId: versionId, details: {} });
+    await sendApprovalNotification(
+        () => requestKpiDefinitionNotification(versionId),
+        'KPI definition approval'
+    );
     renderKpiManager();
     await notify.success('KPI definition version approved.');
 }
@@ -395,6 +417,10 @@ export async function rejectKpiDefinitionVersion(versionId) {
     if (reason === null) return;
     await decideKpiDefinitionVersion(versionId, 'rejected', reason);
     await logActivity({ action: 'kpi.definition.reject', entityType: 'kpi_definition_version', entityId: versionId, details: { reason } });
+    await sendApprovalNotification(
+        () => requestKpiDefinitionNotification(versionId),
+        'KPI definition rejection'
+    );
     renderKpiManager();
     await notify.success('KPI definition version rejected.');
 }
@@ -406,6 +432,10 @@ export async function approveKpiTargetVersion(versionId) {
     }
     await decideEmployeeKpiTargetVersion(versionId, 'approved');
     await logActivity({ action: 'kpi.target.approve', entityType: 'employee_kpi_target_version', entityId: versionId, details: {} });
+    await sendApprovalNotification(
+        () => requestKpiTargetNotification(versionId),
+        'KPI target approval'
+    );
     renderKpiManager();
     await notify.success('KPI target version approved.');
 }
@@ -419,6 +449,10 @@ export async function rejectKpiTargetVersion(versionId) {
     if (reason === null) return;
     await decideEmployeeKpiTargetVersion(versionId, 'rejected', reason);
     await logActivity({ action: 'kpi.target.reject', entityType: 'employee_kpi_target_version', entityId: versionId, details: { reason } });
+    await sendApprovalNotification(
+        () => requestKpiTargetNotification(versionId),
+        'KPI target rejection'
+    );
     renderKpiManager();
     await notify.success('KPI target version rejected.');
 }
@@ -678,6 +712,15 @@ export async function saveKpiTargets() {
                 status: result?.status || 'approved',
             },
         });
+
+        if (result?.status === 'pending') {
+            for (const row of result?.rows || []) {
+                await sendApprovalNotification(
+                    () => requestKpiTargetNotification(row?.id),
+                    'KPI target submission'
+                );
+            }
+        }
 
         if (result?.status === 'pending') {
             await notify.success('Target changes submitted. Waiting for HR approval.');
@@ -989,6 +1032,13 @@ export async function saveKpiDef() {
                 status: result?.status || 'approved',
             },
         });
+
+        if (result?.status === 'pending' && result?.version_id) {
+            await sendApprovalNotification(
+                () => requestKpiDefinitionNotification(result.version_id),
+                'KPI definition submission'
+            );
+        }
 
         clearKpiDefForm();
         renderKpiManager();

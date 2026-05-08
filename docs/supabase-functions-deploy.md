@@ -20,8 +20,6 @@ Add these in Supabase Dashboard:
 - `APPROVAL_NOTIFICATION_WEBHOOK_SECRET`
 - `REPORT_EXPORT_WEBHOOK_SECRET`
 
-Optional later, when email delivery is ready:
-
 - `EMAIL_PROVIDER`
 - `EMAIL_API_URL`
 - `EMAIL_API_KEY`
@@ -45,15 +43,9 @@ supabase secrets set SERVICE_ROLE_KEY="your-service-role-key"
 supabase secrets set REPORT_EXPORT_BUCKET="report-exports"
 supabase secrets set APPROVAL_NOTIFICATION_WEBHOOK_SECRET="replace-with-a-long-random-secret"
 supabase secrets set REPORT_EXPORT_WEBHOOK_SECRET="replace-with-a-long-random-secret"
-```
-
-Add these later when email is configured:
-
-```bash
-supabase secrets set EMAIL_PROVIDER="generic"
-supabase secrets set EMAIL_API_URL="https://your-email-provider.example/send"
+supabase secrets set EMAIL_PROVIDER="resend"
 supabase secrets set EMAIL_API_KEY="your-email-api-key"
-supabase secrets set EMAIL_FROM="noreply@example.com"
+supabase secrets set EMAIL_FROM="HRIS <noreply@example.com>"
 supabase secrets set EMAIL_REPLY_TO="hr@example.com"
 ```
 
@@ -62,6 +54,26 @@ Provider notes:
 - `EMAIL_PROVIDER=generic` keeps the current JSON POST behavior using `EMAIL_API_URL`
 - `EMAIL_PROVIDER=resend` uses Resend's email API and defaults `EMAIL_API_URL` to `https://api.resend.com/emails` when omitted
 - both modes still use `EMAIL_API_KEY`, `EMAIL_FROM`, and optional `EMAIL_REPLY_TO`
+
+## Notification smoke check
+
+After deploying `approval-notifications`, use real row IDs from the target environment.
+The command runs in dry-run mode by default and still verifies recipient resolution and
+activity logging. Add `-- --live` only when you want to send real email.
+
+```powershell
+$env:SUPABASE_URL="https://your-project-id.supabase.co"
+$env:APPROVAL_NOTIFICATION_WEBHOOK_SECRET="replace-with-the-production-secret"
+$env:KPI_DEFINITION_VERSION_ID="00000000-0000-0000-0000-000000000000"
+$env:KPI_TARGET_VERSION_ID="00000000-0000-0000-0000-000000000000"
+$env:PROBATION_REVIEW_ID="00000000-0000-0000-0000-000000000000"
+$env:PIP_PLAN_ID="00000000-0000-0000-0000-000000000000"
+npm run qa:notifications
+npm run qa:notifications -- --live
+```
+
+If a webhook secret is not available, set `APPROVAL_NOTIFICATION_ACCESS_TOKEN` to a
+valid HR, manager, director, or superadmin Supabase access token instead.
 
 ## First-time CLI setup on Windows
 
@@ -168,7 +180,8 @@ After deploy, verify:
 3. Role change from Settings still works.
 4. Dashboard KPI PDF/XLSX export downloads successfully.
 5. Probation PDF/XLSX export downloads successfully.
-6. Approval notifications return dry-run behavior when unconfigured, and successful deliveries/failures are logged in `admin_activity_log`.
+6. `npm run qa:notifications` passes in dry-run mode for KPI definition, KPI target, probation, and PIP fixture IDs.
+7. `npm run qa:notifications -- --live` sends through Resend and logs successful deliveries/failures in `admin_activity_log`.
 
 ## Local file reminder
 

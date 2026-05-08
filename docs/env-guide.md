@@ -28,11 +28,12 @@ Set these as Supabase function secrets, not frontend hosting variables:
 | `URL` | Supabase project URL used inside Edge Functions |
 | `ANON_KEY` | Caller-scoped Supabase anon key |
 | `SERVICE_ROLE_KEY` | Service-role key for privileged operations |
-| `EMAIL_PROVIDER` | `generic` or `resend` for notifications |
-| `EMAIL_API_URL` | Provider API URL |
+| `EMAIL_PROVIDER` | Use `resend` in production; `generic` is available for compatible JSON email APIs |
+| `EMAIL_API_URL` | Provider API URL; optional for Resend because the function defaults to `https://api.resend.com/emails` |
 | `EMAIL_API_KEY` | Provider API key |
 | `EMAIL_FROM` | Sender address |
 | `EMAIL_REPLY_TO` | Optional reply-to address |
+| `APPROVAL_NOTIFICATION_WEBHOOK_SECRET` | Shared secret for scripted notification smoke checks and webhook automation |
 
 ## Local QA Variables
 
@@ -43,6 +44,11 @@ Set these as Supabase function secrets, not frontend hosting variables:
 | `SUPABASE_SERVICE_ROLE_KEY` | Service key for bootstrap/stress scripts |
 | `SUPABASE_DB_URL` | Postgres URL for local bootstrap scripts |
 | `E2E_BASE_URL` | Playwright base URL |
+| `KPI_DEFINITION_VERSION_ID` | Optional fixture for `npm run qa:notifications` |
+| `KPI_TARGET_VERSION_ID` | Optional fixture for `npm run qa:notifications` |
+| `PROBATION_REVIEW_ID` | Optional fixture for `npm run qa:notifications` |
+| `PIP_PLAN_ID` | Optional fixture for `npm run qa:notifications` |
+| `APPROVAL_NOTIFICATION_ACCESS_TOKEN` | Optional authenticated user JWT for `npm run qa:notifications` when no webhook secret is used |
 
 ## Laravel Backend Variables
 

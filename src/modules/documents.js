@@ -43,6 +43,18 @@ const PAYROLL_CSV_COLUMNS = [
 	"organization",
 	"notes",
 ];
+const PAYROLL_AMOUNT_COLUMNS = [
+	"basic_salary",
+	"overtime",
+	"commission",
+	"bonus",
+	"pph21",
+	"bpjs_kes",
+	"bpjs_tk",
+	"other_deduction",
+	"bpjs_kes_company",
+	"bpjs_tk_company",
+];
 const TEMPLATE_VARIABLE_TOKENS = [
 	"{{company_name}}",
 	"{{employee_name}}",
@@ -116,8 +128,9 @@ function parsePayrollAmount(value) {
 	const raw = String(value ?? "").trim();
 	if (!raw) return 0;
 	const normalized = raw.replace(/[^\d-]/g, "");
+	if (!/\d/.test(normalized) || (normalized.match(/-/g) || []).length > 1) return Number.NaN;
 	const num = Number(normalized);
-	return Number.isFinite(num) ? num : 0;
+	return Number.isFinite(num) ? num : Number.NaN;
 }
 
 function formatPlainNumber(value) {
@@ -267,6 +280,15 @@ function normalizePayrollDate(value) {
 	return Number.isNaN(parsed.getTime()) ? raw : parsed.toISOString().slice(0, 10);
 }
 
+function isValidPayrollPeriod(value) {
+	return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || "").trim());
+}
+
+function isValidPayrollDate(value) {
+	const raw = String(value || "").trim();
+	return !raw || /^\d{4}-\d{2}-\d{2}$/.test(raw);
+}
+
 function payrollRecordFromCsvRow(row) {
 	const value = (...aliases) => getCsvValue(row, aliases);
 	const numberValue = (...aliases) => parsePayrollAmount(value(...aliases));
@@ -309,6 +331,37 @@ function payrollRecordFromCsvRow(row) {
 		organization: value("organization", "organisation", "department"),
 		notes: value("notes", "note"),
 	};
+}
+
+function validatePayrollRecord(record, rowNumber) {
+	const prefix = `Row ${rowNumber}`;
+	const errors = [];
+
+	if (!String(record?.employee_id || "").trim()) {
+		errors.push(`${prefix}: employee_id is required.`);
+	}
+
+	if (!String(record?.payroll_period || "").trim()) {
+		errors.push(`${prefix}: payroll_period is required.`);
+	} else if (!isValidPayrollPeriod(record.payroll_period)) {
+		errors.push(`${prefix}: payroll_period must use YYYY-MM.`);
+	}
+
+	if (!isValidPayrollDate(record?.payroll_cutoff_start)) {
+		errors.push(`${prefix}: payroll_cutoff_start must use YYYY-MM-DD.`);
+	}
+
+	if (!isValidPayrollDate(record?.payroll_cutoff_end)) {
+		errors.push(`${prefix}: payroll_cutoff_end must use YYYY-MM-DD.`);
+	}
+
+	PAYROLL_AMOUNT_COLUMNS.forEach((key) => {
+		if (!Number.isFinite(Number(record?.[key]))) {
+			errors.push(`${prefix}: ${key} must be numeric.`);
+		}
+	});
+
+	return errors;
 }
 
 function parseValidityToDate(baseDate, validityPeriod) {
@@ -1825,9 +1878,21 @@ function downloadPayrollCsvTemplate() {
 async function importPayrollCsvFile(file) {
 	if (!file) return;
 	const text = await file.text();
-	const rows = parseCsvRows(text)
-		.map(payrollRecordFromCsvRow)
-		.filter((record) => record.employee_id && record.payroll_period);
+	const parsedRows = parseCsvRows(text).map((row, index) => ({
+		record: payrollRecordFromCsvRow(row),
+		rowNumber: index + 2,
+	}));
+	const errors = parsedRows.flatMap(({ record, rowNumber }) =>
+		validatePayrollRecord(record, rowNumber),
+	);
+	if (errors.length > 0) {
+		await notify.error(
+			`Payroll import validation failed:\n${errors.slice(0, 8).join("\n")}${errors.length > 8 ? `\n...and ${errors.length - 8} more error(s)` : ""}`,
+		);
+		return;
+	}
+
+	const rows = parsedRows.map(({ record }) => record);
 	if (rows.length === 0) {
 		await notify.warn("No valid payroll rows found in CSV.");
 		return;

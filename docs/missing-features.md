@@ -21,19 +21,24 @@ Known product gaps confirmed by current docs and code shape.
 
 **Current state:** `supabase/functions/approval-notifications/index.ts:95–101` reads
 `EMAIL_PROVIDER`, `EMAIL_API_URL`, `EMAIL_API_KEY`, `EMAIL_FROM`, `EMAIL_REPLY_TO` from env.
-Missing secrets → logs `"unconfigured"` and skips delivery. `resend` is the only named provider.
+Missing secrets → logs `"unconfigured"` and skips delivery. `resend` is the named production
+provider. Frontend dispatch is wired for KPI definition submissions/decisions, KPI target
+submissions/decisions, probation decisions, and PIP create/status updates.
 
 **Needed:** Set secrets in Supabase dashboard (`EMAIL_PROVIDER=resend`, `EMAIL_API_KEY`,
-`EMAIL_FROM`). Verify delivery for each trigger (manpower approval, KPI sign-off, probation
-review). Document required keys in `supabase/functions/.env.example`.
+`EMAIL_FROM`, optional `EMAIL_REPLY_TO`). Run `npm run qa:notifications` with real row IDs for
+dry-run recipient resolution, then `npm run qa:notifications -- --live` to verify delivery for
+KPI definition, KPI target, probation review, and PIP notifications.
 
 ## Payroll Import QA
 
 **Current state:** `importPayrollRecords` upserts rows keyed by `(employee_id, payroll_period)`.
-Both adapter paths are implemented. No QA run against production-like data.
+Both adapter paths are implemented. CSV import now rejects missing `employee_id`, malformed
+`payroll_period`, malformed cutoff dates, and non-numeric amounts before saving. Laravel API
+import validates the same required shape server-side. No QA run against production-like data.
 
 **Needed:** QA with real employee IDs. Verify payslip PDF output against imported rows. Confirm
-upsert idempotency. Test edge cases: missing `employee_id`, malformed period, non-numeric amounts.
+upsert idempotency against Supabase and Laravel-backed environments.
 
 **Note:** No code change expected unless edge cases surface in `importPayrollRecords` validation
 or the payslip template in `pdfTemplates.js`.

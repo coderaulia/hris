@@ -200,6 +200,7 @@ async function submitKpiDefinitionVersion(change) {
     if (!definitionId) throw new Error('Failed to resolve KPI definition id.');
 
     let insertedVersionNo = 0;
+    let insertedVersionId = '';
     let lastInsertError = null;
 
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -222,9 +223,10 @@ async function submitKpiDefinitionVersion(change) {
         };
 
         try {
-            const { error } = await backend.kpis.saveDefinitionVersion(versionRow);
+            const { data, error } = await backend.kpis.saveDefinitionVersion(versionRow);
             if (error) throw error;
             insertedVersionNo = versionNo;
+            insertedVersionId = String(data?.id || versionRow.id || '');
             lastInsertError = null;
             break;
         } catch (error) {
@@ -270,6 +272,7 @@ async function submitKpiDefinitionVersion(change) {
         status: requestStatus,
         requiresApproval,
         definition_id: definitionId,
+        version_id: insertedVersionId,
         version_no: insertedVersionNo,
     };
 }

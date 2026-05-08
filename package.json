@@ -11,6 +11,7 @@
 		"qa:schema-discipline": "node scripts/qa/schema-discipline-check.mjs",
 		"qa:bootstrap-grants": "node scripts/qa/bootstrap-grants-check.mjs",
 		"qa:rls-audit": "node scripts/qa/rls-policy-audit.mjs",
+		"qa:notifications": "node scripts/qa/approval-notifications-smoke.mjs",
 		"qa:migrations": "node scripts/qa/migration-safety-check.mjs",
 		"qa:negative": "node scripts/qa/rls-negative-path.mjs",
 		"qa:stress:seed": "node scripts/qa/stress-seed.mjs",

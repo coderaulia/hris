@@ -4,8 +4,9 @@
 
 import { state, isAdmin, isManager } from '../../lib/store.js';
 import { downloadEdgeExportFile, requestProbationExport } from '../../lib/edge/exports.js';
+import { requestPipNotification, requestProbationNotification } from '../../lib/edge/notifications.js';
 import { getSwal } from '../../lib/swal.js';
-import { escapeHTML, escapeInlineArg } from '../../lib/utils.js';
+import { debugError, escapeHTML, escapeInlineArg } from '../../lib/utils.js';
 import {
     buildProbationDraft,
     saveProbationReview,
@@ -82,6 +83,20 @@ function getErrorMessage(error, fallback = 'Unknown error') {
 
     if (parts.length === 0) return fallback;
     return [...new Set(parts)].join(' | ');
+}
+
+async function sendStatusNotification(requester, contextLabel) {
+    try {
+        const result = await requester();
+        if (result?.delivered === false && result?.provider === 'unconfigured') {
+            debugError(`${contextLabel} notification skipped: email provider is not configured.`);
+        }
+        return result;
+    } catch (error) {
+        debugError(`${contextLabel} notification failed:`, error);
+        await notify.warn(`${contextLabel} saved, but notification delivery failed: ${getErrorMessage(error)}`);
+        return null;
+    }
 }
 
 function isHrOperator() {
@@ -507,6 +522,13 @@ export async function reviewProbation(reviewId) {
         },
     });
 
+    if (String(decision || '').toLowerCase() !== 'pending') {
+        await sendStatusNotification(
+            () => requestProbationNotification(reviewId),
+            'Probation review'
+        );
+    }
+
     renderProbationPipView();
     await notify.success('Probation review updated.');
     } catch (error) {
@@ -805,6 +827,11 @@ export async function generatePipPlans() {
             },
         ]);
 
+        await sendStatusNotification(
+            () => requestPipNotification(plan.id),
+            'PIP plan'
+        );
+
         created++;
     }
 
@@ -875,7 +902,11 @@ export async function updatePipPlanStatus(planId) {
         },
     });
 
+    await sendStatusNotification(
+        () => requestPipNotification(planId),
+        'PIP status'
+    );
+
     renderProbationPipView();
     await notify.success('PIP plan updated.');
 }
-
