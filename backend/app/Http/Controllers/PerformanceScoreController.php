@@ -35,7 +35,7 @@ class PerformanceScoreController extends Controller
             [
                 'total_score' => $validated['total_score'],
                 'detail' => $validated['detail'] ?? [],
-                'calculated_by' => Auth::user()->employee_id,
+                'calculated_by' => $request->user()->employee_id,
                 'calculated_at' => now(),
             ]
         );

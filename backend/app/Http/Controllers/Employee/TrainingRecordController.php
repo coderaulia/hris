@@ -12,9 +12,8 @@ class TrainingRecordController extends Controller
 {
     public function index(Request $request)
     {
-        $query = EmployeeTrainingRecord::query();
-        
-        // Simplified scoping
+        $query = EmployeeScopeService::scopeQuery(EmployeeTrainingRecord::query());
+
         return TrainingRecordResource::collection($query->get());
     }
 

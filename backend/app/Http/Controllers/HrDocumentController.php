@@ -10,7 +10,9 @@ use App\Models\HrDocumentArchive;
 use App\Models\HrDocumentReferenceOption;
 use App\Models\HrDocumentTemplate;
 use App\Models\HrPayrollRecord;
+use App\Services\EmployeeScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class HrDocumentController extends Controller
@@ -105,6 +107,8 @@ class HrDocumentController extends Controller
 
     public function archive(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         $query = HrDocumentArchive::orderByDesc('generated_at');
         if ($request->filled('employee_id')) {
             $query->where('employee_id', $request->employee_id);
@@ -114,27 +118,86 @@ class HrDocumentController extends Controller
 
     public function storeArchive(Request $request)
     {
-        $archive = HrDocumentArchive::create([
-            'id' => $request->input('id', (string) Str::uuid()),
-            'employee_id' => $request->input('employee_id', ''),
-            'document_type' => $request->input('document_type', ''),
-            'filename' => $request->input('filename', ''),
+        $this->abortUnlessHrOperator($request);
+
+        $validated = $request->validate([
+            'id' => ['nullable', 'uuid'],
+            'employee_id' => ['required', 'string', 'max:64'],
+            'document_type' => ['required', 'string', 'max:128'],
+            'filename' => ['required', 'string', 'max:255'],
+            'generated_by' => ['nullable', 'string', 'max:128'],
+            'generated_at' => ['nullable', 'date'],
+            'metadata' => ['nullable', 'array'],
+        ]);
+
+        $archive = HrDocumentArchive::updateOrCreate([
+            'id' => $validated['id'] ?? (string) Str::uuid(),
+        ], [
+            'employee_id' => $validated['employee_id'],
+            'document_type' => $validated['document_type'],
+            'filename' => basename($validated['filename']),
             'storage_path' => null,
-            'generated_by' => $request->input('generated_by'),
-            'generated_at' => $request->input('generated_at', now()),
-            'metadata' => $request->input('metadata', []),
+            'generated_by' => $validated['generated_by'] ?? null,
+            'generated_at' => $validated['generated_at'] ?? now(),
+            'metadata' => $validated['metadata'] ?? [],
         ]);
 
         return new HrDocumentArchiveResource($archive);
     }
 
-    public function destroyArchive($id)
+    public function uploadArchiveFile(Request $request, $id)
     {
+        $this->abortUnlessHrOperator($request);
+
         $archive = HrDocumentArchive::findOrFail($id);
-        if ($archive->storage_path && file_exists(storage_path('app/' . $archive->storage_path))) {
-            unlink(storage_path('app/' . $archive->storage_path));
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimetypes:application/pdf', 'max:10240'],
+        ]);
+
+        $safeFilename = preg_replace('/[^A-Za-z0-9._-]+/', '_', basename($archive->filename));
+        $storagePath = "hr-document-archive/{$archive->id}/{$safeFilename}";
+
+        if ($archive->storage_path) {
+            Storage::disk('local')->delete($archive->storage_path);
+        }
+
+        Storage::disk('local')->put($storagePath, file_get_contents($validated['file']->getRealPath()));
+        $archive->update(['storage_path' => $storagePath]);
+
+        return new HrDocumentArchiveResource($archive);
+    }
+
+    public function downloadArchiveFile(Request $request, $id)
+    {
+        $this->abortUnlessHrOperator($request);
+
+        $archive = HrDocumentArchive::findOrFail($id);
+        if (!$archive->storage_path || !Storage::disk('local')->exists($archive->storage_path)) {
+            abort(404, 'Archive file not found.');
+        }
+
+        return Storage::disk('local')->download($archive->storage_path, $archive->filename, [
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    public function destroyArchive(Request $request, $id)
+    {
+        $this->abortUnlessHrOperator($request);
+
+        $archive = HrDocumentArchive::findOrFail($id);
+        if ($archive->storage_path) {
+            Storage::disk('local')->delete($archive->storage_path);
         }
         $archive->delete();
         return response()->noContent();
+    }
+
+    private function abortUnlessHrOperator(Request $request): void
+    {
+        $user = $request->user();
+        if (($user->role ?? '') !== 'superadmin' && !EmployeeScopeService::isHrUser($user)) {
+            abort(403, 'Insufficient permissions.');
+        }
     }
 }

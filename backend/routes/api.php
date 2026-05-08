@@ -96,6 +96,10 @@ Route::prefix('v1')->group(function () {
         // HR Document Archive
         Route::get('/hr-document-archive', [\App\Http\Controllers\HrDocumentController::class, 'archive']);
         Route::post('/hr-document-archive', [\App\Http\Controllers\HrDocumentController::class, 'storeArchive']);
+        Route::post('/hr-document-archive/{id}/file', [\App\Http\Controllers\HrDocumentController::class, 'uploadArchiveFile']);
+        Route::get('/hr-document-archive/{id}/file', [\App\Http\Controllers\HrDocumentController::class, 'downloadArchiveFile']);
         Route::delete('/hr-document-archive/{id}', [\App\Http\Controllers\HrDocumentController::class, 'destroyArchive']);
+        Route::post('/hr-document-archives/{id}/file', [\App\Http\Controllers\HrDocumentController::class, 'uploadArchiveFile']);
+        Route::get('/hr-document-archives/{id}/file', [\App\Http\Controllers\HrDocumentController::class, 'downloadArchiveFile']);
     });
 });

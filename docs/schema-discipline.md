@@ -10,6 +10,9 @@ This repository uses exactly two schema entrypoints:
 2. `migrations/YYYYMMDD_description.sql`
    Append-only incremental schema changes for every change after the bootstrap snapshot.
 
+Rollback companions may use `migrations/YYYYMMDD_description.rollback.sql`. They are recovery
+scripts, not bootstrap entrypoints, and are excluded from the forward migration chain.
+
 There should be no other schema SQL entrypoints in the repository.
 
 ## Rules
@@ -54,6 +57,7 @@ That creates drift between environments and makes deployments non-deterministic.
    - `migrations/20260409_dashboard_server_views.sql`
    - `migrations/20260417_hr_documents_foundation.sql`
    - `migrations/20260429_hr_payroll_records.sql`
+   - `migrations/20260507_hr_document_archive.sql`
 
 This is the only supported database bootstrap path.
 
@@ -65,6 +69,7 @@ The bootstrap/audit scripts now consume this exact chain directly, so docs and a
 
 - schema SQL only exists in allowed locations
 - migration naming and transaction wrappers
+- rollback migration naming and transaction wrappers
 - RLS policy expectations
 - Data API grants for anon/authenticated roles
 

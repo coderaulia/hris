@@ -1,9 +1,27 @@
 # Commit Logs
 
-Last updated: 2026-04-29  
+Last updated: 2026-05-08  
 Current baseline on `main`: active working branch
 
 This file is a lean session log. Update it at the end of a work session or when the user asks, not after every commit.
+
+## 2026-05-08
+
+Continued the missing-features/code-audit fix order. Rollback SQL now has a supported
+`*.rollback.sql` QA convention, `20260507_hr_document_archive.sql` is in the canonical migration
+chain, Laravel scoped reads were tightened for assessment/training, performance-score save no
+longer depends on a missing `Auth` import, and employee role validation now accepts `hr` and
+`director`.
+
+Laravel HR document archive parity was added for PDF upload/download/delete with private local
+storage, plus adapter support for multipart upload and authenticated blob downloads. Backend
+feature tests were added for the scoped-resource and archive flows, and Playwright adapter coverage
+now exercises Laravel archive upload/download. Bundle chunking was split so `pdf-vendor` dropped
+below the 500 KB warning threshold.
+
+Verification: `npm run build`, `npm run qa:hardening`, and
+`npx playwright test tests/backend-adapter.spec.js` passed. Laravel PHP tests were not run because
+`php` and `composer` were not available on PATH in this shell.
 
 ## 2026-04-29
 

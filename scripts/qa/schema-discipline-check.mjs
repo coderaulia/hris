@@ -30,8 +30,10 @@ for (const filePath of sqlFiles) {
 
     if (rel.startsWith('migrations/')) {
         const name = path.basename(rel);
-        if (!/^\d{8}_[a-z0-9_]+\.sql$/.test(name)) {
-            failures.push(`${rel}: migration filename must match YYYYMMDD_description.sql`);
+        const isForwardMigration = /^\d{8}_[a-z0-9_]+\.sql$/.test(name);
+        const isRollbackMigration = /^\d{8}_[a-z0-9_]+\.rollback\.sql$/.test(name);
+        if (!isForwardMigration && !isRollbackMigration) {
+            failures.push(`${rel}: migration filename must match YYYYMMDD_description.sql or YYYYMMDD_description.rollback.sql`);
         }
         continue;
     }

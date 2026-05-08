@@ -11,6 +11,8 @@ if (!fs.existsSync(migrationDir)) {
 const files = fs.readdirSync(migrationDir)
     .filter(name => name.endsWith('.sql'))
     .sort((a, b) => a.localeCompare(b));
+const forwardFiles = files.filter(name => !name.endsWith('.rollback.sql'));
+const rollbackFiles = files.filter(name => name.endsWith('.rollback.sql'));
 
 const failures = [];
 
@@ -21,7 +23,7 @@ const bannedPatterns = [
     { regex: /disable\s+row\s+level\s+security/i, label: 'Disabling RLS is not allowed' },
 ];
 
-for (const file of files) {
+function readNormalizedSql(file) {
     const fullPath = path.join(migrationDir, file);
     const sql = fs.readFileSync(fullPath, 'utf8');
     const sanitizedSql = sql
@@ -29,10 +31,10 @@ for (const file of files) {
         .replace(/\/\*[\\s\\S]*?\*\//g, '');
     const normalized = sanitizedSql.toLowerCase();
 
-    if (!/^\d{8}_[a-z0-9_]+\.sql$/.test(file)) {
-        failures.push(`${file}: filename must match YYYYMMDD_description.sql`);
-    }
+    return { sanitizedSql, normalized };
+}
 
+function assertTransactionWrapped(file, normalized) {
     if (!/\bbegin\s*;/i.test(normalized)) {
         failures.push(`${file}: missing BEGIN; transaction wrapper`);
     }
@@ -40,6 +42,16 @@ for (const file of files) {
     if (!/\bcommit\s*;/i.test(normalized)) {
         failures.push(`${file}: missing COMMIT; transaction wrapper`);
     }
+}
+
+for (const file of forwardFiles) {
+    const { sanitizedSql, normalized } = readNormalizedSql(file);
+
+    if (!/^\d{8}_[a-z0-9_]+\.sql$/.test(file)) {
+        failures.push(`${file}: filename must match YYYYMMDD_description.sql`);
+    }
+
+    assertTransactionWrapped(file, normalized);
 
     for (const pattern of bannedPatterns) {
         if (pattern.regex.test(sanitizedSql)) {
@@ -48,8 +60,19 @@ for (const file of files) {
     }
 }
 
+for (const file of rollbackFiles) {
+    const { normalized } = readNormalizedSql(file);
+
+    if (!/^\d{8}_[a-z0-9_]+\.rollback\.sql$/.test(file)) {
+        failures.push(`${file}: rollback filename must match YYYYMMDD_description.rollback.sql`);
+    }
+
+    assertTransactionWrapped(file, normalized);
+}
+
 console.log('=== Migration Safety Check ===');
-console.log(`migrations_scanned: ${files.length}`);
+console.log(`forward_migrations_scanned: ${forwardFiles.length}`);
+console.log(`rollback_migrations_scanned: ${rollbackFiles.length}`);
 
 if (failures.length > 0) {
     console.error(`failed_checks: ${failures.length}`);

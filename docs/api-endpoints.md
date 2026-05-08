@@ -1,6 +1,6 @@
 # API Endpoints
 
-Updated: 2026-05-07
+Updated: 2026-05-08
 
 The optional Laravel API is mounted under `/api/v1`. Frontend calls should go through `src/lib/backend.js`; direct route calls belong inside `src/lib/backends/laravel-adapter.js`.
 
@@ -114,9 +114,11 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `POST` | `/hr-payroll-records/import` | Import/upsert payroll rows |
 | `GET` | `/hr-document-archive` | List document archive records |
 | `POST` | `/hr-document-archive` | Create document archive record |
+| `POST` | `/hr-document-archive/{id}/file` | Upload PDF file for archive record |
+| `GET` | `/hr-document-archive/{id}/file` | Download PDF file for archive record |
 | `DELETE` | `/hr-document-archive/{id}` | Delete document archive record |
-| `POST` | `/hr-document-archives/{id}/file` | Upload PDF file for archive record |
-| `POST` | `/hr-document-archives/{id}/signature` | Update signature status for archive record |
+| `POST` | `/hr-document-archives/{id}/file` | Alias for archive PDF upload |
+| `GET` | `/hr-document-archives/{id}/file` | Alias for archive PDF download |
 
 ## Response Shape Rule
 

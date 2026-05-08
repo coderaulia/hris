@@ -23,7 +23,10 @@ export default defineConfig({
                 manualChunks(id) {
                     if (!id.includes('node_modules')) return;
                     if (id.includes('exceljs')) return 'excel-vendor';
-                    if (id.includes('jspdf') || id.includes('html2canvas')) return 'pdf-vendor';
+                    if (id.includes('html2canvas')) return 'pdf-html-vendor';
+                    if (id.includes('canvg') || id.includes('dompurify')) return 'pdf-svg-vendor';
+                    if (id.includes('fflate') || id.includes('fast-png')) return 'pdf-image-vendor';
+                    if (id.includes('jspdf')) return 'pdf-vendor';
                     if (id.includes('chart.js')) return 'charts-vendor';
                     if (id.includes('sweetalert2')) return 'ui-vendor';
                     if (id.includes('@supabase')) return 'supabase-vendor';

@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-04-29
+Last updated: 2026-05-08
 
 ## Current State
 
@@ -13,6 +13,7 @@ Last updated: 2026-04-29
 - Adapter Pattern: The system is now fully abstracted behind `src/lib/backend.js`, allowing it to run against either Supabase or Laravel backends.
 - Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
 - Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
+- PDF generation code is lazy-loaded; PDF vendor dependencies are split into named chunks so no single PDF chunk exceeds the current Vite warning threshold.
 - Process docs now exist for the `claude.md` workflow: tech stack, schema, API endpoints, coding standards, env guide, git workflow, session commit log, and agent handoff.
 
 ## Security Baseline
@@ -20,6 +21,7 @@ Last updated: 2026-04-29
 - `complete-setup.sql` is the fresh-environment bootstrap snapshot
 - Every schema/security change must also ship in `migrations/YYYYMMDD_description.sql`
 - CI now blocks deploys when schema discipline, migration safety, RLS expectations, or Data API grants drift
+- Rollback SQL uses the supported `migrations/YYYYMMDD_description.rollback.sql` convention; QA scripts distinguish rollback companions from forward migrations.
 
 ## Edge Function Status
 
@@ -43,6 +45,7 @@ Last updated: 2026-04-29
 - **Auth**: Laravel Sanctum (compatible with frontend SPA login).
 - **Module Coverage**: All major frontend modules (Auth, Employees, KPIs, Probation, PIP, etc.) are supported via the Adapter Pattern.
 - **Database**: Connects to the same Postgres instance as Supabase.
+- **Recent Fixes**: Assessment/training reads use shared employee scoping, performance-score save uses the authenticated request user, and employee role validation accepts `hr` and `director`.
 
 ## HR Documents Status
 
@@ -60,17 +63,21 @@ Last updated: 2026-04-29
 - Payroll data upload is implemented for both Supabase and Laravel adapter paths:
   - Supabase uses `migrations/20260429_hr_payroll_records.sql`
   - Laravel exposes `/hr-payroll-records` and `/hr-payroll-records/import`
+- Generated document archive is implemented:
+  - Supabase stores PDFs in the private `hr-document-archive` bucket
+  - Laravel stores PDFs on the private local disk and exposes authenticated upload/download endpoints
+  - Archive metadata is stored in `hr_document_archive`
 
 ## Current Gaps
 
-- HR documents are generated client-side only (no persistent document archive table yet)
 - E-signature workflow is not implemented yet
 - Approval notifications still require production provider secrets before live delivery works
-- Large chart and vendor chunks still exist, although heavy KPI/probation exports are offloaded to edge functions
+- Full workflow E2E coverage is still missing for employee CRUD, training, manpower, payroll import, real archive workspace download, and role guardrails
 - Payroll import stores reusable rows per employee/month, but manual QA still needs to verify CSV import against production-like employee IDs and payslip PDF output.
-- `claude.md` expects branch-per-task and rollback-script discipline; the repo documents that expectation, but prior local work has been committed directly on `main` and existing migrations do not include paired rollback scripts.
+- Existing older migrations still do not include paired rollback scripts.
 
 ## Recent Milestones
 
 - 2026-04-29: Manpower recruitment-card deletion now routes through Supabase/Laravel backend adapters.
 - 2026-04-29: Documentation process was aligned around lean session updates in `docs/commit-logs.md`, `agents.md`, and this status file.
+- 2026-05-08: Audit fix order restored hardening QA, added Laravel archive file parity, tightened Laravel scoping, added targeted backend/adapter coverage, and split the PDF vendor chunks.

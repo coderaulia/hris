@@ -5,9 +5,10 @@ function getToken() {
 }
 
 async function fetchApi(endpoint, options = {}) {
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     const headers = {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
+        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
         ...options.headers,
     };
 
@@ -34,6 +35,36 @@ async function fetchApi(endpoint, options = {}) {
     if (response.status === 204) return null;
 
     return response.json();
+}
+
+async function fetchBlob(endpoint, options = {}) {
+    const headers = {
+        'Accept': 'application/pdf',
+        ...options.headers,
+    };
+
+    const token = getToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        ...options,
+        headers,
+    });
+
+    if (!response.ok) {
+        let message = response.statusText;
+        try {
+            const errorData = await response.json();
+            message = errorData.message || message;
+        } catch {
+            // Keep the status text when the file endpoint does not return JSON.
+        }
+        throw new Error(message || 'API request failed');
+    }
+
+    return response.blob();
 }
 
 export const laravelAdapter = {
@@ -689,13 +720,23 @@ export const laravelAdapter = {
                 return { data: null, error };
             }
         },
-        storeArchive: async (archiveRow, _pdfBlob) => {
+        storeArchive: async (archiveRow, pdfBlob) => {
             try {
-                const data = await fetchApi('/hr-document-archive', {
+                const created = await fetchApi('/hr-document-archive', {
                     method: 'POST',
                     body: JSON.stringify(archiveRow),
                 });
-                return { data: data.data, error: null };
+                let archive = created.data;
+                if (pdfBlob && archive?.id) {
+                    const formData = new FormData();
+                    formData.append('file', pdfBlob, archive.filename || archiveRow.filename || 'document.pdf');
+                    const uploaded = await fetchApi(`/hr-document-archive/${archive.id}/file`, {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    archive = uploaded.data;
+                }
+                return { data: archive, error: null };
             } catch (error) {
                 return { data: null, error };
             }
@@ -708,8 +749,19 @@ export const laravelAdapter = {
                 return { error };
             }
         },
-        getSignedUrl: async (_storagePath) => {
-            return { data: null, error: new Error('File download not supported in Laravel backend') };
+        getSignedUrl: async (storagePath) => {
+            try {
+                const parts = String(storagePath || '').split('/');
+                const archiveRootIndex = parts.indexOf('hr-document-archive');
+                const id = archiveRootIndex >= 0
+                    ? parts[archiveRootIndex + 1]
+                    : (parts[parts.length - 1] || '').match(/^[0-9a-f-]{36}/i)?.[0];
+                if (!id) throw new Error('Archive file path is invalid');
+                const blob = await fetchBlob(`/hr-document-archive/${id}/file`);
+                return { data: { signedUrl: URL.createObjectURL(blob) }, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
         },
     }
 };

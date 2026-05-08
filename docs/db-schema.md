@@ -1,6 +1,6 @@
 # Database Schema
 
-Updated: 2026-04-29
+Updated: 2026-05-08
 
 This is the working schema map for application code and QA. The authoritative SQL remains `complete-setup.sql` plus the canonical migration chain in `scripts/support/canonical-migration-chain.mjs`.
 
@@ -70,11 +70,11 @@ Current optional aggregate views not yet created: `manpower_funnel_summary`, `ma
 | `hr_document_templates` | Editable document templates |
 | `hr_document_reference_options` | Contract, SP, payroll, and legal reference options |
 | `hr_payroll_records` | Reusable employee/month payroll rows for payslip import |
-| `hr_document_archives` | Generated-document archive metadata, storage path, and signature workflow state |
+| `hr_document_archive` | Generated-document archive metadata and storage path |
 
 `hr_payroll_records` is created by `migrations/20260429_hr_payroll_records.sql` and is unique by `(employee_id, payroll_period)`.
 
-`hr_document_archives` is created by `migrations/20260508_hr_document_archives.sql`. Key columns: `id`, `employee_id`, `document_type`, `filename`, `storage_path`, `generated_by`, `generated_at`, `metadata` (JSONB), `company_signed_at`, `recipient_signed_at`. PDFs are stored in the private `hr-document-archives` Supabase Storage bucket (created by `migrations/20260508_hr_document_archive_storage.sql`).
+`hr_document_archive` is created by `migrations/20260507_hr_document_archive.sql`. Key columns: `id`, `employee_id`, `document_type`, `filename`, `storage_path`, `generated_by`, `generated_at`, `metadata` (JSONB), and `created_at`. PDFs are stored in the private `hr-document-archive` Supabase Storage bucket in Supabase mode and the Laravel private local disk under `hr-document-archive/{archive_id}/...` in Laravel mode.
 
 ## Schema Safety Rules
 

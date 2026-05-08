@@ -203,4 +203,86 @@ test.describe('Backend Adapter Routing', () => {
         ]);
         expect(result.actionIds.every(Boolean)).toBe(true);
     });
+
+    test('Laravel adapter uploads and downloads HR document archive files', async ({ page }) => {
+        await page.addInitScript(() => {
+            window._VITE_BACKEND_TYPE = 'laravel';
+        });
+        await page.reload();
+
+        const requests = [];
+
+        await page.route('**/api/v1/hr-document-archive', async route => {
+            const payload = route.request().postDataJSON();
+            requests.push({ type: 'create', payload });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: {
+                        ...payload,
+                        id: '11111111-1111-4111-8111-111111111111',
+                        storage_path: null,
+                    },
+                }),
+            });
+        });
+
+        await page.route('**/api/v1/hr-document-archive/11111111-1111-4111-8111-111111111111/file', async route => {
+            if (route.request().method() === 'POST') {
+                requests.push({
+                    type: 'upload',
+                    contentType: route.request().headers()['content-type'] || '',
+                });
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        data: {
+                            id: '11111111-1111-4111-8111-111111111111',
+                            employee_id: 'E001',
+                            document_type: 'offer_letter',
+                            filename: 'offer-letter.pdf',
+                            storage_path: 'hr-document-archive/11111111-1111-4111-8111-111111111111/offer-letter.pdf',
+                        },
+                    }),
+                });
+                return;
+            }
+
+            requests.push({ type: 'download' });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/pdf',
+                body: '%PDF-1.4\n',
+            });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            const saved = await backend.documents.storeArchive({
+                id: '11111111-1111-4111-8111-111111111111',
+                employee_id: 'E001',
+                document_type: 'offer_letter',
+                filename: 'offer-letter.pdf',
+                generated_at: new Date().toISOString(),
+                metadata: {},
+            }, new Blob(['%PDF-1.4\n'], { type: 'application/pdf' }));
+            const urlResult = await backend.documents.getSignedUrl(saved.data.storage_path);
+
+            return {
+                error: saved.error ? saved.error.message : null,
+                storagePath: saved.data.storage_path,
+                urlError: urlResult.error ? urlResult.error.message : null,
+                signedUrlPrefix: String(urlResult.data?.signedUrl || '').slice(0, 5),
+            };
+        });
+
+        expect(result.error).toBeNull();
+        expect(result.urlError).toBeNull();
+        expect(result.storagePath).toContain('hr-document-archive/11111111-1111-4111-8111-111111111111');
+        expect(result.signedUrlPrefix).toBe('blob:');
+        expect(requests.map(item => item.type)).toEqual(['create', 'upload', 'download']);
+        expect(requests.find(item => item.type === 'upload').contentType).toContain('multipart/form-data');
+    });
 });

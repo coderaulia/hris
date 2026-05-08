@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Auth;
 
 class EmployeeController extends Controller
 {
+    private const ROLE_RULE = 'in:superadmin,director,hr,manager,employee';
+
     public function index(Request $request)
     {
         $query = Employee::query();
@@ -46,7 +48,7 @@ class EmployeeController extends Controller
             'department' => 'nullable|string',
             'manager_id' => 'nullable|string|exists:employees,employee_id',
             'auth_email' => 'nullable|email|unique:employees,auth_email',
-            'role' => 'required|in:superadmin,manager,employee',
+            'role' => 'required|' . self::ROLE_RULE,
             'kpi_targets' => 'nullable|array',
             'must_change_password' => 'nullable|boolean',
         ]);
@@ -79,7 +81,7 @@ class EmployeeController extends Controller
             $rules['department'] = 'nullable|string';
             $rules['manager_id'] = 'nullable|string|exists:employees,employee_id';
             $rules['auth_email'] = 'nullable|email|unique:employees,auth_email,' . $employee->employee_id . ',employee_id';
-            $rules['role'] = 'sometimes|required|in:superadmin,manager,employee';
+            $rules['role'] = 'sometimes|required|' . self::ROLE_RULE;
         }
 
         $validated = $request->validate($rules);
