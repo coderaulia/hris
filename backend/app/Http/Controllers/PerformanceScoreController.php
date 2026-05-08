@@ -6,22 +6,12 @@ use App\Http\Resources\PerformanceScoreResource;
 use App\Models\EmployeePerformanceScore;
 use App\Services\EmployeeScopeService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class PerformanceScoreController extends Controller
 {
     public function index(Request $request)
     {
-        $query = EmployeePerformanceScore::query();
-        
-        $user = $request->user();
-        if ($user->role !== 'superadmin') {
-            $query->whereIn('employee_id', function($sub) use ($user) {
-                $sub->select('employee_id')->from('employees')
-                    ->where('manager_id', $user->employee_id)
-                    ->orWhere('employee_id', $user->employee_id);
-            });
-        }
+        $query = EmployeeScopeService::scopeQuery(EmployeePerformanceScore::query());
 
         return PerformanceScoreResource::collection($query->get());
     }

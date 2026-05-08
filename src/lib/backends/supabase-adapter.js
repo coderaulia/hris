@@ -151,6 +151,24 @@ export const supabaseAdapter = {
             return await supabase.from('kpi_records').delete().eq('id', id);
         }
     },
+    dashboard: {
+        fetchSummary: async () => {
+            return await supabase.from('dashboard_summary').select('*').maybeSingle();
+        },
+        fetchProbationExpiry: async (limit = 8) => {
+            return await supabase
+                .from('dashboard_probation_expiry')
+                .select('employee_id,name,department,position,probation_end_date,days_remaining')
+                .limit(limit);
+        },
+        fetchAssessmentCoverage: async () => {
+            return await supabase
+                .from('dashboard_assessment_coverage')
+                .select('department,active_employee_count,covered_employee_count,missing_employee_count,coverage_pct')
+                .order('coverage_pct', { ascending: true })
+                .order('department', { ascending: true });
+        },
+    },
     scores: {
         list: async (columns = '*') => {
             return await supabase.from('employee_performance_scores').select(columns);

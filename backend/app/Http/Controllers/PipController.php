@@ -28,18 +28,42 @@ class PipController extends Controller
 
     public function store(Request $request)
     {
-        $this->abortUnlessCanWritePip($request, $request->input('employee_id'));
+        $validated = $request->validate([
+            'id'               => ['nullable', 'uuid'],
+            'employee_id'      => ['required', 'string', 'exists:employees,employee_id'],
+            'trigger_reason'   => ['nullable', 'string'],
+            'trigger_period'   => ['nullable', 'string', 'max:128'],
+            'start_date'       => ['nullable', 'date_format:Y-m-d'],
+            'target_end_date'  => ['nullable', 'date_format:Y-m-d'],
+            'status'           => ['nullable', 'in:active,completed,extended,escalated,cancelled'],
+            'owner_manager_id' => ['nullable', 'string', 'max:128'],
+            'summary'          => ['nullable', 'string'],
+            'closed_at'        => ['nullable', 'date'],
+        ]);
 
-        $plan = PipPlan::updateOrCreate(['id' => $request->id], $request->all());
+        $this->abortUnlessCanWritePip($request, $validated['employee_id']);
+
+        $plan = PipPlan::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new PipPlanResource($plan);
     }
 
     public function storeAction(Request $request)
     {
-        $plan = PipPlan::findOrFail($request->input('pip_plan_id'));
+        $validated = $request->validate([
+            'id'               => ['nullable', 'uuid'],
+            'pip_plan_id'      => ['required', 'uuid', 'exists:pip_plans,id'],
+            'action_title'     => ['required', 'string', 'max:255'],
+            'action_detail'    => ['nullable', 'string'],
+            'due_date'         => ['nullable', 'date_format:Y-m-d'],
+            'progress_pct'     => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'status'           => ['nullable', 'in:todo,in_progress,done,blocked'],
+            'checkpoint_note'  => ['nullable', 'string'],
+        ]);
+
+        $plan = PipPlan::findOrFail($validated['pip_plan_id']);
         $this->abortUnlessCanWritePip($request, $plan->employee_id);
 
-        $action = PipAction::updateOrCreate(['id' => $request->id], $request->all());
+        $action = PipAction::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new PipActionResource($action);
     }
 

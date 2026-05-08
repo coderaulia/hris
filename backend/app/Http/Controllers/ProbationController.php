@@ -38,30 +38,70 @@ class ProbationController extends Controller
 
     public function storeReview(Request $request)
     {
-        $this->abortUnlessCanWriteProbation($request, $request->input('employee_id'));
+        $validated = $request->validate([
+            'id'                   => ['nullable', 'uuid'],
+            'employee_id'          => ['required', 'string', 'exists:employees,employee_id'],
+            'review_period_start'  => ['nullable', 'date_format:Y-m-d'],
+            'review_period_end'    => ['nullable', 'date_format:Y-m-d'],
+            'quantitative_score'   => ['nullable', 'numeric'],
+            'qualitative_score'    => ['nullable', 'numeric'],
+            'final_score'          => ['nullable', 'numeric'],
+            'decision'             => ['nullable', 'in:pending,pass,extend,fail'],
+            'manager_notes'        => ['nullable', 'string'],
+            'reviewed_by'          => ['nullable', 'string', 'max:128'],
+            'reviewed_at'          => ['nullable', 'date'],
+        ]);
 
-        $review = ProbationReview::updateOrCreate(['id' => $request->id], $request->all());
+        $this->abortUnlessCanWriteProbation($request, $validated['employee_id']);
+
+        $review = ProbationReview::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new ProbationReviewResource($review);
     }
 
     public function storeMonthlyScore(Request $request)
     {
-        $review = ProbationReview::findOrFail($request->input('probation_review_id'));
+        $validated = $request->validate([
+            'probation_review_id'     => ['required', 'uuid', 'exists:probation_reviews,id'],
+            'month_no'                => ['required', 'integer', 'min:1', 'max:3'],
+            'period_start'            => ['nullable', 'date_format:Y-m-d'],
+            'period_end'              => ['nullable', 'date_format:Y-m-d'],
+            'work_performance_score'  => ['nullable', 'numeric'],
+            'managing_task_score'     => ['nullable', 'numeric'],
+            'manager_qualitative_text' => ['nullable', 'string'],
+            'manager_note'            => ['nullable', 'string'],
+            'attendance_deduction'    => ['nullable', 'numeric'],
+            'attitude_score'          => ['nullable', 'numeric'],
+            'monthly_total'           => ['nullable', 'numeric'],
+        ]);
+
+        $review = ProbationReview::findOrFail($validated['probation_review_id']);
         $this->abortUnlessCanWriteProbation($request, $review->employee_id);
 
         $score = ProbationMonthlyScore::updateOrCreate(
-            ['probation_review_id' => $request->probation_review_id, 'month_no' => $request->month_no],
-            $request->all()
+            ['probation_review_id' => $validated['probation_review_id'], 'month_no' => $validated['month_no']],
+            $validated
         );
         return new ProbationMonthlyScoreResource($score);
     }
 
     public function storeAttendance(Request $request)
     {
-        $review = ProbationReview::findOrFail($request->input('probation_review_id'));
+        $validated = $request->validate([
+            'id'                  => ['nullable', 'uuid'],
+            'probation_review_id' => ['required', 'uuid', 'exists:probation_reviews,id'],
+            'month_no'            => ['required', 'integer', 'min:1', 'max:3'],
+            'event_date'          => ['nullable', 'date_format:Y-m-d'],
+            'event_type'          => ['nullable', 'string', 'max:128'],
+            'qty'                 => ['nullable', 'numeric'],
+            'deduction_points'    => ['nullable', 'numeric'],
+            'note'                => ['nullable', 'string'],
+            'entered_by'          => ['nullable', 'string', 'max:128'],
+        ]);
+
+        $review = ProbationReview::findOrFail($validated['probation_review_id']);
         $this->abortUnlessCanWriteProbation($request, $review->employee_id);
 
-        $att = ProbationAttendanceRecord::updateOrCreate(['id' => $request->id], $request->all());
+        $att = ProbationAttendanceRecord::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new ProbationAttendanceRecordResource($att);
     }
 

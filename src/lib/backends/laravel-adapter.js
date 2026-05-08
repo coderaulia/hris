@@ -323,10 +323,8 @@ export const laravelAdapter = {
         },
         listWeightItems: async () => {
             try {
-                const data = await fetchApi('/kpi-weight-profiles');
-                const items = [];
-                data.data.forEach(p => { if(p.items) items.push(...p.items); });
-                return { data: items, error: null };
+                const data = await fetchApi('/kpi-weight-items');
+                return { data: data.data, error: null };
             } catch (error) {
                 return { data: null, error };
             }
@@ -372,6 +370,32 @@ export const laravelAdapter = {
                 return { error };
             }
         }
+    },
+    dashboard: {
+        fetchSummary: async () => {
+            try {
+                const data = await fetchApi('/dashboard/summary');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        fetchProbationExpiry: async (limit = 8) => {
+            try {
+                const data = await fetchApi(`/dashboard/probation-expiry?limit=${limit}`);
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        fetchAssessmentCoverage: async () => {
+            try {
+                const data = await fetchApi('/dashboard/assessment-coverage');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
     },
     scores: {
         list: async () => {

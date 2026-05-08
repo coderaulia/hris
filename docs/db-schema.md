@@ -40,6 +40,16 @@ Every released schema change must have a numbered migration under `migrations/`.
 | `pip_plans` | Performance improvement plans | employee scope |
 | `pip_actions` | PIP actions | plan scope |
 
+## Dashboard Views
+
+| View | Purpose |
+|---|---|
+| `dashboard_summary` | Single-row aggregate of active employees, on-probation count, active PIPs, KPI pending approvals, failed notifications, open hires |
+| `dashboard_probation_expiry` | Ordered list of employees approaching probation end with `days_remaining` |
+| `dashboard_assessment_coverage` | Per-department assessment coverage counts and `coverage_pct` |
+
+Created by `migrations/20260409_dashboard_server_views.sql`. Security-invoker views; RLS on base tables applies.
+
 ## Manpower Tables And Views
 
 | Relation | Purpose |
@@ -60,8 +70,11 @@ Current optional aggregate views not yet created: `manpower_funnel_summary`, `ma
 | `hr_document_templates` | Editable document templates |
 | `hr_document_reference_options` | Contract, SP, payroll, and legal reference options |
 | `hr_payroll_records` | Reusable employee/month payroll rows for payslip import |
+| `hr_document_archives` | Generated-document archive metadata, storage path, and signature workflow state |
 
 `hr_payroll_records` is created by `migrations/20260429_hr_payroll_records.sql` and is unique by `(employee_id, payroll_period)`.
+
+`hr_document_archives` is created by `migrations/20260508_hr_document_archives.sql`. Key columns: `id`, `employee_id`, `document_type`, `filename`, `storage_path`, `generated_by`, `generated_at`, `metadata` (JSONB), `company_signed_at`, `recipient_signed_at`. PDFs are stored in the private `hr-document-archives` Supabase Storage bucket (created by `migrations/20260508_hr_document_archive_storage.sql`).
 
 ## Schema Safety Rules
 

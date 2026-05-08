@@ -38,6 +38,14 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `GET/POST` | `/training-records` | List/create training records |
 | `GET/PUT/PATCH/DELETE` | `/training-records/{id}` | Manage one training record |
 
+## Dashboard
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/dashboard/summary` | Fetch dashboard summary view (counts) |
+| `GET` | `/dashboard/probation-expiry` | Fetch expiring probation list (`?limit=N`) |
+| `GET` | `/dashboard/assessment-coverage` | Fetch assessment coverage by department |
+
 ## Assessments And KPI
 
 | Method | Path | Purpose |
@@ -61,6 +69,7 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `GET` | `/kpi-weight-profiles` | List KPI weight profiles |
 | `POST` | `/kpi-weight-profiles` | Create or update KPI weight profile |
 | `POST` | `/kpi-weight-profiles/{profileId}/items` | Upsert KPI weight profile items |
+| `GET` | `/kpi-weight-items` | List all KPI weight items (flat) |
 | `GET` | `/performance-scores` | List performance scores |
 | `POST` | `/performance-scores` | Save performance score |
 | `GET` | `/competency-config` | List competency config |
@@ -103,6 +112,11 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `GET` | `/hr-document-options` | List HR document reference options |
 | `GET` | `/hr-payroll-records` | List reusable payroll rows |
 | `POST` | `/hr-payroll-records/import` | Import/upsert payroll rows |
+| `GET` | `/hr-document-archive` | List document archive records |
+| `POST` | `/hr-document-archive` | Create document archive record |
+| `DELETE` | `/hr-document-archive/{id}` | Delete document archive record |
+| `POST` | `/hr-document-archives/{id}/file` | Upload PDF file for archive record |
+| `POST` | `/hr-document-archives/{id}/signature` | Update signature status for archive record |
 
 ## Response Shape Rule
 

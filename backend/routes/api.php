@@ -30,6 +30,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/assessment-scores', [\App\Http\Controllers\Assessment\AssessmentController::class, 'scores']);
         Route::get('/assessment-history', [\App\Http\Controllers\Assessment\AssessmentController::class, 'history']);
 
+        // Dashboard
+        Route::get('/dashboard/summary', [\App\Http\Controllers\DashboardController::class, 'summary']);
+        Route::get('/dashboard/probation-expiry', [\App\Http\Controllers\DashboardController::class, 'probationExpiry']);
+        Route::get('/dashboard/assessment-coverage', [\App\Http\Controllers\DashboardController::class, 'assessmentCoverage']);
+
         // KPIs
         Route::get('/kpis', [\App\Http\Controllers\KpiController::class, 'index']);
         Route::post('/kpis', [\App\Http\Controllers\KpiController::class, 'storeDefinition']);
@@ -46,6 +51,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/kpi-weight-profiles', [\App\Http\Controllers\KpiController::class, 'weightProfiles']);
         Route::post('/kpi-weight-profiles', [\App\Http\Controllers\KpiController::class, 'storeWeightProfile']);
         Route::post('/kpi-weight-profiles/{profileId}/items', [\App\Http\Controllers\KpiController::class, 'storeWeightItems']);
+        Route::get('/kpi-weight-items', [\App\Http\Controllers\KpiController::class, 'weightItems']);
 
         // Performance Scores
         Route::get('/performance-scores', [\App\Http\Controllers\PerformanceScoreController::class, 'index']);

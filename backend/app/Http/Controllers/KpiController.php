@@ -244,6 +244,11 @@ class KpiController extends Controller
         return KpiWeightProfileResource::collection(KpiWeightProfile::with('items')->get());
     }
 
+    public function weightItems()
+    {
+        return KpiWeightItemResource::collection(KpiWeightItem::all());
+    }
+
     public function storeWeightProfile(Request $request)
     {
         $this->abortUnlessKpiApprover($request);

@@ -77,7 +77,23 @@ class HrDocumentController extends Controller
 
     public function storeTemplate(Request $request)
     {
-        $template = HrDocumentTemplate::updateOrCreate(['id' => $request->id], $request->all());
+        $validated = $request->validate([
+            'id'                   => ['nullable', 'uuid'],
+            'document_type'        => ['required', 'string', 'max:128'],
+            'locale'               => ['nullable', 'string', 'max:16'],
+            'contract_type'        => ['nullable', 'string', 'max:128'],
+            'template_name'        => ['required', 'string', 'max:255'],
+            'template_status'      => ['nullable', 'in:active,inactive,draft'],
+            'version_no'           => ['nullable', 'integer', 'min:1'],
+            'header_json'          => ['nullable', 'array'],
+            'body_json'            => ['nullable', 'array'],
+            'body_markup'          => ['nullable', 'string'],
+            'signature_config_json' => ['nullable', 'array'],
+            'field_schema_json'    => ['nullable', 'array'],
+            'is_default'           => ['nullable', 'boolean'],
+        ]);
+
+        $template = HrDocumentTemplate::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new HrDocumentTemplateResource($template);
     }
 

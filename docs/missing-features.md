@@ -45,13 +45,54 @@ or the payslip template in `pdfTemplates.js`.
 
 ## Migration Rollback Scripts
 
-**Current state:** `claude.md` requires paired rollback scripts. Ten Supabase migration files in
-`migrations/` (oldest `20260307`) and Laravel migrations in `backend/database/migrations/` have
-no companion rollback SQL. Laravel `down()` methods only cover `dropIfExists` on self-created tables.
+**Current state:** `claude.md` requires paired rollback scripts. Thirteen Supabase migration files in
+`migrations/` (oldest `20260307`, newest `20260508_hr_document_archive_storage`) and Laravel
+migrations in `backend/database/migrations/` have no companion rollback SQL. Laravel `down()`
+methods only cover `dropIfExists` on self-created tables.
 
 **Needed:** Companion `YYYYMMDD_description.rollback.sql` for each Supabase migration reversing
 added columns, dropped columns, and RLS policy changes. Complete Laravel `down()` methods.
-Rollback procedure documented in `docs/`.
+Rollback procedure documented in `docs/`. All future migrations must ship with a paired rollback
+before merge.
+
+## E2E Playwright Coverage Gaps
+
+**Current state:** Eight specs cover auth, assessment, KPI approval, probation/PIP, HR documents,
+backend adapter routing, stress workload, and live schema smoke. Large functional areas have no
+E2E coverage.
+
+**Missing flows:**
+- Employee CRUD (create, update, delete single and bulk)
+- Training records management
+- Manpower plan/request approval and pipeline card management
+- Settings and competency configuration changes
+- Payroll CSV import and reconciliation
+- HR document archive listing, file download, and signature actions
+- Role-based access guardrails (what each role can and cannot see/do)
+
+**Touch:** new or extended specs under `tests/`, seed data adjustments in
+`tests/support/` if needed.
+
+## Backend Feature Test Coverage Gaps
+
+**Current state:** `ScopedAccessTest.php` covers employee/manager/HR scope, assessment
+scoping, and probation write authorization. `HrDocumentArchiveTest.php` covers archive creation
+and signature sequencing. `ExampleTest.php` is a placeholder only.
+
+**Missing coverage:**
+- Manpower plan/request/pipeline CRUD and scope enforcement
+- Training record CRUD and authorization
+- KPI definition/version/target version approval state machine (full cycle: create → pending →
+  approved/rejected → re-submit paths)
+- KPI weight profile and weight item save paths
+- Performance score list scoping for HR and superadmin roles
+- PIP action status transitions
+- Validation failure responses (422) across ManpowerController, ProbationController, PipController, HrDocumentController (validate blocks added 2026-05-08, no tests yet)
+- Delete operations and orphaned-record edge cases
+- Settings bulk update atomicity
+
+**Touch:** new `Feature/` test classes under `backend/tests/Feature/`, extending
+`BuildsHrisTestSchema` for consistent test DB setup.
 
 ## Bundle Size: pdf-vendor
 

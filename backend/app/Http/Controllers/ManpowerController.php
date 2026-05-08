@@ -39,9 +39,22 @@ class ManpowerController extends Controller
     {
         $this->abortUnlessHrOperator($request);
 
+        $validated = $request->validate([
+            'period'             => ['required', 'string', 'regex:/^\d{4}-(0[1-9]|1[0-2])$/'],
+            'department'         => ['required', 'string', 'max:255'],
+            'position'           => ['required', 'string', 'max:255'],
+            'seniority'          => ['required', 'string', 'max:128'],
+            'planned_headcount'  => ['nullable', 'integer', 'min:0'],
+            'approved_headcount' => ['nullable', 'integer', 'min:0'],
+            'status'             => ['nullable', 'in:draft,submitted,approved,active,closed'],
+            'notes'              => ['nullable', 'string'],
+            'created_by'         => ['nullable', 'string', 'max:128'],
+            'updated_by'         => ['nullable', 'string', 'max:128'],
+        ]);
+
         $plan = ManpowerPlan::updateOrCreate(
-            ['period' => $request->period, 'department' => $request->department, 'position' => $request->position, 'seniority' => $request->seniority],
-            $request->all()
+            ['period' => $validated['period'], 'department' => $validated['department'], 'position' => $validated['position'], 'seniority' => $validated['seniority']],
+            $validated
         );
         return new ManpowerPlanResource($plan);
     }
@@ -50,7 +63,24 @@ class ManpowerController extends Controller
     {
         $this->abortUnlessCanSubmitRequest($request);
 
-        $req = HeadcountRequest::updateOrCreate(['id' => $request->id], $request->all());
+        $validated = $request->validate([
+            'id'              => ['nullable', 'uuid'],
+            'plan_id'         => ['nullable', 'uuid', 'exists:manpower_plans,id'],
+            'request_code'    => ['nullable', 'string', 'max:128'],
+            'department'      => ['required', 'string', 'max:255'],
+            'position'        => ['required', 'string', 'max:255'],
+            'seniority'       => ['nullable', 'string', 'max:128'],
+            'requested_count' => ['nullable', 'integer', 'min:1'],
+            'business_reason' => ['nullable', 'string'],
+            'priority'        => ['nullable', 'in:low,normal,high,urgent'],
+            'requested_by'    => ['nullable', 'string', 'max:128'],
+            'approved_by'     => ['nullable', 'string', 'max:128'],
+            'approval_status' => ['nullable', 'in:pending,approved,rejected,cancelled'],
+            'approval_note'   => ['nullable', 'string'],
+            'target_hire_date' => ['nullable', 'date_format:Y-m-d'],
+        ]);
+
+        $req = HeadcountRequest::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new HeadcountRequestResource($req);
     }
 
@@ -58,7 +88,19 @@ class ManpowerController extends Controller
     {
         $this->abortUnlessHrOperator($request);
 
-        $pipe = RecruitmentPipeline::updateOrCreate(['id' => $request->id], $request->all());
+        $validated = $request->validate([
+            'id'                  => ['nullable', 'uuid'],
+            'request_id'          => ['required', 'uuid', 'exists:headcount_requests,id'],
+            'candidate_name'      => ['nullable', 'string', 'max:255'],
+            'stage'               => ['nullable', 'in:requested,sourcing,screening,interview,offer,hired,closed'],
+            'source'              => ['nullable', 'string', 'max:255'],
+            'owner_id'            => ['nullable', 'string', 'max:128'],
+            'offer_status'        => ['nullable', 'string', 'max:128'],
+            'expected_start_date' => ['nullable', 'date_format:Y-m-d'],
+            'notes'               => ['nullable', 'string'],
+        ]);
+
+        $pipe = RecruitmentPipeline::updateOrCreate(['id' => $validated['id'] ?? null], $validated);
         return new RecruitmentPipelineResource($pipe);
     }
 
