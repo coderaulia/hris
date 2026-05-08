@@ -1,6 +1,6 @@
 # Code Audit
 
-Updated: 2026-05-08
+Updated: 2026-05-09
 
 This document captures current code flaws and missing features found during the local audit. Keep
 this page focused on actionable implementation gaps; keep broad delivery status in
@@ -10,7 +10,8 @@ this page focused on actionable implementation gaps; keep broad delivery status 
 
 - `npm run build`: passed on 2026-05-08. Latest bundle split reduced `pdf-vendor` from 619.14 KB
   to 370.54 KB and split PDF-adjacent optional packages into named chunks.
-- `npm run qa:hardening`: passed on 2026-05-08.
+- `npm run qa:hardening`: passed on 2026-05-08 and again on 2026-05-09 after adding rollback
+  companions for every active Supabase migration.
 - `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including Laravel HR
   document archive upload/download adapter coverage.
 - Laravel feature tests were added, but `php` and `composer` were not available on PATH in the
@@ -31,7 +32,7 @@ Fixed locally on 2026-05-08:
   and the setup/schema docs.
 - `npm run qa:hardening` passes again.
 
-Remaining note: older forward migrations still do not have rollback companions.
+Follow-up resolved on 2026-05-09 by the full rollback companion pass below.
 
 ### Laravel scoped-read regressions
 
@@ -81,6 +82,19 @@ Fixed locally on 2026-05-08:
   `pdf-html-vendor`, `pdf-svg-vendor`, and `pdf-image-vendor`.
 - Latest build sizes: `pdf-vendor` 370.54 KB, `pdf-html-vendor` 201.04 KB,
   `pdf-svg-vendor` 181.71 KB, `pdf-image-vendor` 46.50 KB.
+
+### Migration rollback companions
+
+Fixed locally on 2026-05-09:
+
+- Added `*.rollback.sql` companions for every older active Supabase migration in the canonical
+  chain.
+- Rollbacks now cover assessment/training/performance foundations, probation workflow, director/HR
+  role scoping, KPI governance, security hardening, Data API grants, legacy employee-column
+  restoration, manpower planning, dashboard views, HR document templates, and payroll records.
+- The rollback set is intended for reverse-chain recovery, newest migration first, because later
+  migrations may depend on objects created by earlier migrations.
+- `npm run qa:hardening` passes with 12 forward migrations and 12 rollback migrations scanned.
 
 ## Medium Priority Findings
 
@@ -132,10 +146,9 @@ PDF verification, and idempotency checks across both backend modes are still pen
 
 ## Suggested Next Fix Order
 
-1. Add rollback companions for older active Supabase migrations.
-2. Expand backend feature tests for manpower, KPI approval state machines, PIP transitions,
+1. Expand backend feature tests for manpower, KPI approval state machines, PIP transitions,
    validation failures, delete edge cases, and settings bulk update atomicity.
-3. Add Playwright specs for employee CRUD, training records, manpower, payroll import, real archive
+2. Add Playwright specs for employee CRUD, training records, manpower, payroll import, real archive
    workspace download, and role guardrails.
-4. Implement the external e-signature workflow for archived documents.
-5. Run production-like payroll import QA and live notification-provider QA.
+3. Implement the external e-signature workflow for archived documents.
+4. Run production-like payroll import QA and live notification-provider QA.

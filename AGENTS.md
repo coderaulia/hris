@@ -17,3 +17,11 @@ Scope: Migration QA/docs, Laravel API controllers/routes/migrations/tests, backe
 Outcome: Hardening passes again; assessment/training reads use shared scope; performance-score save and role validation are fixed; Laravel archive PDFs can upload/download/delete; `pdf-vendor` is below the 500 KB warning threshold.
 Verification: `npm run build`, `npm run qa:hardening`, and `npx playwright test tests/backend-adapter.spec.js` passed. Laravel PHP tests were added but not run because `php`/`composer` were unavailable on PATH.
 Open notes: Remaining gaps are older migration rollback companions, broader backend/Playwright workflow coverage, external e-signature, live notification-provider QA, and production-like payroll import QA.
+
+## 2026-05-09 Codex
+
+Summary: Added rollback companions for every active Supabase migration and refreshed the audit gap list.
+Scope: Supabase migration rollback scripts, schema discipline docs, missing-features/code-audit/status docs.
+Outcome: The active chain now has 12 forward migrations and 12 rollback companions; rollback coverage is no longer the next open audit item.
+Verification: `npm run qa:hardening` passed. `rtk` is still unavailable on PATH, so commands were run directly.
+Open notes: Rollback scripts should be dry-run newest-first against a disposable database before production recovery use. Next audit gaps are backend feature-test breadth, Playwright workflow coverage, e-signature, notification live QA, and production-like payroll import QA.

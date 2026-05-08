@@ -52,14 +52,15 @@ or the payslip template in `pdfTemplates.js`.
 ## Migration Rollback Coverage
 
 **Current state:** Rollback files now have a supported QA convention:
-`migrations/YYYYMMDD_description.rollback.sql`. One rollback exists for
-`20260507_hr_document_archive.sql`. Older active Supabase migrations still have no rollback
-companions.
+`migrations/YYYYMMDD_description.rollback.sql`. Every active Supabase migration in the canonical
+chain now has a rollback companion, and `npm run qa:hardening` scans 12 forward migrations plus 12
+rollback migrations successfully.
 
 **Needed:**
-- Add companion rollback scripts for older active forward migrations.
 - Keep future migrations paired with rollback scripts before merge.
-- Consider rollback-specific docs for operational restore order and environment ownership.
+- Staging dry-run of reverse-chain rollback order against a disposable database before relying on
+  the scripts for production recovery.
+- Environment ownership notes for who can approve destructive recovery operations.
 
 ## E2E Playwright Coverage Gaps
 

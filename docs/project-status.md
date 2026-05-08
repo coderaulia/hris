@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-05-08
+Last updated: 2026-05-09
 
 ## Current State
 
@@ -74,7 +74,8 @@ Last updated: 2026-05-08
 - Approval notifications still require production provider secrets before live delivery works
 - Full workflow E2E coverage is still missing for employee CRUD, training, manpower, payroll import, real archive workspace download, and role guardrails
 - Payroll import stores reusable rows per employee/month, but manual QA still needs to verify CSV import against production-like employee IDs and payslip PDF output.
-- Existing older migrations still do not include paired rollback scripts.
+- Rollback companions now exist for every active Supabase migration, but staging dry-run ownership
+  still needs to be formalized before production recovery use.
 
 ## Recent Milestones
 

@@ -13,6 +13,11 @@ This repository uses exactly two schema entrypoints:
 Rollback companions may use `migrations/YYYYMMDD_description.rollback.sql`. They are recovery
 scripts, not bootstrap entrypoints, and are excluded from the forward migration chain.
 
+Rollback scripts should be applied newest-first as a reverse chain. They may drop tables, revoke
+grants, and remove seeded settings that later migrations depend on, so do not run an older rollback
+while newer migrations remain active unless a recovery plan explicitly accounts for those
+dependencies.
+
 There should be no other schema SQL entrypoints in the repository.
 
 ## Rules

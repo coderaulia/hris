@@ -1,9 +1,24 @@
 # Commit Logs
 
-Last updated: 2026-05-08  
+Last updated: 2026-05-09  
 Current baseline on `main`: active working branch
 
 This file is a lean session log. Update it at the end of a work session or when the user asks, not after every commit.
+
+## 2026-05-09
+
+Continued `docs/missing-features.md` and `docs/code-audit.md` by completing the next audit fix:
+rollback companions for every active Supabase migration. The migration folder now has paired
+`*.rollback.sql` files for the full canonical chain, including assessment/training, probation,
+role scoping, KPI governance, security hardening, grants, legacy assessment columns, manpower,
+dashboard views, HR document templates, payroll records, and the existing HR document archive.
+
+Audit and status docs now mark rollback companion coverage as resolved and clarify that rollback
+scripts are reverse-chain recovery tools that should be dry-run newest-first before production
+use.
+
+Verification: `npm run qa:hardening` passed with 12 forward migrations and 12 rollback migrations
+scanned. `rtk` remains unavailable on PATH in this shell.
 
 ## 2026-05-08
 
