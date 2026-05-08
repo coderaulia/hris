@@ -10,6 +10,10 @@ import {
 	fetchHrPayrollRecords,
 	saveHrDocumentTemplate,
 	saveHrPayrollRecords,
+	fetchHrDocumentArchive,
+	saveHrDocumentArchive,
+	deleteHrDocumentArchive,
+	getHrDocumentArchiveUrl,
 } from "./data/hr-documents.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -1261,12 +1265,14 @@ async function ensureHrDocumentCollectionsLoaded() {
 		fetchHrDocumentTemplates(),
 		fetchHrDocumentReferenceOptions(),
 		fetchHrPayrollRecords(),
+		fetchHrDocumentArchive(),
 	]).finally(() => {
 		templateCollectionsLoaded = true;
 		templateCollectionsPromise = null;
 		ensureTemplateDefaults();
 		if (canAccessDocuments()) {
 			rerenderDocumentWorkspace();
+			renderDocumentArchive(state.hrDocumentArchive);
 		}
 	});
 
@@ -2690,6 +2696,28 @@ function bindSetupHandlers() {
 
 				doc.save(filename);
 
+				try {
+					const pdfBlob = doc.output("blob");
+					await saveHrDocumentArchive(
+						{
+							employee_id: context.subject.id,
+							document_type: documentsDraft.documentType,
+							filename,
+							generated_by: state.currentUser?.id || "",
+							generated_at: new Date().toISOString(),
+							metadata: {
+								employee_name: context.subject.name || "",
+								template_id: documentsDraft.templateId || "",
+								signer_id: documentsDraft.signerId || "",
+							},
+						},
+						pdfBlob,
+					);
+					renderDocumentArchive(state.hrDocumentArchive);
+				} catch (archiveError) {
+					console.warn("Archive save failed:", archiveError);
+				}
+
 				if (documentsDraft.documentType === "warning_letter" && state.db?.[context.subject.id]) {
 					const spUntil = parseValidityToDate(
 						context.values.letter_date || TODAY_ISO,
@@ -2785,6 +2813,141 @@ function bindSetupHandlers() {
 	}
 }
 
+function makeArchiveRow(record) {
+	const config = getDocumentConfig(record.document_type);
+	const typeLabel = config?.label || record.document_type || "-";
+	const employeeName = record.metadata?.employee_name || record.employee_id || "-";
+	const date = record.generated_at
+		? new Date(record.generated_at).toLocaleString("id-ID", {
+				year: "numeric",
+				month: "short",
+				day: "numeric",
+				hour: "2-digit",
+				minute: "2-digit",
+		  })
+		: "-";
+
+	const tr = document.createElement("tr");
+
+	const tdFilename = document.createElement("td");
+	tdFilename.className = "small";
+	tdFilename.textContent = record.filename || "-";
+
+	const tdEmployee = document.createElement("td");
+	tdEmployee.className = "small";
+	tdEmployee.textContent = employeeName;
+
+	const tdType = document.createElement("td");
+	const badge = document.createElement("span");
+	badge.className = "badge bg-secondary-subtle text-secondary-emphasis";
+	badge.textContent = typeLabel;
+	tdType.appendChild(badge);
+
+	const tdDate = document.createElement("td");
+	tdDate.className = "small text-muted text-nowrap";
+	tdDate.textContent = date;
+
+	const tdActions = document.createElement("td");
+	tdActions.className = "text-end";
+	const btnGroup = document.createElement("div");
+	btnGroup.className = "btn-group btn-group-sm";
+
+	if (record.storage_path) {
+		const dlBtn = document.createElement("button");
+		dlBtn.className = "btn btn-outline-primary doc-archive-download-btn";
+		dlBtn.dataset.id = record.id;
+		dlBtn.dataset.path = record.storage_path;
+		dlBtn.title = "Download";
+		const dlIcon = document.createElement("i");
+		dlIcon.className = "bi bi-download";
+		dlBtn.appendChild(dlIcon);
+		btnGroup.appendChild(dlBtn);
+	}
+
+	const delBtn = document.createElement("button");
+	delBtn.className = "btn btn-outline-danger doc-archive-delete-btn";
+	delBtn.dataset.id = record.id;
+	delBtn.title = "Delete";
+	const delIcon = document.createElement("i");
+	delIcon.className = "bi bi-trash";
+	delBtn.appendChild(delIcon);
+	btnGroup.appendChild(delBtn);
+
+	tdActions.appendChild(btnGroup);
+	tr.append(tdFilename, tdEmployee, tdType, tdDate, tdActions);
+	return tr;
+}
+
+function renderDocumentArchive(records) {
+	const empty = document.getElementById("doc-archive-empty");
+	const table = document.getElementById("doc-archive-table");
+	const tbody = document.getElementById("doc-archive-tbody");
+	if (!empty || !table || !tbody) return;
+
+	const list = Array.isArray(records) ? records : [];
+	if (list.length === 0) {
+		empty.classList.remove("d-none");
+		table.classList.add("d-none");
+		return;
+	}
+
+	empty.classList.add("d-none");
+	table.classList.remove("d-none");
+	tbody.replaceChildren(...list.map(makeArchiveRow));
+}
+
+let archiveHandlersBound = false;
+
+function bindArchiveHandlers() {
+	if (archiveHandlersBound) return;
+	archiveHandlersBound = true;
+
+	const refreshBtn = document.getElementById("doc-archive-refresh-btn");
+	if (refreshBtn) {
+		refreshBtn.onclick = async () => {
+			refreshBtn.disabled = true;
+			await fetchHrDocumentArchive();
+			renderDocumentArchive(state.hrDocumentArchive);
+			refreshBtn.disabled = false;
+		};
+	}
+
+	const tbody = document.getElementById("doc-archive-tbody");
+	if (tbody) {
+		tbody.addEventListener("click", async (event) => {
+			const downloadBtn = event.target.closest(".doc-archive-download-btn");
+			if (downloadBtn) {
+				const storagePath = downloadBtn.dataset.path;
+				if (!storagePath) return;
+				try {
+					downloadBtn.disabled = true;
+					const url = await getHrDocumentArchiveUrl({ storage_path: storagePath });
+					if (url) window.open(url, "_blank");
+				} catch (err) {
+					await notify.error(`Download failed: ${err?.message || String(err)}`);
+				} finally {
+					downloadBtn.disabled = false;
+				}
+				return;
+			}
+
+			const deleteBtn = event.target.closest(".doc-archive-delete-btn");
+			if (deleteBtn) {
+				const id = deleteBtn.dataset.id;
+				if (!id) return;
+				try {
+					deleteBtn.disabled = true;
+					await deleteHrDocumentArchive(id);
+					renderDocumentArchive(state.hrDocumentArchive);
+				} catch (err) {
+					await notify.error(`Delete failed: ${err?.message || String(err)}`);
+					deleteBtn.disabled = false;
+				}
+			}
+		});
+	}
+}
+
 export function resetDocumentsWorkspace() {
 	documentsDraft.subjectMode = "employee";
 	documentsDraft.surfaceMode = "preview";
@@ -2845,5 +3008,7 @@ export function renderDocumentsWorkspace() {
 	renderDocumentTypeOptions();
 	rerenderDocumentWorkspace();
 	bindSetupHandlers();
+	bindArchiveHandlers();
+	renderDocumentArchive(state.hrDocumentArchive);
 	setControlsDisabled(false);
 }

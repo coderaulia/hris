@@ -7,6 +7,7 @@ export const state = {
     hrDocumentTemplates: [],
     hrDocumentReferenceOptions: [],
     hrPayrollRecords: [],
+    hrDocumentArchive: [],
     appConfig: {},    // Competency config { positionName: { competencies: [...] } }
     kpiConfig: [],    // KPI definitions
     kpiDefinitionVersions: [],

@@ -656,6 +656,36 @@ export const laravelAdapter = {
             } catch (error) {
                 return { error };
             }
-        }
+        },
+        listArchive: async () => {
+            try {
+                const data = await fetchApi('/hr-document-archive');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        storeArchive: async (archiveRow, _pdfBlob) => {
+            try {
+                const data = await fetchApi('/hr-document-archive', {
+                    method: 'POST',
+                    body: JSON.stringify(archiveRow),
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        deleteArchive: async (id) => {
+            try {
+                await fetchApi(`/hr-document-archive/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
+            }
+        },
+        getSignedUrl: async (_storagePath) => {
+            return { data: null, error: new Error('File download not supported in Laravel backend') };
+        },
     }
 };

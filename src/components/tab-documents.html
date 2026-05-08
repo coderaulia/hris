@@ -138,4 +138,37 @@
             </div>
         </div>
     </div>
+
+    <div class="row g-4 mt-0">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center gap-3">
+                    <div>
+                        <h6 class="fw-bold m-0"><i class="bi bi-archive me-1"></i>Document Archive</h6>
+                        <div class="small text-muted mt-1">All generated documents. Download or delete entries.</div>
+                    </div>
+                    <button id="doc-archive-refresh-btn" class="btn btn-sm btn-outline-secondary" type="button">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div id="doc-archive-empty" class="text-center text-muted py-4 small">No archived documents yet.</div>
+                    <div class="table-responsive">
+                        <table id="doc-archive-table" class="table table-sm mb-0 d-none">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Filename</th>
+                                    <th>Employee</th>
+                                    <th>Type</th>
+                                    <th>Generated</th>
+                                    <th class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="doc-archive-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

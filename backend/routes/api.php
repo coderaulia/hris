@@ -87,5 +87,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/hr-document-options', [\App\Http\Controllers\HrDocumentController::class, 'options']);
         Route::get('/hr-payroll-records', [\App\Http\Controllers\HrDocumentController::class, 'payrollRecords']);
         Route::post('/hr-payroll-records/import', [\App\Http\Controllers\HrDocumentController::class, 'importPayrollRecords']);
+        // HR Document Archive
+        Route::get('/hr-document-archive', [\App\Http\Controllers\HrDocumentController::class, 'archive']);
+        Route::post('/hr-document-archive', [\App\Http\Controllers\HrDocumentController::class, 'storeArchive']);
+        Route::delete('/hr-document-archive/{id}', [\App\Http\Controllers\HrDocumentController::class, 'destroyArchive']);
     });
 });

@@ -252,6 +252,35 @@ export const supabaseAdapter = {
         },
         deleteTemplate: async (id) => {
             return await supabase.from('hr_document_templates').delete().eq('id', id);
-        }
+        },
+        listArchive: async () => {
+            return await supabase
+                .from('hr_document_archive')
+                .select('*')
+                .order('generated_at', { ascending: false });
+        },
+        storeArchive: async (archiveRow, pdfBlob) => {
+            const storagePath = `${archiveRow.employee_id}/${archiveRow.id}-${archiveRow.filename}`;
+            const { error: uploadError } = await supabase.storage
+                .from('hr-document-archive')
+                .upload(storagePath, pdfBlob, { contentType: 'application/pdf', upsert: false });
+            if (uploadError) throw uploadError;
+            return await supabase
+                .from('hr_document_archive')
+                .insert({ ...archiveRow, storage_path: storagePath })
+                .select()
+                .single();
+        },
+        deleteArchive: async (id, storagePath) => {
+            if (storagePath) {
+                await supabase.storage.from('hr-document-archive').remove([storagePath]);
+            }
+            return await supabase.from('hr_document_archive').delete().eq('id', id);
+        },
+        getSignedUrl: async (storagePath) => {
+            return await supabase.storage
+                .from('hr-document-archive')
+                .createSignedUrl(storagePath, 3600);
+        },
     }
 };

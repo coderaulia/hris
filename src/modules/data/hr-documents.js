@@ -204,6 +204,57 @@ async function deleteHrDocumentTemplate(templateId) {
     }
 }
 
+async function fetchHrDocumentArchive() {
+    try {
+        const { data, error } = await backend.documents.listArchive();
+        if (error) throw error;
+        state.hrDocumentArchive = data || [];
+        emit('data:hrDocumentArchive', state.hrDocumentArchive);
+        return state.hrDocumentArchive;
+    } catch (error) {
+        debugError('Fetch HR document archive error:', error);
+        state.hrDocumentArchive = [];
+        emit('data:hrDocumentArchive', state.hrDocumentArchive);
+        return [];
+    }
+}
+
+async function saveHrDocumentArchive(archiveData, pdfBlob) {
+    const row = {
+        id: generateUuid(),
+        employee_id: String(archiveData.employee_id || '').trim(),
+        document_type: String(archiveData.document_type || '').trim(),
+        filename: String(archiveData.filename || '').trim(),
+        generated_by: String(archiveData.generated_by || '').trim() || null,
+        generated_at: archiveData.generated_at || new Date().toISOString(),
+        metadata: archiveData.metadata || {},
+    };
+
+    const { data, error } = await backend.documents.storeArchive(row, pdfBlob);
+    if (error) throw error;
+
+    const saved = data || row;
+    state.hrDocumentArchive = [saved, ...(Array.isArray(state.hrDocumentArchive) ? state.hrDocumentArchive : [])];
+    emit('data:hrDocumentArchive', state.hrDocumentArchive);
+    return saved;
+}
+
+async function deleteHrDocumentArchive(id) {
+    const record = (Array.isArray(state.hrDocumentArchive) ? state.hrDocumentArchive : []).find(r => r.id === id);
+    const { error } = await backend.documents.deleteArchive(id, record?.storage_path || null);
+    if (error) throw error;
+
+    state.hrDocumentArchive = (Array.isArray(state.hrDocumentArchive) ? state.hrDocumentArchive : []).filter(r => r.id !== id);
+    emit('data:hrDocumentArchive', state.hrDocumentArchive);
+}
+
+async function getHrDocumentArchiveUrl(record) {
+    if (!record?.storage_path) return null;
+    const { data, error } = await backend.documents.getSignedUrl(record.storage_path);
+    if (error) throw error;
+    return data?.signedUrl || null;
+}
+
 export {
     fetchHrDocumentTemplates,
     fetchHrDocumentReferenceOptions,
@@ -211,4 +262,8 @@ export {
     saveHrPayrollRecords,
     saveHrDocumentTemplate,
     deleteHrDocumentTemplate,
+    fetchHrDocumentArchive,
+    saveHrDocumentArchive,
+    deleteHrDocumentArchive,
+    getHrDocumentArchiveUrl,
 };
