@@ -1,6 +1,6 @@
 # Code Audit
 
-Updated: 2026-05-07
+Updated: 2026-05-08
 
 This document captures the current code flaws and missing features found during the latest local audit. Keep this page focused on actionable implementation gaps; keep broad delivery status in `docs/project-status.md`.
 
@@ -39,37 +39,24 @@ Fixed locally on 2026-05-07:
 - Added Laravel models/resources for `kpi_definition_versions` and `employee_kpi_target_versions`.
 - `tests/backend-adapter.spec.js` now verifies Laravel KPI governance adapter routing.
 
+### Multi-row save paths now persist all rows
+
+Fixed locally on 2026-05-08:
+
+- `src/modules/data/probation.js`: `saveProbationMonthlyScores()` now saves each normalized monthly score row and keeps all saved rows in local state.
+- `src/modules/data/pip.js`: `savePipActions()` now saves each normalized action row and keeps all saved rows in local state.
+
+### Default module config and tests now align
+
+Fixed locally on 2026-05-08:
+
+- `src/config/app-modules.js` now includes `assessment` in the required default module set, matching the documented product scope and `tests/auth.spec.js` manager navigation expectation for `Assessment Queue`.
+
 ## High Priority Findings
 
 No remaining high priority code findings from this audit batch.
 
 ## Medium Priority Findings
-
-### Multi-row save paths only persist the first row
-
-Two data helpers normalize arrays but send only the first row to the backend:
-
-- `src/modules/data/probation.js`: `saveProbationMonthlyScores()` calls `backend.probation.saveMonthlyScore(normalized[0])`.
-- `src/modules/data/pip.js`: `savePipActions()` calls `backend.pip.saveAction(rows[0])`.
-
-Impact:
-
-- Probation month 2/3 score rows can be dropped.
-- Additional PIP action rows can be dropped.
-
-### Default module config and tests disagree
-
-`src/config/app-modules.js` requires only `core`, `dashboard`, `employees`, and `kpi` by default. `Assessment Queue` is gated behind the optional `assessment` module in `src/config/module-navigation.js`.
-
-Current failing test:
-
-- `tests/auth.spec.js` expects manager navigation to contain `Assessment Queue`.
-
-Fix options:
-
-- Enable `assessment` for the relevant test environment, or
-- Update the test expectation to match the default module set, or
-- Make `assessment` a required module if it is truly part of the core product.
 
 ### Backend test coverage is placeholder-only
 
@@ -97,7 +84,7 @@ These are known product gaps confirmed by the current docs and code shape:
 
 1. Done - port and extend the remote Laravel authorization scoping fix.
 2. Done - close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
-3. Fix probation and PIP bulk-save behavior.
-4. Decide whether assessment is default product scope, then align module config and tests.
+3. Done - fix probation and PIP bulk-save behavior.
+4. Done - make assessment part of default product scope and align module config/tests.
 5. Add real backend feature tests for scoped reads/writes.
 6. Continue missing-feature work from HR document archive and e-signature workflows.

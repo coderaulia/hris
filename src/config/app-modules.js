@@ -3,6 +3,7 @@ const REQUIRED_MODULES = Object.freeze([
     'dashboard',
     'employees',
     'kpi',
+    'assessment',
 ]);
 
 const MODULE_REGISTRY = Object.freeze({
