@@ -4,12 +4,15 @@ import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
 import { saveEmployee } from "./data/employees.js";
 import {
+	fetchHrDocumentArchives,
 	deleteHrDocumentTemplate,
 	fetchHrDocumentReferenceOptions,
 	fetchHrDocumentTemplates,
 	fetchHrPayrollRecords,
+	saveHrDocumentArchive,
 	saveHrDocumentTemplate,
 	saveHrPayrollRecords,
+	signHrDocumentArchive,
 } from "./data/hr-documents.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
@@ -1261,6 +1264,7 @@ async function ensureHrDocumentCollectionsLoaded() {
 		fetchHrDocumentTemplates(),
 		fetchHrDocumentReferenceOptions(),
 		fetchHrPayrollRecords(),
+		fetchHrDocumentArchives(),
 	]).finally(() => {
 		templateCollectionsLoaded = true;
 		templateCollectionsPromise = null;
@@ -1777,6 +1781,78 @@ function renderPayrollRecordStatus() {
 	`;
 }
 
+function renderDocumentArchiveList() {
+	const target = document.getElementById("doc-archive-list");
+	if (!target) return;
+
+	const archives = Array.isArray(state.hrDocumentArchives)
+		? state.hrDocumentArchives.slice(0, 6)
+		: [];
+
+	if (archives.length === 0) {
+		target.innerHTML = '<div class="small text-muted">Generated documents will appear here after export.</div>';
+		return;
+	}
+
+	target.innerHTML = archives.map((archive) => {
+		const config = getDocumentConfig(archive.document_type);
+		const typeLabel = config?.label || String(archive.document_type || "Document");
+		const generatedAt = formatDateShort(archive.generated_at || archive.created_at);
+		const status = String(archive.signature_status || "generated").replace(/_/g, " ");
+		const canStillSign = !["signed", "rejected"].includes(status);
+		const needsCompanySign = canStillSign && !archive.company_signed_at;
+		const needsRecipientSign = canStillSign && archive.requires_recipient_signature && !archive.recipient_signed_at;
+		return `
+			<div class="border rounded-2 p-2 mb-2 bg-white">
+				<div class="d-flex justify-content-between gap-2">
+					<div class="fw-semibold small">${escapeHTML(typeLabel)}</div>
+					<span class="badge bg-light text-dark border">${escapeHTML(status)}</span>
+				</div>
+				<div class="small text-muted">${escapeHTML(String(archive.subject_name || "-"))} · ${escapeHTML(generatedAt)}</div>
+				<div class="small text-muted text-truncate" title="${escapeHTML(String(archive.filename || ""))}">${escapeHTML(String(archive.filename || ""))}</div>
+				${
+					needsCompanySign || needsRecipientSign
+						? `<div class="btn-group btn-group-sm mt-2">
+								${
+									needsCompanySign
+										? `<button type="button" class="btn btn-outline-primary" data-doc-sign-archive="${escapeHTML(String(archive.id || ""))}" data-doc-signer-type="company">Company Sign</button>`
+										: ""
+								}
+								${
+									needsRecipientSign
+										? `<button type="button" class="btn btn-outline-secondary" data-doc-sign-archive="${escapeHTML(String(archive.id || ""))}" data-doc-signer-type="recipient">Recipient Sign</button>`
+										: ""
+								}
+							</div>`
+						: ""
+				}
+			</div>
+		`;
+	}).join("");
+
+	target.querySelectorAll("[data-doc-sign-archive]").forEach((button) => {
+		button.addEventListener("click", async (event) => {
+			const archiveId = String(event.currentTarget?.dataset?.docSignArchive || "");
+			const signerType = String(event.currentTarget?.dataset?.docSignerType || "company");
+			event.currentTarget.disabled = true;
+			try {
+				await signHrDocumentArchive(archiveId, {
+					signer_type: signerType,
+					decision: "signed",
+				});
+				renderDocumentArchiveList();
+				await notify.success("Signature status updated.", "Archive Updated");
+			} catch (error) {
+				event.currentTarget.disabled = false;
+				await notify.error(
+					`Failed to update signature: ${error?.message || String(error)}`,
+					"Signature Failed",
+				);
+			}
+		});
+	});
+}
+
 function downloadPayrollCsvTemplate() {
 	const example = {
 		employee_id: documentsDraft.employeeId || "250801",
@@ -1929,6 +2005,57 @@ function renderDynamicFields() {
 			refreshValidationState();
 		});
 	});
+}
+
+function buildArchivePayload(context, filename, fileSizeBytes = 0) {
+	const requiresRecipientSignature = ["offer_letter", "employment_contract"].includes(
+		documentsDraft.documentType,
+	);
+	const signer = getSelectedSigner();
+	return {
+		document_type: documentsDraft.documentType,
+		employee_id:
+			documentsDraft.subjectMode === "employee"
+				? String(context.subject.id || "").trim() || null
+				: null,
+		subject_name: String(context.subject.name || context.subject.id || "").trim(),
+		subject_mode: documentsDraft.subjectMode,
+		template_id: String(context.template.id || "").trim() || null,
+		filename,
+		mime_type: "application/pdf",
+		file_size_bytes: fileSizeBytes,
+		storage_status: "metadata_only",
+		generated_by: state.currentUser?.id || null,
+		signer_id: documentsDraft.signerId || null,
+		signer_title:
+			String(
+				documentsDraft.signerRoleOverride || signer?.position || signer?.role || "",
+			).trim() || null,
+		recipient_signer_id:
+			requiresRecipientSignature && documentsDraft.subjectMode === "employee"
+				? String(context.subject.id || "").trim() || null
+				: null,
+		requires_recipient_signature: requiresRecipientSignature,
+		signature_status: "pending_signature",
+		document_payload_json: {
+			values: context.values,
+			payroll: context.payroll,
+			template: {
+				id: context.template.id || "",
+				label: context.template.label || "",
+			},
+			subject: {
+				id: context.subject.id || "",
+				name: context.subject.name || "",
+				position: context.subject.position || "",
+				department: context.subject.department || "",
+			},
+			signer: {
+				id: documentsDraft.signerId || "",
+				name: signer?.name || state.currentUser?.name || "",
+			},
+		},
+	};
 }
 
 function buildPreviewContext() {
@@ -2517,6 +2644,7 @@ function rerenderDocumentWorkspace() {
 	renderSignerSummary();
 	renderDynamicFields();
 	renderPayrollRecordStatus();
+	renderDocumentArchiveList();
 	renderPreview();
 	refreshValidationState();
 }
@@ -2689,6 +2817,18 @@ function bindSetupHandlers() {
 				});
 
 				doc.save(filename);
+				try {
+					const pdfBlob = doc.output("blob");
+					await saveHrDocumentArchive(
+						buildArchivePayload(context, filename, pdfBlob?.size || 0),
+					);
+					renderDocumentArchiveList();
+				} catch (archiveError) {
+					await notify.warn(
+						`PDF downloaded, but archive save failed: ${archiveError?.message || String(archiveError)}`,
+						"Archive Not Saved",
+					);
+				}
 
 				if (documentsDraft.documentType === "warning_letter" && state.db?.[context.subject.id]) {
 					const spUntil = parseValidityToDate(

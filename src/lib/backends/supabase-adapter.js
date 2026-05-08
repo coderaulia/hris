@@ -242,6 +242,13 @@ export const supabaseAdapter = {
         listPayrollRecords: async () => {
             return await supabase.from('hr_payroll_records').select('*');
         },
+        listArchives: async () => {
+            return await supabase
+                .from('hr_document_archives')
+                .select('*')
+                .order('generated_at', { ascending: false })
+                .limit(100);
+        },
         savePayrollRecords: async (payloads) => {
             return await supabase.from('hr_payroll_records').upsert(payloads, {
                 onConflict: 'employee_id,payroll_period'
@@ -252,6 +259,47 @@ export const supabaseAdapter = {
         },
         deleteTemplate: async (id) => {
             return await supabase.from('hr_document_templates').delete().eq('id', id);
+        },
+        saveArchive: async (payload) => {
+            return await supabase
+                .from('hr_document_archives')
+                .upsert(payload, { onConflict: 'id' })
+                .select()
+                .single();
+        },
+        signArchive: async (id, payload) => {
+            const { data: current, error: fetchError } = await supabase
+                .from('hr_document_archives')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (fetchError) return { data: null, error: fetchError };
+
+            const now = new Date().toISOString();
+            const update = {
+                signature_note: payload?.note || current.signature_note || null,
+            };
+
+            if (payload?.decision === 'rejected') {
+                update.signature_status = 'rejected';
+            } else if (payload?.signer_type === 'company') {
+                update.company_signed_at = now;
+            } else {
+                update.recipient_signed_at = now;
+            }
+
+            if (payload?.decision === 'signed') {
+                const companySigned = Boolean(update.company_signed_at || current.company_signed_at);
+                const recipientSigned = !current.requires_recipient_signature || Boolean(update.recipient_signed_at || current.recipient_signed_at);
+                update.signature_status = companySigned && recipientSigned ? 'signed' : 'pending_signature';
+            }
+
+            return await supabase
+                .from('hr_document_archives')
+                .update(update)
+                .eq('id', id)
+                .select()
+                .single();
         }
     }
 };

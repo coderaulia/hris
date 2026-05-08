@@ -58,23 +58,34 @@ No remaining high priority code findings from this audit batch.
 
 ## Medium Priority Findings
 
-### Backend test coverage is placeholder-only
+### Backend test coverage now has scoped smoke tests
 
-`backend/tests/Feature/ExampleTest.php` only checks `/` returns 200. `backend/tests/Unit/ExampleTest.php` only checks `true`.
+Fixed locally on 2026-05-08:
 
-Missing backend coverage:
+- Added Laravel feature tests for employee/manager/HR scope enforcement, assessment list scoping, probation write authorization, HR document archive creation, and archive signature sequencing.
+- `backend/app/Http/Controllers/Assessment/AssessmentController.php` now uses the shared `EmployeeScopeService::scopeQuery()` path for assessment list reads.
 
-- employee/manager/superadmin scope enforcement
-- adapter parity for Laravel endpoints
-- destructive actions such as delete/archive flows
-- validation and authorization failure cases
+Remaining backend test gaps:
+
+- broader adapter parity for every Laravel endpoint
+- destructive delete/archive edge cases beyond HR document archive creation
+- deeper validation failure cases across controllers
+
+### HR document archive and signature foundation
+
+Fixed locally on 2026-05-08:
+
+- Added `migrations/20260508_hr_document_archives.sql` for generated-document archive metadata, storage path status, and company/recipient signature workflow state.
+- Added Supabase and Laravel adapter methods for listing/saving archives and updating signature status.
+- Added Laravel archive endpoints and resources for `/hr-document-archives` and `/hr-document-archives/{id}/signature`.
+- The HR Documents workspace now saves archive metadata after PDF export and shows recent archives with internal company/recipient sign actions.
 
 ## Missing Features
 
 These are known product gaps confirmed by the current docs and code shape:
 
-- Persistent archive table/storage flow for generated HR documents
-- Full e-signature workflow or approval-sign sequence for generated documents
+- Private file-bucket storage for archived generated HR document PDFs (archive metadata now exists)
+- External e-signature delivery/provider workflow for generated documents (internal sign status now exists)
 - Production notification provider configuration for live outbound delivery
 - Production-like payroll import QA with real employee IDs and payslip PDF verification
 - Rollback-script discipline for migrations, as expected by `claude.md`
@@ -86,5 +97,5 @@ These are known product gaps confirmed by the current docs and code shape:
 2. Done - close Laravel adapter parity gaps for KPI definition/version/target/weight/delete flows.
 3. Done - fix probation and PIP bulk-save behavior.
 4. Done - make assessment part of default product scope and align module config/tests.
-5. Add real backend feature tests for scoped reads/writes.
-6. Continue missing-feature work from HR document archive and e-signature workflows.
+5. Done - add real backend feature tests for scoped reads/writes and HR document archive/signature behavior.
+6. In progress - add HR document archive metadata and internal signature status flow; private file storage and external e-sign delivery remain open.

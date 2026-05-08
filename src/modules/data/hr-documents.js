@@ -81,6 +81,23 @@ async function fetchHrPayrollRecords() {
     }
 }
 
+async function fetchHrDocumentArchives() {
+    try {
+        const { data, error } = await backend.documents.listArchives();
+        if (error) throw error;
+        state.hrDocumentArchives = data || [];
+        emit('data:hrDocumentArchives', state.hrDocumentArchives);
+        return state.hrDocumentArchives;
+    } catch (error) {
+        if (!isMissingRelationError(error)) {
+            debugError('Fetch HR document archives error:', error);
+        }
+        state.hrDocumentArchives = [];
+        emit('data:hrDocumentArchives', state.hrDocumentArchives);
+        return [];
+    }
+}
+
 async function saveHrPayrollRecords(records = []) {
     const payloads = (Array.isArray(records) ? records : [])
         .map(record => {
@@ -135,6 +152,75 @@ async function saveHrPayrollRecords(records = []) {
         String(a?.employee_id || '').localeCompare(String(b?.employee_id || ''))
     );
     emit('data:hrPayrollRecords', state.hrPayrollRecords);
+    return saved;
+}
+
+async function saveHrDocumentArchive(archive = {}) {
+    const payload = {
+        id: String(archive?.id || generateUuid()),
+        document_type: String(archive?.document_type || '').trim(),
+        employee_id: String(archive?.employee_id || '').trim() || null,
+        subject_name: String(archive?.subject_name || '').trim(),
+        subject_mode: String(archive?.subject_mode || 'employee').trim() || 'employee',
+        template_id: String(archive?.template_id || '').trim() || null,
+        filename: String(archive?.filename || '').trim(),
+        mime_type: String(archive?.mime_type || 'application/pdf').trim() || 'application/pdf',
+        file_size_bytes: Math.max(0, Math.round(Number(archive?.file_size_bytes || 0))),
+        storage_status: String(archive?.storage_status || 'metadata_only').trim() || 'metadata_only',
+        storage_path: String(archive?.storage_path || '').trim() || null,
+        generated_by: String(archive?.generated_by || state.currentUser?.id || '').trim() || null,
+        generated_at: archive?.generated_at || new Date().toISOString(),
+        signer_id: String(archive?.signer_id || '').trim() || null,
+        signer_title: String(archive?.signer_title || '').trim() || null,
+        recipient_signer_id: String(archive?.recipient_signer_id || '').trim() || null,
+        requires_recipient_signature: Boolean(archive?.requires_recipient_signature),
+        signature_status: String(archive?.signature_status || 'pending_signature').trim() || 'pending_signature',
+        signature_note: String(archive?.signature_note || '').trim() || null,
+        document_payload_json:
+            archive?.document_payload_json && typeof archive.document_payload_json === 'object'
+                ? archive.document_payload_json
+                : {},
+    };
+
+    if (!payload.document_type || !payload.subject_name || !payload.filename) return null;
+
+    const { data, error } = await backend.documents.saveArchive(payload);
+    if (error) throw error;
+
+    const saved = data || payload;
+    const nextArchives = [
+        saved,
+        ...(Array.isArray(state.hrDocumentArchives) ? state.hrDocumentArchives : []).filter(
+            item => String(item?.id || '') !== String(saved?.id || payload.id)
+        ),
+    ].sort((a, b) =>
+        String(b?.generated_at || b?.created_at || '').localeCompare(String(a?.generated_at || a?.created_at || ''))
+    );
+
+    state.hrDocumentArchives = nextArchives;
+    emit('data:hrDocumentArchives', state.hrDocumentArchives);
+    return saved;
+}
+
+async function signHrDocumentArchive(archiveId, payload = {}) {
+    const id = String(archiveId || '').trim();
+    if (!id) return null;
+
+    const { data, error } = await backend.documents.signArchive(id, {
+        signer_type: String(payload?.signer_type || 'company').trim(),
+        decision: String(payload?.decision || 'signed').trim(),
+        note: String(payload?.note || '').trim() || null,
+    });
+    if (error) throw error;
+
+    const saved = data || null;
+    if (saved) {
+        state.hrDocumentArchives = (Array.isArray(state.hrDocumentArchives)
+            ? state.hrDocumentArchives
+            : []
+        ).map(item => String(item?.id || '') === id ? saved : item);
+        emit('data:hrDocumentArchives', state.hrDocumentArchives);
+    }
     return saved;
 }
 
@@ -205,10 +291,13 @@ async function deleteHrDocumentTemplate(templateId) {
 }
 
 export {
+    fetchHrDocumentArchives,
     fetchHrDocumentTemplates,
     fetchHrDocumentReferenceOptions,
     fetchHrPayrollRecords,
     saveHrPayrollRecords,
+    saveHrDocumentArchive,
     saveHrDocumentTemplate,
+    signHrDocumentArchive,
     deleteHrDocumentTemplate,
 };

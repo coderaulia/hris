@@ -17,22 +17,7 @@ class AssessmentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = EmployeeAssessment::query();
-        
-        // Scope by employee accessibility
-        $user = $request->user();
-        if ($user->role !== 'superadmin') {
-            $query->whereIn('employee_id', function ($sub) use ($user) {
-                $sub->select('employee_id')
-                    ->from('employees')
-                    ->where('manager_id', $user->employee_id)
-                    ->orWhere('employee_id', $user->employee_id);
-                
-                if ($user->role === 'manager') {
-                    $sub->orWhere('department', $user->department);
-                }
-            });
-        }
+        $query = EmployeeScopeService::scopeQuery(EmployeeAssessment::query());
 
         return AssessmentResource::collection($query->get());
     }

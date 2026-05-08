@@ -17,6 +17,7 @@ This folder now keeps only the active schema upgrade chain for normal project de
   - `20260409_dashboard_server_views.sql`
   - `20260417_hr_documents_foundation.sql`
   - `20260429_hr_payroll_records.sql`
+  - `20260508_hr_document_archives.sql`
 
 ## Archived Helpers
 One-off helper scripts and superseded split migrations were moved to [archive](/D:/web/hris/migrations/archive):

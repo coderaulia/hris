@@ -627,6 +627,14 @@ export const laravelAdapter = {
                 return { data: null, error };
             }
         },
+        listArchives: async () => {
+            try {
+                const data = await fetchApi('/hr-document-archives');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
         savePayrollRecords: async (payloads) => {
             try {
                 const data = await fetchApi('/hr-payroll-records/import', {
@@ -655,6 +663,28 @@ export const laravelAdapter = {
                 return { error: null };
             } catch (error) {
                 return { error };
+            }
+        },
+        saveArchive: async (payload) => {
+            try {
+                const data = await fetchApi('/hr-document-archives', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        signArchive: async (id, payload) => {
+            try {
+                const data = await fetchApi(`/hr-document-archives/${id}/signature`, {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
             }
         }
     }

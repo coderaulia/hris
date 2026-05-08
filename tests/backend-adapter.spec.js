@@ -124,4 +124,72 @@ test.describe('Backend Adapter Routing', () => {
         expect(result.deleteError).toBeNull();
         expect(result.methods).toBe(true);
     });
+
+    test('Laravel adapter exposes HR document archive routes', async ({ page }) => {
+        await page.addInitScript(() => {
+            window._VITE_BACKEND_TYPE = 'laravel';
+        });
+        await page.reload();
+
+        await page.route('**/api/v1/hr-document-archives', async route => {
+            if (route.request().method() === 'GET') {
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({ data: [] })
+                });
+                return;
+            }
+
+            expect(route.request().method()).toBe('POST');
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: { id: 'ARCH-1', signature_status: 'pending_signature' }
+                })
+            });
+        });
+
+        await page.route('**/api/v1/hr-document-archives/ARCH-1/signature', async route => {
+            expect(route.request().method()).toBe('POST');
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: { id: 'ARCH-1', signature_status: 'signed' }
+                })
+            });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            const list = await backend.documents.listArchives();
+            const archive = await backend.documents.saveArchive({
+                document_type: 'payslip',
+                subject_name: 'Employee One',
+                filename: 'payslip.pdf',
+            });
+            const signed = await backend.documents.signArchive('ARCH-1', {
+                signer_type: 'company',
+                decision: 'signed',
+            });
+
+            return {
+                listCount: list.data.length,
+                archiveId: archive.data.id,
+                signedStatus: signed.data.signature_status,
+                methods: [
+                    'listArchives',
+                    'saveArchive',
+                    'signArchive',
+                ].every(method => typeof backend.documents[method] === 'function'),
+            };
+        });
+
+        expect(result.listCount).toBe(0);
+        expect(result.archiveId).toBe('ARCH-1');
+        expect(result.signedStatus).toBe('signed');
+        expect(result.methods).toBe(true);
+    });
 });
