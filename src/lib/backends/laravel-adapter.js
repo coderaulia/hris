@@ -226,6 +226,85 @@ export const laravelAdapter = {
                 return { data: null, error };
             }
         },
+        saveDefinition: async (payload) => {
+            try {
+                const data = await fetchApi('/kpis', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        deleteDefinition: async (id) => {
+            try {
+                await fetchApi(`/kpis/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
+            }
+        },
+        listDefinitionVersions: async () => {
+            try {
+                const data = await fetchApi('/kpi-definition-versions');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveDefinitionVersion: async (payload) => {
+            try {
+                const data = await fetchApi('/kpi-definition-versions', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        updateDefinitionVersion: async (id, payload) => {
+            try {
+                const data = await fetchApi(`/kpi-definition-versions/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        listTargetVersions: async () => {
+            try {
+                const data = await fetchApi('/employee-kpi-target-versions');
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveTargetVersion: async (payload) => {
+            try {
+                const data = await fetchApi('/employee-kpi-target-versions', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        updateTargetVersion: async (id, payload) => {
+            try {
+                const data = await fetchApi(`/employee-kpi-target-versions/${id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
         listRecords: async () => {
             try {
                 const data = await fetchApi('/kpi-records');
@@ -243,10 +322,36 @@ export const laravelAdapter = {
             }
         },
         listWeightItems: async () => {
-             const data = await fetchApi('/kpi-weight-profiles');
-             const items = [];
-             data.data.forEach(p => { if(p.items) items.push(...p.items); });
-             return { data: items, error: null };
+            try {
+                const data = await fetchApi('/kpi-weight-profiles');
+                const items = [];
+                data.data.forEach(p => { if(p.items) items.push(...p.items); });
+                return { data: items, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveWeightProfile: async (payload) => {
+            try {
+                const data = await fetchApi('/kpi-weight-profiles', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
+        },
+        saveWeightItems: async (profileId, payload) => {
+            try {
+                const data = await fetchApi(`/kpi-weight-profiles/${profileId}/items`, {
+                    method: 'POST',
+                    body: JSON.stringify({ items: payload })
+                });
+                return { data: data.data, error: null };
+            } catch (error) {
+                return { data: null, error };
+            }
         },
         saveRecord: async (payload) => {
             try {
@@ -257,6 +362,14 @@ export const laravelAdapter = {
                 return { data: data.data, error: null };
             } catch (error) {
                 return { data: null, error };
+            }
+        },
+        deleteRecord: async (id) => {
+            try {
+                await fetchApi(`/kpi-records/${id}`, { method: 'DELETE' });
+                return { error: null };
+            } catch (error) {
+                return { error };
             }
         }
     },

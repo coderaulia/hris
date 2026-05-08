@@ -16,39 +16,39 @@ class ProbationController extends Controller
     public function reviews()
     {
         $query = EmployeeScopeService::scopeQuery(ProbationReview::query());
+
         return ProbationReviewResource::collection($query->get());
     }
 
     public function monthlyScores()
     {
         $reviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->pluck('id');
-        return ProbationMonthlyScoreResource::collection(
-            ProbationMonthlyScore::whereIn('probation_review_id', $reviewIds)->get()
-        );
+        $query = ProbationMonthlyScore::whereIn('probation_review_id', $reviewIds);
+
+        return ProbationMonthlyScoreResource::collection($query->get());
     }
 
     public function attendanceRecords()
     {
         $reviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->pluck('id');
-        return ProbationAttendanceRecordResource::collection(
-            ProbationAttendanceRecord::whereIn('probation_review_id', $reviewIds)->get()
-        );
+        $query = ProbationAttendanceRecord::whereIn('probation_review_id', $reviewIds);
+
+        return ProbationAttendanceRecordResource::collection($query->get());
     }
 
     public function storeReview(Request $request)
     {
-        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
-            abort(403, 'Insufficient permissions.');
-        }
+        $this->abortUnlessCanWriteProbation($request, $request->input('employee_id'));
+
         $review = ProbationReview::updateOrCreate(['id' => $request->id], $request->all());
         return new ProbationReviewResource($review);
     }
 
     public function storeMonthlyScore(Request $request)
     {
-        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
-            abort(403, 'Insufficient permissions.');
-        }
+        $review = ProbationReview::findOrFail($request->input('probation_review_id'));
+        $this->abortUnlessCanWriteProbation($request, $review->employee_id);
+
         $score = ProbationMonthlyScore::updateOrCreate(
             ['probation_review_id' => $request->probation_review_id, 'month_no' => $request->month_no],
             $request->all()
@@ -58,10 +58,22 @@ class ProbationController extends Controller
 
     public function storeAttendance(Request $request)
     {
-        if (!in_array($request->user()->role, ['superadmin', 'manager'])) {
-            abort(403, 'Insufficient permissions.');
-        }
+        $review = ProbationReview::findOrFail($request->input('probation_review_id'));
+        $this->abortUnlessCanWriteProbation($request, $review->employee_id);
+
         $att = ProbationAttendanceRecord::updateOrCreate(['id' => $request->id], $request->all());
         return new ProbationAttendanceRecordResource($att);
+    }
+
+    private function abortUnlessCanWriteProbation(Request $request, ?string $employeeId): void
+    {
+        $role = $request->user()->role ?? '';
+        if (!in_array($role, ['superadmin', 'manager'], true) && !EmployeeScopeService::isHrUser($request->user())) {
+            abort(403, 'Insufficient permissions.');
+        }
+
+        if (!$employeeId || !EmployeeScopeService::canAccess($employeeId)) {
+            abort(403, 'Unauthorized.');
+        }
     }
 }

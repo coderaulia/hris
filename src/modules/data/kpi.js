@@ -7,8 +7,6 @@ import {
     roundScore,
     isPeriodKey,
     isMissingRelationError,
-    execSupabase,
-    fetchOptionalCollection,
 } from './runtime.js';
 import { backend } from '../../lib/backend.js';
 import {
@@ -17,14 +15,6 @@ import {
     getEmployeeKpiTargetResolution,
     getKpiRecordTarget,
 } from './targets.js';
-
-const KPI_DEFINITION_COLUMNS = 'id,name,description,category,target,unit,effective_period,approval_status,approval_required,is_active,latest_version_no,approved_by,approved_at,created_at,updated_at';
-const KPI_DEFINITION_VERSION_COLUMNS = 'id,kpi_definition_id,version_no,effective_period,name,description,category,target,unit,status,request_note,rejection_reason,requested_by,requested_at,approved_by,approved_at,rejected_by,rejected_at,created_at,updated_at';
-const EMPLOYEE_KPI_TARGET_VERSION_COLUMNS = 'id,employee_id,kpi_id,effective_period,target_value,unit,version_no,status,request_note,rejection_reason,requested_by,requested_at,approved_by,approved_at,rejected_by,rejected_at,created_at,updated_at';
-const KPI_WEIGHT_PROFILE_COLUMNS = 'id,profile_name,department,position,active,created_at,updated_at';
-const KPI_WEIGHT_ITEM_COLUMNS = 'id,profile_id,kpi_id,weight_pct,created_at,updated_at';
-const EMPLOYEE_PERFORMANCE_SCORE_COLUMNS = 'id,employee_id,period,score_type,total_score,detail,calculated_by,calculated_at,created_at,updated_at';
-const KPI_RECORD_COLUMNS = 'id,employee_id,kpi_id,period,value,target_snapshot,kpi_name_snapshot,kpi_unit_snapshot,kpi_category_snapshot,definition_version_id,target_version_id,updated_by,submitted_by,created_at,updated_at';
 
 function nowIso() {
     return new Date().toISOString();
@@ -65,17 +55,11 @@ async function getNextDefinitionVersionNo(definitionId) {
 
     let dbMax = 0;
     try {
-        const { data } = await execSupabase(
-            `Fetch latest KPI definition version no (${safeId})`,
-            () => supabase
-                .from('kpi_definition_versions')
-                .select('version_no')
-                .eq('kpi_definition_id', safeId)
-                .order('version_no', { ascending: false })
-                .limit(1),
-            { retries: 1 }
-        );
-        dbMax = Number(data?.[0]?.version_no || 0);
+        const { data, error } = await backend.kpis.listDefinitionVersions();
+        if (error) throw error;
+        dbMax = asArray(data)
+            .filter(row => String(row?.kpi_definition_id || '') === safeId)
+            .reduce((max, row) => Math.max(max, Number(row?.version_no || 0)), 0);
     } catch {
         dbMax = 0;
     }
@@ -96,19 +80,13 @@ async function getNextTargetVersionNo(employeeId, kpiId, period) {
 
     let dbMax = 0;
     try {
-        const { data } = await execSupabase(
-            `Fetch latest KPI target version no (${safeEmp}/${safeKpi}/${safePeriod})`,
-            () => supabase
-                .from('employee_kpi_target_versions')
-                .select('version_no')
-                .eq('employee_id', safeEmp)
-                .eq('kpi_id', safeKpi)
-                .eq('effective_period', safePeriod)
-                .order('version_no', { ascending: false })
-                .limit(1),
-            { retries: 1 }
-        );
-        dbMax = Number(data?.[0]?.version_no || 0);
+        const { data, error } = await backend.kpis.listTargetVersions();
+        if (error) throw error;
+        dbMax = asArray(data)
+            .filter(row => String(row?.employee_id || '') === safeEmp
+                && String(row?.kpi_id || '') === safeKpi
+                && String(row?.effective_period || '') === safePeriod)
+            .reduce((max, row) => Math.max(max, Number(row?.version_no || 0)), 0);
     } catch {
         dbMax = 0;
     }
@@ -136,12 +114,37 @@ async function fetchKpiDefinitions() {
 }
 
 async function fetchKpiDefinitionVersions() {
-    // Phase 4 will handle versions if needed, for now return empty
-    return [];
+    try {
+        const { data, error } = await backend.kpis.listDefinitionVersions();
+        if (error) throw error;
+        state.kpiDefinitionVersions = data || [];
+        emit('data:kpiDefinitionVersions', state.kpiDefinitionVersions);
+        return state.kpiDefinitionVersions;
+    } catch (error) {
+        if (!isMissingRelationError(error)) {
+            debugError('Fetch KPI definition versions error:', error);
+        }
+        state.kpiDefinitionVersions = [];
+        emit('data:kpiDefinitionVersions', state.kpiDefinitionVersions);
+        return [];
+    }
 }
 
 async function fetchEmployeeKpiTargetVersions() {
-    return [];
+    try {
+        const { data, error } = await backend.kpis.listTargetVersions();
+        if (error) throw error;
+        state.employeeKpiTargetVersions = data || [];
+        emit('data:employeeKpiTargetVersions', state.employeeKpiTargetVersions);
+        return state.employeeKpiTargetVersions;
+    } catch (error) {
+        if (!isMissingRelationError(error)) {
+            debugError('Fetch employee KPI target versions error:', error);
+        }
+        state.employeeKpiTargetVersions = [];
+        emit('data:employeeKpiTargetVersions', state.employeeKpiTargetVersions);
+        return [];
+    }
 }
 
 async function saveKpiDefinition(kpi) {
@@ -153,15 +156,8 @@ async function saveKpiDefinition(kpi) {
         is_active: kpi?.is_active === false ? false : true,
     };
 
-    const { data } = await execSupabase(
-        'Save KPI definition',
-        () => supabase
-            .from('kpi_definitions')
-            .upsert(payload, { onConflict: 'id' })
-            .select()
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.kpis.saveDefinition(payload);
+    if (error) throw error;
 
     const idx = state.kpiConfig.findIndex(row => row.id === data.id);
     if (idx >= 0) state.kpiConfig[idx] = data;
@@ -226,11 +222,8 @@ async function submitKpiDefinitionVersion(change) {
         };
 
         try {
-            await execSupabase(
-                'Save KPI definition version',
-                () => supabase.from('kpi_definition_versions').insert(versionRow),
-                { interactiveRetry: true, retries: 1 }
-            );
+            const { error } = await backend.kpis.saveDefinitionVersion(versionRow);
+            if (error) throw error;
             insertedVersionNo = versionNo;
             lastInsertError = null;
             break;
@@ -299,14 +292,8 @@ async function decideKpiDefinitionVersion(versionId, decision, reason = '') {
         rejected_at: action === 'rejected' ? now : null,
     };
 
-    await execSupabase(
-        `Update KPI definition version ${id}`,
-        () => supabase
-            .from('kpi_definition_versions')
-            .update(basePayload)
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.kpis.updateDefinitionVersion(id, basePayload);
+    if (error) throw error;
 
     if (action === 'approved') {
         await saveKpiDefinition({
@@ -349,11 +336,9 @@ async function decideKpiDefinitionVersion(versionId, decision, reason = '') {
 }
 
 async function deleteKpiDefinition(id) {
-    await execSupabase(
-        `Delete KPI definition "${id}"`,
-        () => supabase.from('kpi_definitions').delete().eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.kpis.deleteDefinition(id);
+    if (error) throw error;
+
     state.kpiConfig = state.kpiConfig.filter(k => k.id !== id);
     emit('data:kpiConfig', state.kpiConfig);
 }
@@ -407,11 +392,8 @@ async function submitEmployeeKpiTargetVersions({ employee_id, effective_period, 
             };
 
             try {
-                const { data } = await execSupabase(
-                    'Save employee KPI target version',
-                    () => supabase.from('employee_kpi_target_versions').insert(payload).select(EMPLOYEE_KPI_TARGET_VERSION_COLUMNS).single(),
-                    { interactiveRetry: true, retries: 1 }
-                );
+                const { data, error } = await backend.kpis.saveTargetVersion(payload);
+                if (error) throw error;
                 inserted = data || payload;
                 lastInsertError = null;
                 break;
@@ -448,21 +430,15 @@ async function decideEmployeeKpiTargetVersion(versionId, decision, reason = '') 
     if (!['approved', 'rejected'].includes(action)) throw new Error('Invalid decision action.');
 
     const now = nowIso();
-    await execSupabase(
-        `Update employee KPI target version ${id}`,
-        () => supabase
-            .from('employee_kpi_target_versions')
-            .update({
-                status: action,
-                rejection_reason: action === 'rejected' ? String(reason || '').trim() : '',
-                approved_by: action === 'approved' ? (state.currentUser?.id || null) : null,
-                approved_at: action === 'approved' ? now : null,
-                rejected_by: action === 'rejected' ? (state.currentUser?.id || null) : null,
-                rejected_at: action === 'rejected' ? now : null,
-            })
-            .eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.kpis.updateTargetVersion(id, {
+        status: action,
+        rejection_reason: action === 'rejected' ? String(reason || '').trim() : '',
+        approved_by: action === 'approved' ? (state.currentUser?.id || null) : null,
+        approved_at: action === 'approved' ? now : null,
+        rejected_by: action === 'rejected' ? (state.currentUser?.id || null) : null,
+        rejected_at: action === 'rejected' ? now : null,
+    });
+    if (error) throw error;
 
     await fetchEmployeeKpiTargetVersions();
 }
@@ -701,15 +677,8 @@ async function fetchEmployeePerformanceScores() {
 }
 
 async function saveKpiWeightProfile(profile) {
-    const { data } = await execSupabase(
-        'Save KPI weight profile',
-        () => supabase
-            .from('kpi_weight_profiles')
-            .upsert(profile, { onConflict: 'id' })
-            .select()
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.kpis.saveWeightProfile(profile);
+    if (error) throw error;
 
     const idx = state.kpiWeightProfiles.findIndex(p => p.id === data.id);
     if (idx >= 0) state.kpiWeightProfiles[idx] = data;
@@ -730,14 +699,8 @@ async function saveKpiWeightItems(profileId, items = []) {
 
     if (rows.length === 0) return [];
 
-    const { data } = await execSupabase(
-        'Save KPI weight items',
-        () => supabase
-            .from('kpi_weight_items')
-            .upsert(rows, { onConflict: 'profile_id,kpi_id' })
-            .select(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.kpis.saveWeightItems(profileId, rows);
+    if (error) throw error;
 
     const current = state.kpiWeightItems.filter(item => item.profile_id !== profileId);
     state.kpiWeightItems = [...current, ...(data || [])];
@@ -808,15 +771,8 @@ async function saveKpiRecord(record) {
         updated_by: record.updated_by || state.currentUser?.id || null,
     };
 
-    const { data } = await execSupabase(
-        'Save KPI record',
-        () => supabase
-            .from('kpi_records')
-            .upsert(payload, { onConflict: 'id' })
-            .select()
-            .single(),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { data, error } = await backend.kpis.saveRecord(payload);
+    if (error) throw error;
 
     const idx = state.kpiRecords.findIndex(r => r.id === data.id);
     if (idx >= 0) state.kpiRecords[idx] = data;
@@ -831,11 +787,9 @@ async function saveKpiRecord(record) {
 async function deleteKpiRecord(id) {
     const existing = state.kpiRecords.find(r => r.id === id) || null;
 
-    await execSupabase(
-        `Delete KPI record "${id}"`,
-        () => supabase.from('kpi_records').delete().eq('id', id),
-        { interactiveRetry: true, retries: 1 }
-    );
+    const { error } = await backend.kpis.deleteRecord(id);
+    if (error) throw error;
+
     state.kpiRecords = state.kpiRecords.filter(r => r.id !== id);
     emit('data:kpiRecords', state.kpiRecords);
 
@@ -865,4 +819,3 @@ export {
     deleteKpiRecord,
     resolveEmployeeKpiTarget,
 };
-

@@ -5,20 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
-class KpiDefinition extends Model
+class EmployeeKpiTargetVersion extends Model
 {
     use HasUuids;
 
-    protected $table = 'kpi_definitions';
+    protected $table = 'employee_kpi_target_versions';
     protected $guarded = [];
 
     protected function casts(): array
     {
         return [
-            'target' => 'float',
-            'approval_required' => 'boolean',
-            'is_active' => 'boolean',
+            'target_value' => 'float',
+            'requested_at' => 'datetime',
             'approved_at' => 'datetime',
+            'rejected_at' => 'datetime',
         ];
     }
 }

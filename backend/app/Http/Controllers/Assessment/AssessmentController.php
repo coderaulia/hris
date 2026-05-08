@@ -39,14 +39,16 @@ class AssessmentController extends Controller
 
     public function scores()
     {
-        $accessibleIds = EmployeeScopeService::scopeQuery(EmployeeAssessment::query())->pluck('id');
-        $scores = EmployeeAssessmentScore::whereIn('assessment_id', $accessibleIds)->get();
+        $assessmentIds = EmployeeScopeService::scopeQuery(EmployeeAssessment::query())->pluck('id');
+        $scores = EmployeeAssessmentScore::whereIn('assessment_id', $assessmentIds)->get();
+
         return AssessmentScoreResource::collection($scores);
     }
 
     public function history()
     {
         $query = EmployeeScopeService::scopeQuery(EmployeeAssessmentHistory::query());
+
         return AssessmentHistoryResource::collection($query->get());
     }
 

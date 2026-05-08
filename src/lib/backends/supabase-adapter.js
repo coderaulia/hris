@@ -72,6 +72,52 @@ export const supabaseAdapter = {
         list: async (columns = '*') => {
             return await supabase.from('kpi_definitions').select(columns);
         },
+        saveDefinition: async (payload) => {
+            return await supabase
+                .from('kpi_definitions')
+                .upsert(payload, { onConflict: 'id' })
+                .select()
+                .single();
+        },
+        deleteDefinition: async (id) => {
+            return await supabase.from('kpi_definitions').delete().eq('id', id);
+        },
+        listDefinitionVersions: async (columns = '*') => {
+            return await supabase.from('kpi_definition_versions').select(columns);
+        },
+        saveDefinitionVersion: async (payload) => {
+            const query = payload?.id
+                ? supabase.from('kpi_definition_versions').upsert(payload, { onConflict: 'id' })
+                : supabase.from('kpi_definition_versions').insert(payload);
+
+            return await query.select().single();
+        },
+        updateDefinitionVersion: async (id, payload) => {
+            return await supabase
+                .from('kpi_definition_versions')
+                .update(payload)
+                .eq('id', id)
+                .select()
+                .single();
+        },
+        listTargetVersions: async (columns = '*') => {
+            return await supabase.from('employee_kpi_target_versions').select(columns);
+        },
+        saveTargetVersion: async (payload) => {
+            return await supabase
+                .from('employee_kpi_target_versions')
+                .insert(payload)
+                .select()
+                .single();
+        },
+        updateTargetVersion: async (id, payload) => {
+            return await supabase
+                .from('employee_kpi_target_versions')
+                .update(payload)
+                .eq('id', id)
+                .select()
+                .single();
+        },
         listRecords: async (columns = '*') => {
             return await supabase.from('kpi_records').select(columns);
         },
@@ -81,8 +127,28 @@ export const supabaseAdapter = {
         listWeightItems: async (columns = '*') => {
             return await supabase.from('kpi_weight_items').select(columns);
         },
+        saveWeightProfile: async (payload) => {
+            return await supabase
+                .from('kpi_weight_profiles')
+                .upsert(payload, { onConflict: 'id' })
+                .select()
+                .single();
+        },
+        saveWeightItems: async (_profileId, payload) => {
+            return await supabase
+                .from('kpi_weight_items')
+                .upsert(payload, { onConflict: 'profile_id,kpi_id' })
+                .select();
+        },
         saveRecord: async (payload) => {
-            return await supabase.from('kpi_records').upsert(payload);
+            return await supabase
+                .from('kpi_records')
+                .upsert(payload, { onConflict: 'id' })
+                .select()
+                .single();
+        },
+        deleteRecord: async (id) => {
+            return await supabase.from('kpi_records').delete().eq('id', id);
         }
     },
     scores: {

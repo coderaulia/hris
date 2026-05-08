@@ -1,6 +1,6 @@
 # API Endpoints
 
-Updated: 2026-04-29
+Updated: 2026-05-07
 
 The optional Laravel API is mounted under `/api/v1`. Frontend calls should go through `src/lib/backend.js`; direct route calls belong inside `src/lib/backends/laravel-adapter.js`.
 
@@ -47,9 +47,20 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `GET` | `/assessment-scores` | List assessment scores |
 | `GET` | `/assessment-history` | List assessment history |
 | `GET` | `/kpis` | List KPI definitions |
+| `POST` | `/kpis` | Create or update KPI definition |
+| `DELETE` | `/kpis/{id}` | Delete KPI definition |
+| `GET` | `/kpi-definition-versions` | List KPI definition versions |
+| `POST` | `/kpi-definition-versions` | Create KPI definition version |
+| `PATCH` | `/kpi-definition-versions/{id}` | Approve or reject KPI definition version |
+| `GET` | `/employee-kpi-target-versions` | List scoped employee KPI target versions |
+| `POST` | `/employee-kpi-target-versions` | Create employee KPI target version |
+| `PATCH` | `/employee-kpi-target-versions/{id}` | Approve or reject employee KPI target version |
 | `GET` | `/kpi-records` | List KPI records |
 | `POST` | `/kpi-records` | Save KPI record |
+| `DELETE` | `/kpi-records/{id}` | Delete KPI record |
 | `GET` | `/kpi-weight-profiles` | List KPI weight profiles |
+| `POST` | `/kpi-weight-profiles` | Create or update KPI weight profile |
+| `POST` | `/kpi-weight-profiles/{profileId}/items` | Upsert KPI weight profile items |
 | `GET` | `/performance-scores` | List performance scores |
 | `POST` | `/performance-scores` | Save performance score |
 | `GET` | `/competency-config` | List competency config |
