@@ -12,11 +12,14 @@ this page focused on actionable implementation gaps; keep broad delivery status 
   to 370.54 KB and split PDF-adjacent optional packages into named chunks.
 - `npm run qa:hardening`: passed on 2026-05-08 and again on 2026-05-09 after adding rollback
   companions for every active Supabase migration. It also passed after the Laravel workflow parity
-  migration and feature-test expansion on 2026-05-09.
+  migration and feature-test expansion on 2026-05-09, and again after the Laravel training adapter
+  fix and Playwright adapter coverage expansion.
 - `npm run build`: passed again on 2026-05-09 after the Laravel workflow parity and feature-test
-  updates.
+  updates, and after the Laravel training adapter fix.
 - `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including Laravel HR
-  document archive upload/download adapter coverage.
+  document archive upload/download adapter coverage. It passed again on 2026-05-09 with 10 tests
+  covering Laravel employee/training save routing, manpower approval/pipeline routing, payroll
+  import routing, and archive listing/download routing.
 - Laravel feature tests were expanded again on 2026-05-09, but `php` and `composer` were still not
   available on PATH in the local shell, so they were not run in this pass.
 - `rtk` is required by local instructions but was not available on PATH in this shell.
@@ -113,6 +116,19 @@ Fixed locally on 2026-05-09:
 - `npm run build` and `npm run qa:hardening` passed after these changes.
 - Laravel tests still need to be executed in an environment with `php` and `composer` available.
 
+### Laravel training adapter parity and workflow route coverage
+
+Fixed locally on 2026-05-09:
+
+- Employee save now replaces training rows through `backend.training.list/delete/create`, removing
+  the direct Supabase delete path that broke Laravel backend mode.
+- Training fetch now includes `id` and `notes` so existing normalized rows can be safely replaced.
+- Expanded `tests/backend-adapter.spec.js` to cover Laravel employee/training save routing,
+  manpower plan/request/pipeline routing, pipeline delete, payroll import routing, and HR document
+  archive listing/download routing.
+- `npx playwright test tests/backend-adapter.spec.js`, `npm run build`, and `npm run qa:hardening`
+  passed after the change.
+
 ## Medium Priority Findings
 
 ### Backend feature test coverage still needs execution and deeper edge breadth
@@ -133,10 +149,11 @@ Remaining coverage:
 
 ### Playwright E2E coverage gaps
 
-Adapter-level coverage was added for Laravel archive upload/download, but full workflow E2E
-coverage is still missing for several product areas.
+Adapter-level Playwright coverage now proves Laravel routing for archive upload/download,
+employee/training saves, manpower approval/pipeline, payroll import, and archive listing/download.
+Full browser workflow E2E coverage is still missing for several product areas.
 
-Flows still without meaningful E2E coverage:
+Flows still without full UI E2E coverage:
 - Employee CRUD
 - Training records management
 - Manpower request approval and pipeline management
@@ -167,8 +184,9 @@ PDF verification, and idempotency checks across both backend modes are still pen
 
 1. Run the expanded Laravel feature suite in an environment with PHP/Composer and address any
    failures.
-2. Add Playwright specs for employee CRUD, training records, manpower, payroll import, real archive
-   workspace download, and role guardrails.
+2. Add full UI Playwright specs for employee CRUD, training records, manpower, payroll import, real
+   archive workspace download, and role guardrails. Adapter-level route coverage for these areas is
+   now in place.
 3. Deepen backend edge coverage for orphan/delete cases and KPI re-submit/stale approval paths.
 4. Implement the external e-signature workflow for archived documents.
 5. Run production-like payroll import QA and live notification-provider QA.

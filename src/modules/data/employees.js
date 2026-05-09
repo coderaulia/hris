@@ -70,7 +70,7 @@ const LEGACY_EMPLOYEE_COLUMNS = [
 const EMPLOYEE_ASSESSMENT_COLUMNS = 'id,employee_id,assessment_type,percentage,assessed_by,assessed_at,source_date';
 const EMPLOYEE_ASSESSMENT_SCORE_COLUMNS = 'assessment_id,competency_name,score,note';
 const EMPLOYEE_ASSESSMENT_HISTORY_COLUMNS = 'employee_id,assessed_on,percentage,seniority,position,created_at';
-const EMPLOYEE_TRAINING_RECORD_COLUMNS = 'employee_id,course,start_date,end_date,provider,status,created_at';
+const EMPLOYEE_TRAINING_RECORD_COLUMNS = 'id,employee_id,course,start_date,end_date,provider,status,notes,created_at';
 
 async function fetchEmployees() {
     try {
@@ -267,14 +267,18 @@ async function replaceAssessmentHistoryRows(rec) {
 }
 
 async function replaceTrainingRows(rec) {
-    await execSupabase(
-        `Replace training rows for ${rec.id}`,
-        () => supabase
-            .from('employee_training_records')
-            .delete()
-            .eq('employee_id', rec.id),
-        { retries: 0 }
+    const existing = await backend.training.list(EMPLOYEE_TRAINING_RECORD_COLUMNS);
+    if (existing.error) throw existing.error;
+
+    const existingRows = asArray(existing.data).filter(row =>
+        String(row?.employee_id || '') === String(rec.id || '') &&
+        String(row?.id || '').trim()
     );
+
+    for (const row of existingRows) {
+        const response = await backend.training.delete(row.id);
+        if (response.error) throw response.error;
+    }
 
     const rows = asArray(getTrainingRecords(rec))
         .map(item => ({
@@ -292,12 +296,9 @@ async function replaceTrainingRows(rec) {
             status: ['planned', 'ongoing', 'completed', 'approved'].includes(item.status) ? item.status : 'ongoing',
         }));
 
-    if (rows.length > 0) {
-        await execSupabase(
-            `Insert training rows for ${rec.id}`,
-            () => supabase.from('employee_training_records').insert(rows),
-            { interactiveRetry: true, retries: 1 }
-        );
+    for (const row of rows) {
+        const response = await backend.training.create(row);
+        if (response.error) throw response.error;
     }
 }
 

@@ -66,7 +66,9 @@ rollback migrations successfully.
 
 **Current state:** Eight specs cover auth, assessment, KPI approval, probation/PIP, HR documents,
 backend adapter routing, stress workload, and live schema smoke. Adapter-level coverage now proves
-Laravel archive upload/download routing, but large functional areas still have no E2E coverage.
+Laravel archive upload/download, employee/training save, manpower approval/pipeline, payroll import,
+and archive listing/download routing, but large functional areas still need full UI workflow E2E
+coverage.
 
 **Missing flows:**
 - Employee CRUD (create, update, delete single and bulk)
@@ -89,13 +91,17 @@ validation, HR document archive create/upload/download/delete, manpower plan/req
 authorization, KPI definition/target approval paths, KPI weight profile/item saves, PIP action
 transitions, selected validation failures, and settings bulk update authorization/validation. A
 Laravel parity migration was added for app settings, manpower, PIP, and richer KPI governance fields
-needed by those controller paths. Unit tests cover a small part of `EmployeeScopeService`. The
-Laravel tests were not run locally because `php` and `composer` were not available on PATH.
+needed by those controller paths. Employee training replacement now uses the backend adapter instead
+of direct Supabase writes, so Laravel mode has route parity for training saves. Unit tests cover a
+small part of `EmployeeScopeService`. The Laravel tests were not run locally because `php` and
+`composer` were not available on PATH.
 
 **Recently done on 2026-05-09:**
 - Added `backend/database/migrations/2026_05_09_000000_add_laravel_workflow_parity_tables.php`.
 - Wrapped `AppSettingController::bulkUpdate()` in a transaction.
 - Added Laravel feature tests for manpower, KPI workflow, PIP workflow, and settings bulk updates.
+- Fixed employee training replacement to use `backend.training` routes and added mocked Playwright
+  coverage for employee/training, manpower, payroll, and archive Laravel adapter paths.
 
 **Remaining coverage:**
 - Run the expanded Laravel feature suite with PHP/Composer available and fix any failures.

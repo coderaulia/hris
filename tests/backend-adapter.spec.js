@@ -285,4 +285,281 @@ test.describe('Backend Adapter Routing', () => {
         expect(requests.map(item => item.type)).toEqual(['create', 'upload', 'download']);
         expect(requests.find(item => item.type === 'upload').contentType).toContain('multipart/form-data');
     });
+
+    test('Laravel employee save uses API training routes instead of direct Supabase writes', async ({ page }) => {
+        await page.addInitScript(() => {
+            window._VITE_BACKEND_TYPE = 'laravel';
+        });
+        await page.reload();
+
+        const requests = [];
+
+        await page.route('**/rest/v1/employee_training_records**', async route => {
+            requests.push({ type: 'unexpected-supabase-training-write' });
+            await route.fulfill({
+                status: 500,
+                contentType: 'application/json',
+                body: JSON.stringify({ message: 'Training sync must use backend adapter routes.' }),
+            });
+        });
+
+        await page.route('**/api/v1/employees', async route => {
+            const payload = route.request().postDataJSON();
+            requests.push({ type: 'employee-create', method: route.request().method(), payload });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: payload }),
+            });
+        });
+
+        await page.route('**/api/v1/training-records', async route => {
+            if (route.request().method() === 'GET') {
+                requests.push({ type: 'training-list' });
+                await route.fulfill({
+                    status: 200,
+                    contentType: 'application/json',
+                    body: JSON.stringify({
+                        data: [
+                            {
+                                id: 'TR-OLD',
+                                employee_id: 'E777',
+                                course: 'Old Course',
+                                status: 'completed',
+                            },
+                            {
+                                id: 'TR-OTHER',
+                                employee_id: 'E888',
+                                course: 'Other Course',
+                                status: 'completed',
+                            },
+                        ],
+                    }),
+                });
+                return;
+            }
+
+            const payload = route.request().postDataJSON();
+            requests.push({ type: 'training-create', payload });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { ...payload, id: 'TR-NEW' } }),
+            });
+        });
+
+        await page.route('**/api/v1/training-records/TR-OLD', async route => {
+            requests.push({ type: 'training-delete', method: route.request().method() });
+            await route.fulfill({ status: 204 });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { state } = await import('./src/lib/store.js');
+            const { saveEmployee } = await import('./src/modules/data/employees.js');
+
+            state.db = {};
+            await saveEmployee({
+                id: 'E777',
+                name: 'Laravel Training Employee',
+                position: 'Developer',
+                seniority: 'Mid',
+                join_date: '2026-05-01',
+                department: 'Engineering',
+                role: 'employee',
+                training_history: [
+                    {
+                        course: 'Security Basics',
+                        start: '2026-05-01',
+                        end: '2026-05-02',
+                        provider: 'Internal',
+                        status: 'completed',
+                        notes: 'Passed.',
+                    },
+                ],
+            });
+
+            return {
+                savedEmployee: state.db.E777?.name,
+                trainingCount: state.db.E777?.training_history?.length,
+            };
+        });
+
+        expect(result.savedEmployee).toBe('Laravel Training Employee');
+        expect(result.trainingCount).toBe(1);
+        expect(requests.map(item => item.type)).toEqual([
+            'employee-create',
+            'training-list',
+            'training-delete',
+            'training-create',
+        ]);
+        expect(requests.find(item => item.type === 'training-create').payload).toMatchObject({
+            employee_id: 'E777',
+            course: 'Security Basics',
+            status: 'completed',
+        });
+    });
+
+    test('Laravel adapter covers manpower approval and pipeline routing', async ({ page }) => {
+        await page.addInitScript(() => {
+            window._VITE_BACKEND_TYPE = 'laravel';
+        });
+        await page.reload();
+
+        const requests = [];
+
+        await page.route('**/api/v1/manpower-plans', async route => {
+            requests.push({ type: 'plan', method: route.request().method(), payload: route.request().postDataJSON() });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { ...route.request().postDataJSON(), id: 'MP-1' } }),
+            });
+        });
+
+        await page.route('**/api/v1/headcount-requests', async route => {
+            requests.push({ type: 'request', method: route.request().method(), payload: route.request().postDataJSON() });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { ...route.request().postDataJSON(), id: 'REQ-1' } }),
+            });
+        });
+
+        await page.route('**/api/v1/recruitment-pipeline', async route => {
+            requests.push({ type: 'pipeline', method: route.request().method(), payload: route.request().postDataJSON() });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: { ...route.request().postDataJSON(), id: 'PIPE-1' } }),
+            });
+        });
+
+        await page.route('**/api/v1/recruitment-pipeline/PIPE-1', async route => {
+            requests.push({ type: 'pipeline-delete', method: route.request().method() });
+            await route.fulfill({ status: 204 });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            const plan = await backend.manpower.savePlan({
+                period: '2026-05',
+                department: 'Engineering',
+                position: 'Developer',
+                seniority: 'Mid',
+                planned_headcount: 2,
+            });
+            const request = await backend.manpower.saveRequest({
+                id: 'REQ-1',
+                department: 'Engineering',
+                position: 'Developer',
+                requested_count: 1,
+                approval_status: 'approved',
+                approved_by: 'HR01',
+            });
+            const pipeline = await backend.manpower.savePipeline({
+                request_id: 'REQ-1',
+                candidate_name: 'Candidate One',
+                stage: 'offer',
+            });
+            const deleted = await backend.manpower.deletePipeline('PIPE-1');
+
+            return {
+                planId: plan.data.id,
+                requestStatus: request.data.approval_status,
+                pipelineStage: pipeline.data.stage,
+                deleteError: deleted.error ? deleted.error.message : null,
+            };
+        });
+
+        expect(result).toEqual({
+            planId: 'MP-1',
+            requestStatus: 'approved',
+            pipelineStage: 'offer',
+            deleteError: null,
+        });
+        expect(requests.map(item => `${item.type}:${item.method}`)).toEqual([
+            'plan:POST',
+            'request:POST',
+            'pipeline:POST',
+            'pipeline-delete:DELETE',
+        ]);
+    });
+
+    test('Laravel adapter covers payroll import and archive listing/download routing', async ({ page }) => {
+        await page.addInitScript(() => {
+            window._VITE_BACKEND_TYPE = 'laravel';
+        });
+        await page.reload();
+
+        const requests = [];
+
+        await page.route('**/api/v1/hr-payroll-records/import', async route => {
+            const payload = route.request().postDataJSON();
+            requests.push({ type: 'payroll-import', payload });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ data: payload.records }),
+            });
+        });
+
+        await page.route('**/api/v1/hr-document-archive', async route => {
+            requests.push({ type: 'archive-list' });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    data: [{
+                        id: '22222222-2222-4222-8222-222222222222',
+                        employee_id: 'E001',
+                        document_type: 'payslip',
+                        filename: 'payslip.pdf',
+                        storage_path: 'hr-document-archive/22222222-2222-4222-8222-222222222222/payslip.pdf',
+                    }],
+                }),
+            });
+        });
+
+        await page.route('**/api/v1/hr-document-archive/22222222-2222-4222-8222-222222222222/file', async route => {
+            requests.push({ type: 'archive-download' });
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/pdf',
+                body: '%PDF-1.4\n',
+            });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            const payroll = await backend.documents.savePayrollRecords([{
+                employee_id: 'E001',
+                payroll_period: '2026-05',
+                basic_salary: 12000000,
+            }]);
+            const archive = await backend.documents.listArchive();
+            const url = await backend.documents.getSignedUrl(archive.data[0].storage_path);
+
+            return {
+                payrollCount: payroll.data.length,
+                archiveCount: archive.data.length,
+                signedUrlPrefix: String(url.data?.signedUrl || '').slice(0, 5),
+                error: payroll.error || archive.error || url.error,
+            };
+        });
+
+        expect(result.error).toBeFalsy();
+        expect(result.payrollCount).toBe(1);
+        expect(result.archiveCount).toBe(1);
+        expect(result.signedUrlPrefix).toBe('blob:');
+        expect(requests.map(item => item.type)).toEqual([
+            'payroll-import',
+            'archive-list',
+            'archive-download',
+        ]);
+        expect(requests[0].payload.records[0]).toMatchObject({
+            employee_id: 'E001',
+            payroll_period: '2026-05',
+            basic_salary: 12000000,
+        });
+    });
 });
