@@ -20,6 +20,9 @@ this page focused on actionable implementation gaps; keep broad delivery status 
   document archive upload/download adapter coverage. It passed again on 2026-05-09 with 10 tests
   covering Laravel employee/training save routing, manpower approval/pipeline routing, payroll
   import routing, and archive listing/download routing.
+- `npx playwright test tests/employee-ui.spec.js`: passed on 2026-05-09 with mocked Laravel UI
+  coverage for superadmin employee create/update/delete and manager guardrails against direct
+  employee-management surfaces.
 - Laravel feature tests were expanded again on 2026-05-09, but `php` and `composer` were still not
   available on PATH in the local shell, so they were not run in this pass.
 - `rtk` is required by local instructions but was not available on PATH in this shell.
@@ -129,6 +132,19 @@ Fixed locally on 2026-05-09:
 - `npx playwright test tests/backend-adapter.spec.js`, `npm run build`, and `npm run qa:hardening`
   passed after the change.
 
+### Employee UI create path and role guardrails
+
+Fixed locally on 2026-05-09:
+
+- The inline Add New Employee form now exposes the `hr` role, matching backend validation and the
+  edit dialog role set.
+- New employee saves no longer populate local state before `saveEmployee()` decides whether to call
+  create or update, so first-time employee rows use backend create routes instead of update routes.
+- Added `tests/employee-ui.spec.js` with mocked Laravel UI coverage for superadmin employee
+  create/update/delete and manager guardrails against direct staff-directory/add-employee surfaces.
+- `npx playwright test tests/employee-ui.spec.js`, `npx playwright test tests/backend-adapter.spec.js`,
+  `npm run build`, and `npm run qa:hardening` passed after the change.
+
 ## Medium Priority Findings
 
 ### Backend feature test coverage still needs execution and deeper edge breadth
@@ -151,10 +167,10 @@ Remaining coverage:
 
 Adapter-level Playwright coverage now proves Laravel routing for archive upload/download,
 employee/training saves, manpower approval/pipeline, payroll import, and archive listing/download.
-Full browser workflow E2E coverage is still missing for several product areas.
+Full browser workflow E2E coverage now covers employee CRUD and one role guardrail path through
+mocked Laravel APIs, but is still missing for several product areas.
 
 Flows still without full UI E2E coverage:
-- Employee CRUD
 - Training records management
 - Manpower request approval and pipeline management
 - Settings and competency configuration changes
@@ -162,7 +178,7 @@ Flows still without full UI E2E coverage:
 - HR document archive listing/download through the real HR Documents workspace in both backend
   modes
 - Future HR document signature actions
-- Role-based access guardrails across superadmin, HR, director, manager, and employee
+- Broader role-based access guardrails across HR, director, manager, and employee
 
 ### External e-signature workflow remains unimplemented
 
@@ -184,9 +200,9 @@ PDF verification, and idempotency checks across both backend modes are still pen
 
 1. Run the expanded Laravel feature suite in an environment with PHP/Composer and address any
    failures.
-2. Add full UI Playwright specs for employee CRUD, training records, manpower, payroll import, real
-   archive workspace download, and role guardrails. Adapter-level route coverage for these areas is
-   now in place.
+2. Add full UI Playwright specs for training records, manpower, payroll import, real archive
+   workspace download, and broader role guardrails. Employee CRUD UI coverage and adapter-level
+   route coverage for several of these areas are now in place.
 3. Deepen backend edge coverage for orphan/delete cases and KPI re-submit/stale approval paths.
 4. Implement the external e-signature workflow for archived documents.
 5. Run production-like payroll import QA and live notification-provider QA.

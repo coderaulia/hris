@@ -140,7 +140,6 @@ function buildOptionsHtml(options, selectedValue, placeholder) {
 
 async function persistEmployeeRecord(rec, isEdit, oldSnapshot) {
     await notify.withLoading(async () => {
-        state.db[rec.id] = rec;
         await saveEmployee(rec);
     }, isEdit ? 'Updating Employee' : 'Adding Employee', 'Saving employee data...');
 

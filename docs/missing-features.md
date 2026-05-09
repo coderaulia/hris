@@ -67,18 +67,20 @@ rollback migrations successfully.
 **Current state:** Eight specs cover auth, assessment, KPI approval, probation/PIP, HR documents,
 backend adapter routing, stress workload, and live schema smoke. Adapter-level coverage now proves
 Laravel archive upload/download, employee/training save, manpower approval/pipeline, payroll import,
-and archive listing/download routing, but large functional areas still need full UI workflow E2E
-coverage.
+and archive listing/download routing. Full UI coverage now also exercises superadmin employee
+create/update/delete and manager guardrails against direct employee-management surfaces with mocked
+Laravel APIs, but large functional areas still need full UI workflow E2E coverage.
 
 **Missing flows:**
-- Employee CRUD (create, update, delete single and bulk)
+- Employee bulk import/export and broader delete edge cases
 - Training records management
 - Manpower plan/request approval and pipeline card management
 - Settings and competency configuration changes
 - Payroll CSV import and reconciliation
 - HR document archive listing and file download through the real workspace in both backend modes
 - HR document signature actions once implemented
-- Role-based access guardrails (what each role can and cannot see/do)
+- Broader role-based access guardrails (what HR, director, manager, and employee can and cannot
+  see/do)
 
 **Touch:** new or extended specs under `tests/`, seed data adjustments in `tests/support/` if
 needed.
@@ -102,6 +104,9 @@ small part of `EmployeeScopeService`. The Laravel tests were not run locally bec
 - Added Laravel feature tests for manpower, KPI workflow, PIP workflow, and settings bulk updates.
 - Fixed employee training replacement to use `backend.training` routes and added mocked Playwright
   coverage for employee/training, manpower, payroll, and archive Laravel adapter paths.
+- Fixed the employee UI create path so new rows call backend create routes, added `hr` to the inline
+  employee role picker, and added mocked UI coverage for employee create/update/delete plus one
+  manager guardrail path.
 
 **Remaining coverage:**
 - Run the expanded Laravel feature suite with PHP/Composer available and fix any failures.
