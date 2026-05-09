@@ -85,18 +85,26 @@ needed.
 
 **Current state:** Feature tests now cover probation read/write scope, KPI definition/KPI record
 authorization basics, scoped assessment/training reads, performance score creation, employee role
-validation, and HR document archive create/upload/download/delete. Unit tests cover a small part of
-`EmployeeScopeService`. The Laravel tests were not run locally because `php` and `composer` were
-not available on PATH.
+validation, HR document archive create/upload/download/delete, manpower plan/request/pipeline
+authorization, KPI definition/target approval paths, KPI weight profile/item saves, PIP action
+transitions, selected validation failures, and settings bulk update authorization/validation. A
+Laravel parity migration was added for app settings, manpower, PIP, and richer KPI governance fields
+needed by those controller paths. Unit tests cover a small part of `EmployeeScopeService`. The
+Laravel tests were not run locally because `php` and `composer` were not available on PATH.
 
-**Missing coverage:**
-- Manpower plan/request/pipeline CRUD and scope enforcement
-- KPI definition/version/target version approval state machine (full cycle: create -> pending ->
-  approved/rejected -> re-submit paths)
-- KPI weight profile and weight item save paths
-- PIP action status transitions
-- Validation failure responses (422) across write controllers
-- Delete operations and orphaned-record edge cases
-- Settings bulk update atomicity
+**Recently done on 2026-05-09:**
+- Added `backend/database/migrations/2026_05_09_000000_add_laravel_workflow_parity_tables.php`.
+- Wrapped `AppSettingController::bulkUpdate()` in a transaction.
+- Added Laravel feature tests for manpower, KPI workflow, PIP workflow, and settings bulk updates.
+
+**Remaining coverage:**
+- Run the expanded Laravel feature suite with PHP/Composer available and fix any failures.
+- KPI definition/version/target version approval state machine re-submit paths and stale approval
+  updates.
+- Broader validation failure responses (422) across the remaining write controllers.
+- Delete operations and orphaned-record edge cases beyond the newly covered recruitment pipeline
+  delete path.
+- Employee CRUD, training record writes/deletes, payroll import, HR template deletes, and settings
+  edge cases under Laravel.
 
 **Touch:** new or extended `Feature/` test classes under `backend/tests/Feature/`.

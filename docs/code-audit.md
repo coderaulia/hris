@@ -11,11 +11,14 @@ this page focused on actionable implementation gaps; keep broad delivery status 
 - `npm run build`: passed on 2026-05-08. Latest bundle split reduced `pdf-vendor` from 619.14 KB
   to 370.54 KB and split PDF-adjacent optional packages into named chunks.
 - `npm run qa:hardening`: passed on 2026-05-08 and again on 2026-05-09 after adding rollback
-  companions for every active Supabase migration.
+  companions for every active Supabase migration. It also passed after the Laravel workflow parity
+  migration and feature-test expansion on 2026-05-09.
+- `npm run build`: passed again on 2026-05-09 after the Laravel workflow parity and feature-test
+  updates.
 - `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including Laravel HR
   document archive upload/download adapter coverage.
-- Laravel feature tests were added, but `php` and `composer` were not available on PATH in the
-  local shell, so they were not run in this pass.
+- Laravel feature tests were expanded again on 2026-05-09, but `php` and `composer` were still not
+  available on PATH in the local shell, so they were not run in this pass.
 - `rtk` is required by local instructions but was not available on PATH in this shell.
 
 ## Resolved Findings
@@ -96,21 +99,37 @@ Fixed locally on 2026-05-09:
   migrations may depend on objects created by earlier migrations.
 - `npm run qa:hardening` passes with 12 forward migrations and 12 rollback migrations scanned.
 
+### Laravel workflow schema parity and backend coverage expansion
+
+Fixed locally on 2026-05-09:
+
+- Added a Laravel parity migration for `app_settings`, manpower planning tables, recruitment
+  pipeline, PIP tables, KPI governance version columns, employee target-version fields, and
+  `kpi_weight_items.weight_pct`.
+- Wrapped settings bulk updates in a database transaction.
+- Added feature tests for manpower plan/request/pipeline CRUD and authorization, KPI
+  definition/target approval paths, KPI weight profile/item saves, PIP action transitions, selected
+  validation failures, pipeline delete behavior, and settings bulk-update authorization/validation.
+- `npm run build` and `npm run qa:hardening` passed after these changes.
+- Laravel tests still need to be executed in an environment with `php` and `composer` available.
+
 ## Medium Priority Findings
 
-### Backend feature test coverage still needs breadth
+### Backend feature test coverage still needs execution and deeper edge breadth
 
-New feature tests cover the high-risk scope/archive fixes above, but broader backend workflows are
-still thin.
+New feature tests now cover the highest-priority backend workflow gaps, but they could not be run in
+the local shell because `php` and `composer` are unavailable. The suite still needs broader edge
+coverage after the new tests are validated.
 
-Missing coverage:
-- Manpower CRUD and authorization edge cases
-- KPI version/target approval state machine
-- KPI weight profile and item save paths
-- PIP action transitions
-- Validation failure responses across write controllers
-- Delete operations and orphaned-record edge cases
-- Settings bulk update atomicity
+Remaining coverage:
+- Run the expanded Laravel feature suite and fix any migration/controller issues it exposes.
+- Add deeper manpower orphan-record cases, including request deletion/cancel paths and pipeline rows
+  tied to missing or deleted requests.
+- Extend KPI approval coverage for re-submit paths, duplicate version numbers, and stale approval
+  updates.
+- Expand validation failure coverage across the remaining write controllers.
+- Add delete/orphan tests for employees, KPI records, HR document templates, training records, and
+  payroll records where supported.
 
 ### Playwright E2E coverage gaps
 
@@ -146,9 +165,10 @@ PDF verification, and idempotency checks across both backend modes are still pen
 
 ## Suggested Next Fix Order
 
-1. Expand backend feature tests for manpower, KPI approval state machines, PIP transitions,
-   validation failures, delete edge cases, and settings bulk update atomicity.
+1. Run the expanded Laravel feature suite in an environment with PHP/Composer and address any
+   failures.
 2. Add Playwright specs for employee CRUD, training records, manpower, payroll import, real archive
    workspace download, and role guardrails.
-3. Implement the external e-signature workflow for archived documents.
-4. Run production-like payroll import QA and live notification-provider QA.
+3. Deepen backend edge coverage for orphan/delete cases and KPI re-submit/stale approval paths.
+4. Implement the external e-signature workflow for archived documents.
+5. Run production-like payroll import QA and live notification-provider QA.

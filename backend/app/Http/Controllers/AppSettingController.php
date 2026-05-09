@@ -6,6 +6,7 @@ use App\Http\Resources\AppSettingResource;
 use App\Models\AppSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AppSettingController extends Controller
 {
@@ -44,9 +45,11 @@ class AppSettingController extends Controller
             'settings.*.value' => 'required|string',
         ]);
 
-        foreach ($request->settings as $item) {
-            AppSetting::updateOrCreate(['key' => $item['key']], ['value' => $item['value']]);
-        }
+        DB::transaction(function () use ($request) {
+            foreach ($request->settings as $item) {
+                AppSetting::updateOrCreate(['key' => $item['key']], ['value' => $item['value']]);
+            }
+        });
 
         return response()->json(['message' => 'Settings updated successfully.']);
     }
