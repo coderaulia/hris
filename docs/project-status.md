@@ -2,83 +2,109 @@
 
 Last updated: 2026-05-09
 
-## Current State
+This is the current project recap for handoff and planning. Detailed gap tracking lives in
+`docs/missing-features.md`; audit findings and verification notes live in `docs/code-audit.md`.
 
-- Frontend: Vite SPA with vanilla JS, Tailwind-enhanced custom UI, and Bootstrap utilities
-- Backend (Dual Option):
-  - Supabase Auth + Postgres + RLS + Edge Functions
-  - **Laravel API** (PHP/Lumen) with Sanctum Auth and centralized security scoping via Adapter Pattern
-- Navigation: sidebar-driven app shell with role-aware menu groups
-- Core modules: dashboard, employees (manpower planning, requests, recruitment board, directory), assessment, records, settings, KPI governance, probation/PIP, and HR Documents workspace
-- Adapter Pattern: The system is now fully abstracted behind `src/lib/backend.js`, allowing it to run against either Supabase or Laravel backends.
-- Bundle strategy: route-based lazy loading is now in place for major modules, with Records split further so probation/PIP loads separately
-- Build output: gzip assets and vendor chunking are configured for better first-load performance and cache behavior
-- PDF generation code is lazy-loaded; PDF vendor dependencies are split into named chunks so no single PDF chunk exceeds the current Vite warning threshold.
-- Process docs now exist for the `claude.md` workflow: tech stack, schema, API endpoints, coding standards, env guide, git workflow, session commit log, and agent handoff.
+## Current Shape
 
-## Security Baseline
+- Frontend: Vite SPA using vanilla JS modules, Tailwind-enhanced custom UI, Bootstrap utilities,
+  and a sidebar-driven app shell with role-aware navigation.
+- Backends: the app can run against either Supabase or the Laravel/Lumen API through
+  `src/lib/backend.js`.
+- Supabase: Auth, Postgres, RLS, Storage, and Edge Functions remain the primary deployed backend
+  model.
+- Laravel: Sanctum auth and centralized `EmployeeScopeService` mirror the Supabase/RLS access
+  model for the alternate API path.
+- Core modules: dashboard, employees, manpower planning, recruitment pipeline, assessments,
+  training records, settings, KPI governance, probation/PIP, and HR Documents.
+- Build performance: route-level lazy loading and vendor chunking are in place; PDF generation is
+  lazy-loaded and split into smaller PDF-adjacent chunks.
 
-- `complete-setup.sql` is the fresh-environment bootstrap snapshot
-- Every schema/security change must also ship in `migrations/YYYYMMDD_description.sql`
-- CI now blocks deploys when schema discipline, migration safety, RLS expectations, or Data API grants drift
-- Rollback SQL uses the supported `migrations/YYYYMMDD_description.rollback.sql` convention; QA scripts distinguish rollback companions from forward migrations.
+## Completed So Far
 
-## Edge Function Status
+- Schema discipline is standardized around `complete-setup.sql` plus the canonical migration chain
+  in `scripts/support/canonical-migration-chain.mjs`.
+- Every active Supabase migration now has a matching
+  `migrations/YYYYMMDD_description.rollback.sql` companion.
+- Hardening QA checks schema location, migration naming/transactions, rollback naming/transactions,
+  RLS expectations, and Supabase Data API grants.
+- Employee role support now covers `superadmin`, `director`, `hr`, `manager`, and `employee` across
+  Laravel validation and Supabase scoping assumptions.
+- Laravel assessment and training reads use shared employee scoping.
+- Laravel performance-score creation uses the authenticated request user correctly.
+- Manpower recruitment-card deletion routes through the backend adapter in both Supabase and
+  Laravel modes.
+- Generated HR document archive is implemented for both backend modes:
+  - Supabase stores PDFs in the private `hr-document-archive` bucket.
+  - Laravel stores PDFs on the private local disk and exposes authenticated upload/download/delete
+    endpoints.
+- Payroll CSV import persists reusable employee/month rows through both adapter paths.
+- PDF vendor chunking is below the current Vite warning threshold from the last recorded build.
+- Process docs now exist for API endpoints, architecture, coding standards, environment setup, git
+  workflow, schema, session logs, and agent handoff.
 
-- Implemented function domains:
-  - `admin-user-mutations` for managed auth user creation and privileged role updates
-  - `auth-callbacks` for callback normalization and server-side profile resolution
-  - `approval-notifications` for recipient resolution and placeholder/provider-ready notification dispatch
-  - `report-exports` for server-side KPI/probation binary generation, Storage upload, and signed URL downloads
-- Normal application CRUD is still intended to remain browser-side through direct Supabase SDK calls with RLS enforcement
-- Edge Function secrets now use `URL`, `ANON_KEY`, and `SERVICE_ROLE_KEY`
-- Authenticated Edge Function reads now use a caller-scoped client, while service-role access is kept for privileged tasks like auth admin and Storage signing
-- Approval notifications now support configured provider delivery, with dry-run fallback when email secrets are absent
-- Dashboard and probation export buttons now use the edge export flow end-to-end
-- Deploy instructions now live in `docs/supabase-functions-deploy.md`
-- Production rollout depends on deploying the functions in Supabase after secrets are in place
+## HR Documents
 
-## Laravel Backend Status
+The HR Documents workspace is implemented as an HR/superadmin-only operational tool, not a static
+export demo. It supports:
 
-- **Architecture**: Lumen/Laravel API in the `backend/` directory.
-- **Security**: Centralized security via `EmployeeScopeService` replicates Postgres RLS logic.
-- **Auth**: Laravel Sanctum (compatible with frontend SPA login).
-- **Module Coverage**: All major frontend modules (Auth, Employees, KPIs, Probation, PIP, etc.) are supported via the Adapter Pattern.
-- **Database**: Connects to the same Postgres instance as Supabase.
-- **Recent Fixes**: Assessment/training reads use shared employee scoping, performance-score save uses the authenticated request user, and employee role validation accepts `hr` and `director`.
+- offer letters, employment contracts, payslips, warning letters, and termination letters
+- employee-backed documents plus manual candidate entry for offer letters
+- dynamic forms, live preview, and A4 template editing
+- DB-backed templates and reference options when migrations are applied, with graceful fallback for
+  partial environments
+- signer placeholders for printed/wet-sign and future digital-sign workflows
+- payroll CSV template download/import backed by `hr_payroll_records`
+- generation audit events in `admin_activity_log`
+- generated PDF archive metadata and file storage through Supabase and Laravel
 
-## HR Documents Status
+## Edge Functions
 
-- Phase 1 through Phase 4 from `implementation_plan.md` are implemented
-- New module `src/modules/documents.js` provides:
-  - role-gated HR Documents workspace (`hr` and `superadmin`)
-  - dynamic template forms with live preview
-  - runtime access guardrails + validation feedback
-  - payslip payroll CSV template download/import backed by `hr_payroll_records`
-- PDF engine `src/lib/pdfTemplates.js` now generates:
-  - offer letter, employment contract, payslip, warning letter, termination letter
-  - standardized filename output and multi-page-safe body rendering
-- Generation events are written to `admin_activity_log` with action `document.generate`
-- Smoke E2E coverage is available in `tests/hr-documents.spec.js`
-- Payroll data upload is implemented for both Supabase and Laravel adapter paths:
-  - Supabase uses `migrations/20260429_hr_payroll_records.sql`
-  - Laravel exposes `/hr-payroll-records` and `/hr-payroll-records/import`
-- Generated document archive is implemented:
-  - Supabase stores PDFs in the private `hr-document-archive` bucket
-  - Laravel stores PDFs on the private local disk and exposes authenticated upload/download endpoints
-  - Archive metadata is stored in `hr_document_archive`
+Implemented domains:
 
-## Current Gaps
+- `admin-user-mutations` for managed auth-user creation and privileged role updates
+- `auth-callbacks` for callback normalization and server-side profile resolution
+- `approval-notifications` for recipient resolution and provider-ready notification dispatch
+- `report-exports` for server-side KPI/probation binary generation, Storage upload, and signed URL
+  downloads
 
-- E-signature workflow is not implemented yet
-- Approval notifications still require production provider secrets before live delivery works
-- Full workflow E2E coverage is still missing for employee CRUD, training, manpower, payroll import, real archive workspace download, and role guardrails
-- Payroll import stores reusable rows per employee/month, but manual QA still needs to verify CSV import against production-like employee IDs and payslip PDF output.
-- Rollback companions now exist for every active Supabase migration, but staging dry-run ownership
-  still needs to be formalized before production recovery use.
+Production notification delivery still depends on real provider secrets and live QA.
+
+## Verification Baseline
+
+Most recent recorded checks:
+
+- `npm run build`: passed on 2026-05-08.
+- `npm run qa:hardening`: passed on 2026-05-09 with 12 forward migrations and 12 rollback
+  migrations scanned.
+- `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including Laravel HR
+  document archive upload/download adapter coverage.
+- Laravel PHP feature tests were added but have not been run locally because `php` and `composer`
+  were unavailable on PATH in this shell.
+- Local `rtk` instructions exist, but `rtk` is currently unavailable on PATH in this shell.
+
+## Open Gaps
+
+- Backend feature-test breadth is still thin for manpower workflows, KPI approval state machines,
+  KPI weight saves, PIP action transitions, validation failures, delete/orphan edge cases, and
+  settings bulk update atomicity.
+- Playwright workflow coverage is still missing for employee CRUD, training records, manpower
+  approvals/pipeline management, payroll import, real archive workspace download, and role
+  guardrails.
+- E-signature is not implemented beyond signer placeholders and archived generated PDFs.
+- Production notification provider secrets and live outbound notification QA are still pending.
+- Payroll import needs production-like QA with real employee IDs, payslip PDF verification, and
+  Supabase/Laravel idempotency checks.
+- Rollback companions should be dry-run newest-first against a disposable database before relying
+  on them for production recovery.
 
 ## Recent Milestones
 
-- 2026-04-29: Manpower recruitment-card deletion now routes through Supabase/Laravel backend adapters.
-- 2026-04-29: Documentation process was aligned around lean session updates in `docs/commit-logs.md`, `agents.md`, and this status file.
-- 2026-05-08: Audit fix order restored hardening QA, added Laravel archive file parity, tightened Laravel scoping, added targeted backend/adapter coverage, and split the PDF vendor chunks.
+- 2026-04-29: Manpower recruitment-card deletion now routes through Supabase/Laravel backend
+  adapters.
+- 2026-04-29: Documentation process aligned around lean updates in `docs/commit-logs.md`,
+  `AGENTS.md`, and this status file.
+- 2026-05-08: Audit pass restored hardening QA, added Laravel archive file parity, tightened
+  Laravel scoping, added targeted backend/adapter coverage, and split PDF vendor chunks.
+- 2026-05-09: Added rollback companions for every active Supabase migration and refreshed audit
+  docs so rollback coverage is no longer the next open item.

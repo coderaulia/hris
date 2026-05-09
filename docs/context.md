@@ -1,19 +1,19 @@
 # Project Context
 
-Last updated: 2026-04-17
+Last updated: 2026-05-09
 
 ## What This Is
 
-**HR Performance Suite** - a browser-first SPA for managing the full employee performance lifecycle inside a single organisation. The app uses direct Supabase browser access for normal CRUD and targeted Supabase Edge Functions where privileged or heavy server-side boundaries are required.
+**HR Performance Suite** - a browser-first SPA for managing the full employee performance lifecycle inside a single organisation. The app can run against Supabase or the Laravel API through the backend adapter; Supabase remains the primary deployed model for Auth, Postgres/RLS, Storage, and Edge Functions.
 
 ## Stack
 
 | Layer | Technology |
 |---|---|
 | Build | Vite (static SPA) |
-| Auth | Supabase Auth (browser-side) |
-| Database | Supabase Postgres + RLS |
-| Client SDK | `@supabase/supabase-js` |
+| Auth | Supabase Auth or Laravel Sanctum |
+| Database | Supabase Postgres + RLS, optionally accessed through Laravel API |
+| Client SDK | `@supabase/supabase-js`, plus backend adapter modules |
 | Exports | Mixed: Edge `report-exports` for KPI/probation files, client-side `jspdf` templates for HR document generation |
 | Hosting | Hostinger (static files) |
 | Health check | `/healthz.json` (static file) |
@@ -52,12 +52,11 @@ Last updated: 2026-04-17
 
 ## Known Pain Points
 
-- Fresh environment setup requires running bootstrap SQL + retrofit migration to set Data API grants
-- Production auth redirect handling is still being stabilised
+- Fresh environment setup requires `complete-setup.sql` plus the canonical migration chain
 - RLS + grant mismatch causes silent employee-role fallback (looks like auth works, but role is wrong)
 - Notification provider secrets are still required for fully live outbound notifications
-- Full HR template management requires the `hr_document_templates` migration-backed table to exist in Supabase
 - Long legal templates still need careful manual QA for page breaks and Indonesian wording review before production use
+- Rollback companions exist for every active migration, but should be dry-run newest-first before production recovery use
 
 ## Current HR Documents State
 
@@ -76,9 +75,11 @@ The HR Documents workspace is now a configurable HR document module, not only a 
   - save
   - delete
 - payroll earning/deduction breakdown rows
+- payroll CSV import backed by `hr_payroll_records`
 - warning-letter SP persistence
 - termination audit metadata
 - signature placeholders for both digital-sign placement and wet-sign printing
+- generated PDF archive metadata and file storage in Supabase/Laravel modes
 
 Primary implementation files:
 
@@ -91,7 +92,6 @@ Primary implementation files:
 
 ## What Does NOT Exist Yet
 
-- Custom backend server (optional, not planned on main)
-- Persistent archive table for generated HR document files
+- External/public signer portal for generated HR documents
 - Full e-signature workflow or approval-sign sequence for generated HR documents
 - Full end-to-end coverage across every module/path (smoke coverage exists, including `tests/hr-documents.spec.js`)

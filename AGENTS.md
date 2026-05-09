@@ -16,7 +16,7 @@ Summary: Executed the audit fix order through migration QA, Laravel scoping, arc
 Scope: Migration QA/docs, Laravel API controllers/routes/migrations/tests, backend adapter, HR document archive, bundle config, audit docs.
 Outcome: Hardening passes again; assessment/training reads use shared scope; performance-score save and role validation are fixed; Laravel archive PDFs can upload/download/delete; `pdf-vendor` is below the 500 KB warning threshold.
 Verification: `npm run build`, `npm run qa:hardening`, and `npx playwright test tests/backend-adapter.spec.js` passed. Laravel PHP tests were added but not run because `php`/`composer` were unavailable on PATH.
-Open notes: Remaining gaps are older migration rollback companions, broader backend/Playwright workflow coverage, external e-signature, live notification-provider QA, and production-like payroll import QA.
+Open notes: Superseded on 2026-05-09 for rollback companions. Remaining gaps are broader backend/Playwright workflow coverage, external e-signature, live notification-provider QA, and production-like payroll import QA.
 
 ## 2026-05-09 Codex
 

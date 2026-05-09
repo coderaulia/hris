@@ -1,6 +1,6 @@
 # HR Documents Enhancement Status
 
-Updated: 2026-04-29
+Updated: 2026-05-09
 
 ## Goal
 
@@ -14,6 +14,7 @@ Keep a current implementation record for the HR Documents workspace, especially 
 - SP persistence
 - termination/legal metadata
 - signature-ready preview and export layouts
+- generated PDF archive storage/download
 
 ## Current Implementation
 
@@ -36,6 +37,7 @@ The current HR Documents module now supports:
 - preview/export rendering from template placeholders
 - payroll earnings/deductions breakdown rows
 - payroll CSV template download/import for reusable employee-month payslip records
+- generated PDF archive save/download/delete in Supabase and Laravel modes
 - active SP persistence on warning letter generation
 - richer termination metadata logging
 - signature placeholders for:
@@ -51,6 +53,7 @@ Primary implementation files:
 - [src/components/tab-documents.html](/c:/Users/Administrator/Documents/hris-vanaila/src/components/tab-documents.html:1)
 - [src/styles/main.css](/c:/Users/Administrator/Documents/hris-vanaila/src/styles/main.css:1)
 - [migrations/20260429_hr_payroll_records.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260429_hr_payroll_records.sql:1)
+- [migrations/20260507_hr_document_archive.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260507_hr_document_archive.sql:1)
 - [tests/hr-documents.spec.js](/c:/Users/Administrator/Documents/hris-vanaila/tests/hr-documents.spec.js:1)
 
 ## Delivered Workstreams
@@ -119,10 +122,13 @@ Delivered:
 - template save/delete actions are logged
 - payslip CSV import upserts payroll rows by employee and payroll period
 - imported payroll records hydrate payslip identity, cutoff, earnings, deductions, and company-side benefit rows
+- generated PDFs can be archived with metadata, uploaded to private storage, downloaded, and deleted
+  through Supabase and Laravel adapter paths
 
 Key migration:
 
 - [migrations/20260429_hr_payroll_records.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260429_hr_payroll_records.sql:1)
+- [migrations/20260507_hr_document_archive.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260507_hr_document_archive.sql:1)
 
 ## Placeholder Support
 
@@ -175,11 +181,11 @@ So the preview/PDF now shows a combined signature placeholder area instead of on
 
 The main remaining improvements are quality-of-life and legal-content depth, not core functionality:
 
-1. Render the actual signature image inside the signature placeholder when `signature_image_url` exists.
-2. Add a dedicated template list/history view with version comparisons.
-3. Add controlled reference pickers for legal basis and sanctions using `hr_document_reference_options`.
-4. Add richer page-break controls for long Indonesian contract templates.
-5. Add template-level default signature rules by document type and contract type.
+1. Implement request-to-sign, signer inbox, signature capture, and signed/declined status tracking.
+2. Render the actual signature image inside the signature placeholder when `signature_image_url` exists.
+3. Add a dedicated template list/history view with version comparisons.
+4. Add controlled reference pickers for legal basis and sanctions using `hr_document_reference_options`.
+5. Add richer page-break controls for long Indonesian contract templates.
 6. Add payroll import validation preview before saving large CSV batches.
 
 ## Release Checklist
@@ -188,11 +194,13 @@ Before production rollout:
 
 1. Apply [migrations/20260417_hr_documents_foundation.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260417_hr_documents_foundation.sql:1).
 2. Apply [migrations/20260429_hr_payroll_records.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260429_hr_payroll_records.sql:1).
-3. Verify `npm.cmd run build` passes.
-4. Run [tests/hr-documents.spec.js](/c:/Users/Administrator/Documents/hris-vanaila/tests/hr-documents.spec.js:1).
-5. Confirm HR/legal review of the default Indonesian template pack.
-6. Validate A4 export layout for:
+3. Apply [migrations/20260507_hr_document_archive.sql](/c:/Users/Administrator/Documents/hris-vanaila/migrations/20260507_hr_document_archive.sql:1).
+4. Verify `npm run build` passes.
+5. Run [tests/hr-documents.spec.js](/c:/Users/Administrator/Documents/hris-vanaila/tests/hr-documents.spec.js:1).
+6. Confirm HR/legal review of the default Indonesian template pack.
+7. Validate A4 export layout for:
    - long contracts
    - payroll
    - dual-signature documents
-7. Import a payroll CSV for at least one real employee ID and verify the matching payslip PDF uses the saved row.
+8. Import a payroll CSV for at least one real employee ID and verify the matching payslip PDF uses the saved row.
+9. Archive a generated PDF and verify authenticated download/delete in the selected backend mode.

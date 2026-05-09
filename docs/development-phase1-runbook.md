@@ -1,10 +1,11 @@
 # Development Phase 1 Runbook
 
-Last updated: 2026-04-12
+Last updated: 2026-05-09
 
 ## Goal
 
-Phase 1 establishes a repeatable local baseline:
+This historical Phase 1 runbook established the repeatable local baseline. Keep it as the quick
+developer verification path; current product status lives in `docs/project-status.md`.
 
 - verify the app builds
 - verify static schema and security checks pass
@@ -45,7 +46,6 @@ npm run build
 Expected result:
 
 - Vite build completes successfully
-- chunk warnings may still appear for mixed static/dynamic imports
 - warnings are not currently treated as build failures
 
 ### 4. Run static hardening checks
@@ -88,16 +88,15 @@ Minimum variables for E2E:
 
 ## Current Baseline Status
 
-Validated on 2026-04-12 from the local repo:
+Most recent recorded baseline:
 
-- `npm run build`: passed
-- `npm run qa:hardening`: passed
+- `npm run build`: passed on 2026-05-08
+- `npm run qa:hardening`: passed on 2026-05-09
 - `npm run qa:e2e -- --grep "login resolves|auth callback redirect"`: passed
 - focused workflow regressions now execute against the app and surface feature/data failures instead of bootstrap failures
 
 ## Known Non-Blocking Issues
 
-- `src/modules/data.js` is imported both statically and dynamically, so some lazy loading does not split as cleanly as intended
 - the largest remaining implementation hotspots are `src/modules/employees.js`, `src/modules/dashboard/core.js`, and `src/modules/kpi.js`
 - local user-owned edits were already present in `package.json`, `package-lock.json`, and several Playwright specs before Phase 1 execution
 

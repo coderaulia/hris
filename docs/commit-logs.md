@@ -58,4 +58,6 @@ Document signing UX was also upgraded. Preview and export layouts now show struc
 
 Documentation and QA were updated alongside the feature work. The repo now includes refreshed HR document planning/testing docs plus expanded Playwright coverage for manual offer generation, contract-type switching, template-preview editing, SP persistence, termination logging, and access control.
 
-Immediate follow-up remains straightforward: apply the HR document migration in production Supabase projects, verify template CRUD in an environment where `hr_document_templates` exists, run `tests/hr-documents.spec.js`, and continue with the next quality step if needed, such as rendering stored signature images directly inside the signature placeholder boxes.
+This entry is historical. Later sessions added payroll import, generated-document archive storage,
+Laravel archive parity, and rollback companions. Current HR Documents follow-up is now tracked in
+`docs/project-status.md`, `docs/missing-features.md`, and `docs/hr-documents-enhancement-plan.md`.
