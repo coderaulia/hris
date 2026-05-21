@@ -1,6 +1,6 @@
 # Architecture Map
 
-Updated: 2026-04-29
+Updated: 2026-05-21
 
 This file is a lean architecture entry point. Keep implementation details in the focused docs linked below.
 
@@ -41,17 +41,18 @@ Browser (Vite SPA)
 
 ## Canonical References
 
-- Stack and runtime choices: [docs/tech-stack.md](/home/asw/Documents/dev/hris/docs/tech-stack.md)
-- Database tables/views and schema rules: [docs/db-schema.md](/home/asw/Documents/dev/hris/docs/db-schema.md)
-- Laravel API route surface: [docs/api-endpoints.md](/home/asw/Documents/dev/hris/docs/api-endpoints.md)
-- Environment variables: [docs/env-guide.md](/home/asw/Documents/dev/hris/docs/env-guide.md)
-- Coding and adapter rules: [docs/coding-standards.md](/home/asw/Documents/dev/hris/docs/coding-standards.md)
-- Module/refactor ownership: [docs/refactor/module-map.md](/home/asw/Documents/dev/hris/docs/refactor/module-map.md)
-- Current delivery status: [docs/project-status.md](/home/asw/Documents/dev/hris/docs/project-status.md)
+- Docs map: [docs/README.md](README.md)
+- Stack and runtime choices: [docs/tech-stack.md](tech-stack.md)
+- Database tables/views and schema rules: [docs/db-schema.md](db-schema.md)
+- Laravel API route surface: [docs/api-endpoints.md](api-endpoints.md)
+- Environment variables: [docs/env-guide.md](env-guide.md)
+- Coding and adapter rules: [docs/coding-standards.md](coding-standards.md)
+- Module feature toggles: [docs/module-system.md](module-system.md)
+- Current delivery status: [docs/project-status.md](project-status.md)
 
 ## Known Constraints
 
 - Keep RLS and Data API grants aligned with frontend table usage.
 - Keep schema changes in numbered migrations and the canonical migration chain when they are part of normal setup.
 - Do not expose service-role secrets to frontend builds.
-- Keep `docs/commit-logs.md`, `agents.md`, and `docs/project-status.md` lean; update them at session end or when explicitly requested.
+- Keep `docs/commit-logs.md`, `AGENTS.md`, and `docs/project-status.md` lean; update them at session end or when explicitly requested.

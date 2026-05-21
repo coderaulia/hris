@@ -6,35 +6,35 @@ Use this guide for a brand-new Supabase project when you want a clean working de
 
 For a brand-new project:
 
-1. start with [complete-setup.sql](/D:/web/hris/complete-setup.sql)
+1. start with [complete-setup.sql](../complete-setup.sql)
 2. then run only the active migrations below
-3. finish with [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+3. finish with [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
 
-Do not use files inside [migrations/archive](/D:/web/hris/migrations/archive) for a normal fresh install.
+Do not use files inside [migrations/archive](../migrations/archive) for a normal fresh install.
 
 ## Run Order
 
 Run these SQL files in Supabase SQL Editor in this exact order:
 
-1. [complete-setup.sql](/D:/web/hris/complete-setup.sql)
-2. [20260307_performance_foundation.sql](/D:/web/hris/migrations/20260307_performance_foundation.sql)
-3. [20260308_probation_workflow.sql](/D:/web/hris/migrations/20260308_probation_workflow.sql)
-4. [20260308_role_scope_access.sql](/D:/web/hris/migrations/20260308_role_scope_access.sql)
-5. [20260308_kpi_governance.sql](/D:/web/hris/migrations/20260308_kpi_governance.sql)
-6. [20260309_security_qa_hardening.sql](/D:/web/hris/migrations/20260309_security_qa_hardening.sql)
-7. [20260408_data_api_grants.sql](/D:/web/hris/migrations/20260408_data_api_grants.sql)
-8. [20260409_drop_legacy_employee_assessment_columns.sql](/D:/web/hris/migrations/20260409_drop_legacy_employee_assessment_columns.sql)
-9. [20260409_manpower_planning.sql](/D:/web/hris/migrations/20260409_manpower_planning.sql)
-10. [20260409_dashboard_server_views.sql](/D:/web/hris/migrations/20260409_dashboard_server_views.sql)
-11. [20260417_hr_documents_foundation.sql](/D:/web/hris/migrations/20260417_hr_documents_foundation.sql)
-12. [20260429_hr_payroll_records.sql](/D:/web/hris/migrations/20260429_hr_payroll_records.sql)
-13. [20260507_hr_document_archive.sql](/D:/web/hris/migrations/20260507_hr_document_archive.sql)
-14. [01_dummy_seed.sql](/D:/web/hris/supabase/01_dummy_seed.sql)
+1. [complete-setup.sql](../complete-setup.sql)
+2. [20260307_performance_foundation.sql](../migrations/20260307_performance_foundation.sql)
+3. [20260308_probation_workflow.sql](../migrations/20260308_probation_workflow.sql)
+4. [20260308_role_scope_access.sql](../migrations/20260308_role_scope_access.sql)
+5. [20260308_kpi_governance.sql](../migrations/20260308_kpi_governance.sql)
+6. [20260309_security_qa_hardening.sql](../migrations/20260309_security_qa_hardening.sql)
+7. [20260408_data_api_grants.sql](../migrations/20260408_data_api_grants.sql)
+8. [20260409_drop_legacy_employee_assessment_columns.sql](../migrations/20260409_drop_legacy_employee_assessment_columns.sql)
+9. [20260409_manpower_planning.sql](../migrations/20260409_manpower_planning.sql)
+10. [20260409_dashboard_server_views.sql](../migrations/20260409_dashboard_server_views.sql)
+11. [20260417_hr_documents_foundation.sql](../migrations/20260417_hr_documents_foundation.sql)
+12. [20260429_hr_payroll_records.sql](../migrations/20260429_hr_payroll_records.sql)
+13. [20260507_hr_document_archive.sql](../migrations/20260507_hr_document_archive.sql)
+14. [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
 
 ## Migration Notes
 
-- The main [migrations](/D:/web/hris/migrations) folder now contains only the active upgrade chain.
-- Older split migrations and one-off repair/bootstrap helpers were moved to [migrations/archive](/D:/web/hris/migrations/archive).
+- The main [migrations](../migrations) folder contains the active upgrade chain and rollback companions.
+- Older split migrations and one-off repair/bootstrap helpers were moved to [migrations/archive](../migrations/archive).
 - `20260409_drop_legacy_employee_assessment_columns.sql` stays in the fresh path because the frontend now expects assessment and training data from normalized tables, not the old mirror columns on `employees`.
 - `20260429_hr_payroll_records.sql` adds reusable employee/month payroll rows for HR Documents payslip CSV import.
 - `20260507_hr_document_archive.sql` adds generated-document archive metadata plus the private Supabase Storage bucket and policies.
@@ -88,9 +88,9 @@ After creating each Auth user:
 
 Before using the app locally or in production:
 
-1. Copy [.env.example](/D:/web/hris/.env.example) to `.env`
+1. Copy [.env.example](../.env.example) to `.env`
 2. Fill in `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`
-3. Deploy Edge Functions using [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md) if you need managed users, auth callback normalization, notifications, or server-side exports.
+3. Deploy Edge Functions using [supabase-functions-deploy.md](supabase-functions-deploy.md) if you need managed users, auth callback normalization, notifications, or server-side exports.
 
 ## Alternative: Laravel Backend
 
@@ -98,4 +98,4 @@ If you prefer using a PHP-based API instead of Supabase Edge Functions, you can 
 
 - The Laravel backend connects to the same Supabase Postgres instance.
 - It provides a centralized security layer (`EmployeeScopeService`) and replaces the need for some Edge Functions.
-- To use it, follow the setup instructions in [backend/README.md](/D:/web/hris/backend/README.md) and set `VITE_BACKEND_TYPE=laravel` in your `.env`.
+- To use it, follow the setup instructions in [backend/README.md](../backend/README.md) and set `VITE_BACKEND_TYPE=laravel` in your `.env`.

@@ -1,5 +1,7 @@
 # Module System
 
+Updated: 2026-05-21
+
 The app now supports env-driven feature composition.
 
 ## Required Base Modules
@@ -33,7 +35,6 @@ These are always enabled:
 - selective data sync by enabled modules
 - dashboard, employees, records, and settings surfaces now hide optional module sections
 
-Next migration steps:
-
-- shrink remaining cross-module coupling inside large shared views
-- move remaining tab/view defaults into module-owned contracts
+Large shared views still exist in some modules, but the current production contract is the
+environment-driven registry plus stable adapter/data boundaries. Track refactor-specific follow-up
+inside `docs/code-audit.md` only when it becomes an active implementation risk.

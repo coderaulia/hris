@@ -44,7 +44,7 @@ When code changes affect behavior, also update the relevant docs:
 - `docs/commit-logs.md` for lean session history
 - feature plan docs such as `docs/manpower-planning-plan.md`
 
-Do not update `docs/commit-logs.md`, `agents.md`, or `docs/project-status.md` after every commit. Update them at session end or when the user asks.
+Do not update `docs/commit-logs.md`, `AGENTS.md`, or `docs/project-status.md` after every commit. Update them at session end or when the user asks.
 
 ## Verification
 

@@ -1,136 +1,135 @@
 # HR Performance Suite
 
-HR Performance Suite is a Vite single-page app for employee assessment, KPI tracking, probation review, and role-based HR operations. The frontend talks directly to Supabase for normal CRUD, while selected privileged flows now run through Supabase Edge Functions.
+HR Performance Suite is a Vite single-page app for employee assessment, KPI tracking,
+probation review, manpower planning, HR document generation, and role-based HR operations.
+
+The app supports two backend modes through `src/lib/backend.js`:
+
+- Supabase mode: the primary deployed model, using Supabase Auth, Postgres, RLS, Storage, and
+  Edge Functions.
+- Laravel mode: an optional API boundary under `backend/`, using Sanctum auth, Postgres, and
+  `EmployeeScopeService` for role-aware scoping.
 
 ## Stack
 
-- Frontend: vanilla JavaScript, Vite, Tailwind, Bootstrap utilities
-- Backend (Dual-Option):
-  - **Supabase**: Auth, Postgres, RLS, Edge Functions
-  - **Laravel**: PHP/Lumen API, Postgres, Sanctum (Optional backend via Adapter Pattern)
+- Frontend: Vite, vanilla JavaScript modules, Tailwind-enhanced CSS, Bootstrap utilities
+- Backend options: Supabase direct adapter or Laravel API adapter
 - Charts: Chart.js
-- Hosting: static hosting, Hostinger, or any PHP/Vite capable environment
+- PDF and spreadsheet export: `jspdf`, `jspdf-autotable`, `exceljs`
+- QA: Playwright, schema/migration/RLS hardening scripts, Laravel feature tests
 
-## Backend Options (Adapter Pattern)
+## Core Modules
 
-The application uses an **Adapter Pattern** located in `src/lib/backend.js`. You can switch between a direct Supabase connection and a custom Laravel API by setting the `VITE_BACKEND_TYPE` environment variable.
+- Dashboard and department KPI drill-down
+- Employee directory, role-aware access, and training records
+- Competency assessment and assessment history
+- KPI definitions, targets, approvals, weighted scores, and exports
+- Manpower planning, headcount requests, and recruitment pipeline
+- Probation and PIP workflows
+- HR Documents for offer letters, contracts, payslips, warnings, terminations, templates, payroll
+  import, and generated-document archive
+- Settings, branding, organisation config, and admin activity log
 
-- **Supabase Mode**: Default. Uses the Supabase JS client and direct Postgres interactions.
-- **Laravel Mode**: Routes all data requests to the Laravel API in the `backend/` directory. Useful for custom business logic or complex RLS-like logic (implemented via `EmployeeScopeService`).
+## Project Structure
 
-To enable Laravel mode, set:
+```text
+.
+├── backend/            # Optional Laravel API
+├── complete-setup.sql  # Fresh Supabase baseline schema snapshot
+├── docs/               # Current documentation index and focused references
+├── migrations/         # Active Supabase migration chain and rollback companions
+├── public/
+├── src/                # Vite SPA modules, adapters, UI, data layer
+├── supabase/functions/ # Edge Functions
+└── tests/              # Playwright and support tests
+```
+
+## Local Setup
+
+Install dependencies and start the frontend:
+
+```bash
+npm install
+npm run dev
+```
+
+Run the usual frontend checks:
+
+```bash
+npm run build
+npm run qa:hardening
+npm run qa:e2e
+```
+
+Use `rtk` when working in the Codex shell, for example `rtk npm run build`.
+
+## Supabase Setup
+
+For a fresh Supabase project, follow [docs/fresh-supabase-setup.md](docs/fresh-supabase-setup.md).
+The short version is:
+
+1. Run [complete-setup.sql](complete-setup.sql).
+2. Run the active migrations listed in the fresh setup guide.
+3. Run [supabase/01_dummy_seed.sql](supabase/01_dummy_seed.sql) for demo data.
+4. Copy [.env.example](.env.example) to `.env` and fill in `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`.
+
+The SQL seed prepares employee rows and `auth_email`, but it does not create Supabase Auth users.
+Create the first login manually in Supabase Authentication using the same email as the employee
+row. Recommended first login: `superadmin@demo.local`.
+
+## Laravel Setup
+
+Laravel mode is optional. Use it when the deployment should route browser writes and reads through a
+PHP API instead of direct Supabase table access.
+
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+php artisan serve
+```
+
+Then set these frontend variables:
+
 ```env
 VITE_BACKEND_TYPE=laravel
 VITE_LARAVEL_API_URL=http://localhost:8000/api/v1
 ```
 
-## Core modules
+See [backend/README.md](backend/README.md) and
+[docs/laravel-backend-local-runbook.md](docs/laravel-backend-local-runbook.md) for details.
 
-- Dashboard and department KPI drill-down
-- Employee directory and role-aware access
-- Competency assessment and training records
-- KPI definitions, targets, approvals, and exports
-- Probation and PIP workflows
-- Settings, branding, and org configuration
+## Deployment
 
-## Project structure
+- Hostinger/static deployment: [docs/hostinger-github-autodeploy.md](docs/hostinger-github-autodeploy.md)
+- VPS deployment with Laravel: [docs/cloud-vps-deployment.md](docs/cloud-vps-deployment.md)
+- Supabase Edge Functions: [docs/supabase-functions-deploy.md](docs/supabase-functions-deploy.md)
 
-```text
-.
-├── backend/            # Laravel API (PHP)
-├── complete-setup.sql
-├── migrations/
-├── docs/
-├── public/
-├── src/
-├── supabase/
-│   └── functions/
-└── tests/
-```
+## Documentation
 
-## Fresh setup (Laravel Backend)
+Start with [docs/README.md](docs/README.md) for the current documentation map.
 
-1. Ensure you have PHP 8.2+, Composer, and PostgreSQL installed.
-2. Navigate to the `backend/` directory.
-3. Install dependencies: `composer install`.
-4. Copy `.env.example` to `.env` and configure your database (port 54322 for local Supabase Postgres).
-5. Generate app key: `php artisan key:generate`.
-6. Run migrations: `php artisan migrate`.
-7. Start the API: `php artisan serve`.
-8. Configure the frontend `.env` to use `VITE_BACKEND_TYPE=laravel`.
+Important current-state references:
 
-## Fresh setup (Supabase Direct)
+- [Project status](docs/project-status.md)
+- [Missing features](docs/missing-features.md)
+- [Code audit](docs/code-audit.md)
+- [Architecture](docs/architecture.md)
+- [API endpoints](docs/api-endpoints.md)
+- [Database schema](docs/db-schema.md)
+- [Environment guide](docs/env-guide.md)
 
-1. Create a new Supabase project.
-2. Run the SQL files in [docs/fresh-supabase-setup.md](/D:/web/hris/docs/fresh-supabase-setup.md) in order.
-3. Copy [.env.example](/D:/web/hris/.env.example) to `.env`.
-4. Fill in:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_AUTH_REDIRECT_URL` for your local or production URL
-5. Install dependencies with `npm install`.
-6. Start the app with `npm run dev`.
+## Security Notes
 
-## Auth bootstrap
+- Keep RLS enabled and keep Data API grants aligned with policies.
+- Never expose Supabase service-role keys to frontend hosting.
+- Keep privileged user management, notifications, and server-side exports behind Edge Functions or
+  the Laravel API.
+- Replace seeded/demo passwords before any real rollout.
 
-The SQL seed prepares employee rows and `auth_email`, but it does not create Supabase Auth users. Create the first login manually in `Supabase -> Authentication -> Users`, using the same email as the employee row. The app links `auth_id` automatically on first successful sign-in.
+## License
 
-Recommended first login:
-
-- `superadmin@demo.local`
-
-## Edge Functions
-
-This repo includes these function domains:
-
-- `admin-user-mutations`
-- `auth-callbacks`
-- `approval-notifications`
-- `report-exports`
-
-Deploy and configure them with [docs/supabase-functions-deploy.md](/D:/web/hris/docs/supabase-functions-deploy.md).
-
-## Hostinger deployment
-
-The preferred production flow is Hostinger direct Git deployment, not GitHub Actions FTP upload.
-
-Use [docs/hostinger-github-autodeploy.md](/D:/web/hris/docs/hostinger-github-autodeploy.md) for the current setup. In short:
-
-1. Connect the GitHub repo in Hostinger hPanel.
-2. Set the app type to a Vite/static build.
-3. Add frontend env vars in Hostinger:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_AUTH_REDIRECT_URL`
-   - optional monitoring/session values
-4. Make sure Supabase Auth `Site URL` and redirect URLs match the live domain.
-
-## Cloud / VPS Deployment
-
-For custom VPS deployments (Ubuntu, Nginx, Docker), see [docs/cloud-vps-deployment.md](/D:/web/hris/docs/cloud-vps-deployment.md). This setup is recommended when using the **Laravel Backend** for production.
-
-## Security notes
-
-- Keep RLS enabled.
-- Keep Data API grants aligned with bootstrap and migrations.
-- Never put `SERVICE_ROLE_KEY` in frontend hosting env.
-- Use unique passwords for seeded demo users before any real rollout.
-
-## Supporting docs
-
-- [Fresh Supabase setup](/D:/web/hris/docs/fresh-supabase-setup.md)
-- [Tech stack](/D:/web/hris/docs/tech-stack.md)
-- [Database schema](/D:/web/hris/docs/db-schema.md)
-- [API endpoints](/D:/web/hris/docs/api-endpoints.md)
-- [Coding standards](/D:/web/hris/docs/coding-standards.md)
-- [Environment guide](/D:/web/hris/docs/env-guide.md)
-- [Git workflow](/D:/web/hris/docs/git-workflow.md)
-- [Supabase functions deploy](/D:/web/hris/docs/supabase-functions-deploy.md)
-- [Hostinger deployment](/D:/web/hris/docs/hostinger-github-autodeploy.md)
-- [Cloud / VPS deployment](/D:/web/hris/docs/cloud-vps-deployment.md)
-- [Architecture map](/D:/web/hris/docs/architecture.md)
-- [Project status](/D:/web/hris/docs/project-status.md)
-
-## Licenses
-
-This is not an open source project, every kind of use must have a permission from Vanaila Digital.
+This is not an open source project. Any use requires permission from Vanaila Digital.

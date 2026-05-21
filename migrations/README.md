@@ -4,7 +4,7 @@ This folder now keeps only the active schema upgrade chain for normal project de
 
 ## Active Migrations
 - Run these for existing environments in timestamp order.
-- Fresh environments should start with [complete-setup.sql](/D:/web/hris/complete-setup.sql) and then run only the migrations listed in [fresh-supabase-setup.md](/D:/web/hris/docs/fresh-supabase-setup.md).
+- Fresh environments should start with [complete-setup.sql](../complete-setup.sql) and then run only the migrations listed in [fresh-supabase-setup.md](../docs/fresh-supabase-setup.md).
 - Current grouped chain:
   - `20260307_performance_foundation.sql`
   - `20260308_probation_workflow.sql`
@@ -24,10 +24,21 @@ Rollback companions use `YYYYMMDD_description.rollback.sql`. They are kept besid
 forward migration they reverse, but the canonical bootstrap chain only runs forward migrations.
 
 Current rollback companions:
+- `20260307_performance_foundation.rollback.sql`
+- `20260308_probation_workflow.rollback.sql`
+- `20260308_role_scope_access.rollback.sql`
+- `20260308_kpi_governance.rollback.sql`
+- `20260309_security_qa_hardening.rollback.sql`
+- `20260408_data_api_grants.rollback.sql`
+- `20260409_drop_legacy_employee_assessment_columns.rollback.sql`
+- `20260409_manpower_planning.rollback.sql`
+- `20260409_dashboard_server_views.rollback.sql`
+- `20260417_hr_documents_foundation.rollback.sql`
+- `20260429_hr_payroll_records.rollback.sql`
 - `20260507_hr_document_archive.rollback.sql`
 
 ## Archived Helpers
-One-off helper scripts and superseded split migrations were moved to [archive](/D:/web/hris/migrations/archive):
+One-off helper scripts and superseded split migrations were moved to [archive](archive):
 
 - `20260307_optional_backfill_legacy.sql`
 - `20260307_safe_next_steps.sql`

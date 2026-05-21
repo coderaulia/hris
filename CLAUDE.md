@@ -21,7 +21,7 @@ docs/tech-stack.md → docs/project-status.md → docs/db-schema.md → docs/api
 
 ## Documentation Timing
 
-Do not update `docs/commit-logs.md`, `agents.md`, or `docs/project-status.md` after every commit.
+Do not update `docs/commit-logs.md`, `AGENTS.md`, or `docs/project-status.md` after every commit.
 
 Update those files only:
 
@@ -47,7 +47,7 @@ Files: [list]
 DB tables: [list or none]
 Notes: [risks / migration needed?]
 
-**agents.md**
+**AGENTS.md**
 [YYYY-MM-DD] [name]
 
 Summary: [1 sentence]
@@ -67,7 +67,7 @@ Output: [files]
 At the end of the session, or when the user asks:
 
 1. docs/commit-logs.md → add a short session summary
-2. agents.md → add a concise handoff note
+2. AGENTS.md → add a concise handoff note
 3. project-status.md → update only current state, blockers, or completed milestones
 4. api-endpoints.md → add new routes
 5. db-schema.md → add new tables/columns

@@ -23,5 +23,13 @@ Open notes: Superseded on 2026-05-09 for rollback companions. Remaining gaps are
 Summary: Added rollback companions for every active Supabase migration and refreshed the audit gap list.
 Scope: Supabase migration rollback scripts, schema discipline docs, missing-features/code-audit/status docs.
 Outcome: The active chain now has 12 forward migrations and 12 rollback companions; rollback coverage is no longer the next open audit item.
-Verification: `npm run qa:hardening` passed. `rtk` is still unavailable on PATH, so commands were run directly.
+Verification: `npm run qa:hardening` passed.
 Open notes: Rollback scripts should be dry-run newest-first against a disposable database before production recovery use. Next audit gaps are backend feature-test breadth, Playwright workflow coverage, e-signature, notification live QA, and production-like payroll import QA.
+
+## 2026-05-21 Codex
+
+Summary: Reconciled docs to the current project shape and removed redundant historical pages.
+Scope: README, docs index, status/audit/handoff docs, setup/deployment links, migration docs.
+Outcome: `docs/README.md` is now the docs map; obsolete context, Phase 1 runbook, and refactor-only docs were removed; stale absolute links and outdated `rtk` notes were corrected.
+Verification: Markdown link/search checks and `git diff --check` were used for the doc-only cleanup.
+Open notes: Keep future docs updates focused in the docs index, project status, missing-features, and code-audit surfaces instead of recreating duplicate context pages.

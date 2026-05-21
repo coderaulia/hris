@@ -1,6 +1,6 @@
 # Git Workflow
 
-Updated: 2026-04-29
+Updated: 2026-05-21
 
 ## Branching
 
@@ -28,11 +28,11 @@ git diff -- <files you plan to commit>
 
 Pick the checks that match the change:
 
-- Frontend code: `npm run build`
-- Schema/security: `npm run qa:hardening`
-- JS syntax: `node --check <file>`
-- PHP syntax: `php -l <file>`
-- Browser behavior: focused Playwright spec
+- Frontend code: `rtk npm run build`
+- Schema/security: `rtk npm run qa:hardening`
+- JS syntax: `rtk node --check <file>`
+- PHP syntax: `rtk php -l <file>`
+- Browser behavior: focused Playwright spec through `rtk npx playwright test <spec>`
 
 ## Documentation Timing
 
@@ -42,7 +42,7 @@ Session/status docs:
 
 - `docs/project-status.md`
 - `docs/commit-logs.md`
-- `agents.md`
+- `AGENTS.md`
 
 Reference docs should be updated in the same working unit when code changes affect them:
 
@@ -52,4 +52,5 @@ Reference docs should be updated in the same working unit when code changes affe
 
 ## Current Known Dirty-Worktree Caveat
 
-At the time this guide was created, `_legacy/*` deletions were already present and unrelated to the manpower/doc-maintenance work. Keep them out of commits unless the user explicitly asks to remove legacy files.
+Always inspect `git status --short` before staging. If unrelated user-owned changes are present,
+leave them out of the docs or code slice unless the user explicitly asks to include them.

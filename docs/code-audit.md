@@ -1,6 +1,6 @@
 # Code Audit
 
-Updated: 2026-05-09
+Updated: 2026-05-21
 
 This document captures current code flaws and missing features found during the local audit. Keep
 this page focused on actionable implementation gaps; keep broad delivery status in
@@ -24,8 +24,11 @@ this page focused on actionable implementation gaps; keep broad delivery status 
   coverage for superadmin employee create/update/delete and manager guardrails against direct
   employee-management surfaces.
 - Laravel feature tests were expanded again on 2026-05-09, but `php` and `composer` were still not
-  available on PATH in the local shell, so they were not run in this pass.
-- `rtk` is required by local instructions but was not available on PATH in this shell.
+  available on PATH in that local shell, so they were not run in that pass.
+- `rtk` is available in the current shell and should prefix verification commands per repo
+  instructions.
+- 2026-05-21 docs reconciliation removed redundant historical docs, added `docs/README.md`, and
+  refreshed stale absolute links. No application behavior changed.
 
 ## Resolved Findings
 
@@ -146,6 +149,18 @@ Fixed locally on 2026-05-09:
   `npm run build`, and `npm run qa:hardening` passed after the change.
 
 ## Medium Priority Findings
+
+### Documentation surface should stay current and non-duplicative
+
+The 2026-05-21 docs pass removed obsolete duplicate pages and made `docs/README.md`,
+`docs/project-status.md`, `docs/missing-features.md`, and this file the active navigation/status
+surface.
+
+Keep these rules:
+- Do not recreate broad duplicate context docs when README/status already cover the current shape.
+- Keep `docs/commit-logs.md`, `AGENTS.md`, and `docs/project-status.md` lean.
+- Put new implementation findings in this file and product gaps in `docs/missing-features.md`.
+- Run markdown link checks after deleting or moving docs.
 
 ### Backend feature test coverage still needs execution and deeper edge breadth
 

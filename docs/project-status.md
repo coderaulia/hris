@@ -1,9 +1,9 @@
 # Project Status
 
-Last updated: 2026-05-09
+Last updated: 2026-05-21
 
-This is the current project recap for handoff and planning. Detailed gap tracking lives in
-`docs/missing-features.md`; audit findings and verification notes live in `docs/code-audit.md`.
+This is the current project recap for handoff and planning. Use `docs/README.md` as the docs map,
+`docs/missing-features.md` for confirmed gaps, and `docs/code-audit.md` for audit fix order.
 
 ## Current Shape
 
@@ -17,6 +17,8 @@ This is the current project recap for handoff and planning. Detailed gap trackin
   model for the alternate API path.
 - Core modules: dashboard, employees, manpower planning, recruitment pipeline, assessments,
   training records, settings, KPI governance, probation/PIP, and HR Documents.
+- Feature composition is environment-driven through `VITE_ENABLED_MODULES`; required base modules
+  remain enabled automatically.
 - Build performance: route-level lazy loading and vendor chunking are in place; PDF generation is
   lazy-loaded and split into smaller PDF-adjacent chunks.
 
@@ -41,7 +43,10 @@ This is the current project recap for handoff and planning. Detailed gap trackin
 - Payroll CSV import persists reusable employee/month rows through both adapter paths.
 - PDF vendor chunking is below the current Vite warning threshold from the last recorded build.
 - Process docs now exist for API endpoints, architecture, coding standards, environment setup, git
-  workflow, schema, session logs, and agent handoff.
+  workflow, schema, session logs, docs indexing, and agent handoff.
+- Redundant historical docs were removed on 2026-05-21: the old project context page, Phase 1
+  runbook, and refactor-only module/smoke notes. Current equivalents live in README, this status
+  page, architecture, coding standards, and code audit docs.
 
 ## HR Documents
 
@@ -81,7 +86,8 @@ Most recent recorded checks:
   document archive upload/download adapter coverage.
 - Laravel PHP feature tests were added but have not been run locally because `php` and `composer`
   were unavailable on PATH in this shell.
-- Local `rtk` instructions exist, but `rtk` is currently unavailable on PATH in this shell.
+- `rtk` is available in this shell and should prefix local verification commands per repo
+  instructions.
 
 ## Open Gaps
 
@@ -108,3 +114,5 @@ Most recent recorded checks:
   Laravel scoping, added targeted backend/adapter coverage, and split PDF vendor chunks.
 - 2026-05-09: Added rollback companions for every active Supabase migration and refreshed audit
   docs so rollback coverage is no longer the next open item.
+- 2026-05-21: Refreshed the documentation surface to current state, added a docs index, removed
+  stale historical/refactor docs, and fixed outdated absolute links.

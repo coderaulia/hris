@@ -48,5 +48,5 @@ In `Supabase -> Authentication -> URL Configuration`, set:
 1. Confirm the domain points to Hostinger.
 2. Confirm the repo branch in Hostinger is the branch you actually deploy from.
 3. Confirm the frontend env vars are saved in Hostinger before the first build.
-4. Confirm [healthz.json](/D:/web/hris/public/healthz.json) is reachable after deploy.
+4. Confirm [healthz.json](../public/healthz.json) is reachable after deploy.
 5. Confirm Supabase Auth URLs include the live domain.

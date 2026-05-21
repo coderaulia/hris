@@ -1,9 +1,24 @@
 # Commit Logs
 
-Last updated: 2026-05-09  
+Last updated: 2026-05-21
 Current baseline on `main`: active working branch
 
 This file is a lean session log. Update it at the end of a work session or when the user asks, not after every commit.
+
+## 2026-05-21
+
+Reconciled the documentation surface against the current project state. Added `docs/README.md` as
+the docs map, refreshed README/status/audit references, corrected stale absolute links, and removed
+redundant historical docs:
+
+- `docs/context.md`
+- `docs/development-phase1-runbook.md`
+- `docs/refactor/module-map.md`
+- `docs/refactor/smoke-checklist.md`
+
+Current setup, architecture, schema, deployment, audit, missing-features, and handoff docs remain in
+place as focused references. Verification for this doc-only cleanup used markdown link/search
+checks plus `git diff --check`; no application code changed.
 
 ## 2026-05-09
 
@@ -18,7 +33,7 @@ scripts are reverse-chain recovery tools that should be dry-run newest-first bef
 use.
 
 Verification: `npm run qa:hardening` passed with 12 forward migrations and 12 rollback migrations
-scanned. `rtk` remains unavailable on PATH in this shell.
+scanned.
 
 ## 2026-05-08
 
@@ -42,7 +57,7 @@ Verification: `npm run build`, `npm run qa:hardening`, and
 
 Manpower planning Phase 3 is documented as complete for the current implementation. Recruitment-card deletion now goes through the backend adapter with Supabase/Laravel support and Laravel `DELETE /api/v1/recruitment-pipeline/{id}`.
 
-The documentation process is aligned with `claude.md` around lean session updates. `docs/commit-logs.md`, `agents.md`, and `docs/project-status.md` should be updated at session end or on request, not after every commit.
+The documentation process is aligned with `CLAUDE.md` around lean session updates. `docs/commit-logs.md`, `AGENTS.md`, and `docs/project-status.md` should be updated at session end or on request, not after every commit.
 
 HR Documents documentation was refreshed for the new reusable payroll import path. The active migration chain now includes `20260429_hr_payroll_records.sql`, and the setup/testing docs call out payroll CSV import verification for payslip generation.
 
