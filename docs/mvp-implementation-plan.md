@@ -1,6 +1,6 @@
 # MVP Implementation Plan
 
-_Based on: hr-suite-growth-audit.md × current project state (2026-05-23)_
+_Based on: hr-suite-growth-audit.md × current project state (2026-05-27)_
 _Goal: sellable governance product, not generic HRIS_
 
 ---
@@ -17,7 +17,7 @@ This removes the rip-and-replace objection on first sales call.
 
 ---
 
-## Phase 0 — Stop (immediate, before touching any code)
+## Phase 0 — Stop (immediate, before touching any code) ✅
 
 These are scope traps. Stop spending time here.
 
@@ -32,13 +32,13 @@ These are scope traps. Stop spending time here.
 
 ---
 
-## Phase 1 — Email Delivery via Resend ✉️
+## Phase 1 — Email Delivery via Resend ✉️ — CODE COMPLETE ✅
 
 **Why first:** Approval workflows feel fake without email. KPI approvals, probation decisions, PIP updates all dispatch notifications — but currently skip delivery because secrets are missing. This is demo-critical.
 
-**Current state:** `supabase/functions/approval-notifications/index.ts` is implemented and wired. It reads `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM` from Supabase secrets. Missing → logs `"unconfigured"` and skips.
+**Current state:** `supabase/functions/approval-notifications/index.ts` is fully implemented with Resend provider support. Falls back to dry-run mode when secrets are missing.
 
-**Steps:**
+**Remaining (config-only, no code):**
 
 1. Create Resend account → get API key
 2. Set secrets in Supabase Dashboard → Project Settings → Edge Functions:
@@ -57,107 +57,90 @@ These are scope traps. Stop spending time here.
 
 ---
 
-## Phase 2 — Visible Audit Trail Screen 🔍
+## Phase 2 — Visible Audit Trail Screen 🔍 — DONE ✅
 
-**Why:** `admin_activity_log` is written. Nobody can see it. For a governance product, the viewable audit log IS the selling point. An HR director will ask: "Who changed this KPI target, when, approved by whom?"
+**Why:** `admin_activity_log` is written. For a governance product, the viewable audit log IS the selling point.
 
-**Current state:**
-- `supabase-adapter.js:190` — reads `admin_activity_log`, limited to 100 rows, ordered by `created_at`
-- `src/modules/data/activity.js` — `logActivity()` writes, `fetchActivityLogs()` reads into `state.activityLogs`
-- `module-navigation.js:240` — `admin_activity_log` listed under Settings endpoints
-- No UI renders this data to the user
+**Implemented:**
+- ✅ Dedicated "Audit Log" tab in Settings (HR/superadmin only) with navigation item
+- ✅ Full filterable table: Timestamp | User | Action | Module | Record ID | Details
+- ✅ Filter by: module (KPI / Assessment / Probation / PIP / Employee / Documents / Settings / Organization), date range, user
+- ✅ Actor name resolution from employee database
+- ✅ "Export Audit Log" button → Excel via exceljs (client-side)
+- ✅ Users & Roles section shows last 10 entries with link to full log
+- ✅ `logActivity()` called on all meaningful mutations across modules
 
-**Steps:**
-
-1. Add "Audit Log" tab inside Settings module (HR/superadmin only)
-2. Render `state.activityLogs` as a filterable table:
-   - Columns: `Timestamp | User | Action | Module | Record ID | Details`
-   - Filter by: module (KPI / Probation / PIP / Documents), date range, user
-   - Show `changed_by` name (join against `state.db` for display name)
-3. Add "Export Audit Log" button → Excel via exceljs (see Phase 3 pattern)
-4. Ensure `logActivity()` is called on all meaningful mutations: KPI definition save, target submit/approve/reject, probation status change, PIP action, document generation
-
-**Done when:** HR director can open Settings → Audit Log, see who approved a KPI target, and export to Excel.
+**Done:** HR director can open Settings → Audit Log, see who approved a KPI target, filter by module/date/user, and export to Excel.
 
 ---
 
-## Phase 3 — User-Facing Data Export 📊
+## Phase 3 — User-Facing Data Export 📊 — DONE ✅
 
-**Why:** Mid-market buyers won't commit data without an exit. "Export all to Excel" per module is a trust signal AND a sale unlocker. `exceljs` is already installed — it just isn't user-facing.
+**Why:** Mid-market buyers won't commit data without an exit. "Export all to Excel" per module is a trust signal AND a sale unlocker.
 
-**Current state:** `exceljs@^4.4.0` in package.json. No user-facing export buttons confirmed outside of payroll CSV download template.
+**Implemented:**
 
-**Modules to cover (in priority order):**
+| Module | Export | Status |
+|---|---|---|
+| KPI Governance | Department KPI Excel/PDF, Employee KPI PDF (edge function) | ✅ |
+| KPI Records | Client-side Excel export with filters | ✅ |
+| Assessments | Client-side Excel export (scores per employee per period) | ✅ |
+| Probation / PIP | Excel + PDF export | ✅ |
+| Employee Directory | CSV export + Excel export | ✅ |
+| Audit Log | Excel export with active filters | ✅ |
 
-| Module | Export content |
-|---|---|
-| KPI Governance | KPI definitions + target versions + approval history per employee |
-| Assessments | Competency scores per employee per period |
-| Probation / PIP | Status, reviewer, dates, outcomes |
-| Employee Directory | Full employee list with roles, departments, positions |
-| Audit Log | (Covered in Phase 2) |
+**Shared utility:** `src/lib/exportUtils.js` — `exportToExcel(rows, filename, options)` and `exportToCSV(rows, filename)` using exceljs client-side.
 
-**Steps per module:**
-
-1. Add `exportToExcel(data, filename)` util in `src/lib/exportUtils.js` (shared, one implementation)
-2. Add "Export to Excel" button in each module's list/table view — HR/superadmin only
-3. Map the module's current rendered data to flat rows (no transformations needed — use what's already on screen)
-4. Wire button → `exportToExcel()` → browser download
-
-**Implementation note:** Do NOT create new API calls for export. Export what's already loaded in `state`. If a user needs full history, they scroll/filter first.
-
-**Done when:** HR director can export KPI results for one employee to Excel in under 3 clicks.
+**Done:** HR director can export KPI results, assessment records, employee directory, and audit log to Excel in under 3 clicks.
 
 ---
 
-## Phase 4 — CSV Import for Onboarding 📥
+## Phase 4 — CSV Import for Onboarding 📥 — DONE ✅
 
-**Why:** Mid-market buyer has 50–250 employees in a spreadsheet. If they can't import, onboarding blocks the deal. The setup fee covers this work — but it must work.
+**Why:** Mid-market buyer has 50–250 employees in a spreadsheet. If they can't import, onboarding blocks the deal.
 
-**Current state:** Payroll CSV import is implemented (`importPayrollRecords`). Employee directory has no import. KPI definitions have no import.
+**Implemented:**
 
-**Steps:**
+1. **Employee CSV import** ✅
+   - Template: `ID, Name, Position, Seniority, Join_Date, Department, Manager_ID, Role, Email`
+   - Full validation, duplicate detection, preview table, confirmation dialog
+   - Import summary: N created, N updated, N errors with row numbers
+   - Activity logging on import
 
-1. **Employee CSV import** (Priority 4a)
-   - Define CSV template: `name, email, position, department, role, hire_date, manager_email`
-   - Add "Import Employees" button (superadmin only) → file picker → parse CSV → validate → batch upsert via `backend.employees` adapter
-   - Download CSV template button next to import
-   - Show import summary: N created, N updated, N errors with row numbers
+2. **KPI Definition import** ✅
+   - JSON import (existing): full KPI definition array
+   - CSV import (new): `kpi_name, department, position, target, unit, period, description`
+   - Downloadable CSV template button
+   - Validation, preview, and confirmation flow
 
-2. **KPI Definition import** (Priority 4b)
-   - Define CSV template: `kpi_name, department, position, weight, target_value, unit, period`
-   - Add "Import KPI Definitions" button in KPI governance (HR/superadmin only)
-   - Reuse import pattern from 4a
-
-**Done when:** Can onboard a 50-person company from spreadsheet to working KPI tracking in one session.
+**Done:** Can onboard a 50-person company from spreadsheet to working KPI tracking in one session.
 
 ---
 
-## Phase 5 — Backup & Recovery Story 📋
+## Phase 5 — Backup & Recovery Story 📋 — DONE ✅
 
 **Why:** Buyer's IT will ask "what if you disappear or data is lost?" Not having an answer kills the deal silently.
 
-**This is documentation, not code.** Per-customer Supabase instances (one project per customer) naturally isolate data. The story already exists — it just isn't written down.
+**Delivered:**
 
-**Deliverables:**
+- ✅ `docs/data-backup-recovery.md` — comprehensive document covering:
+  - Supabase automatic daily backups + PITR
+  - On-demand export procedures (Dashboard, CLI, pg_dump)
+  - Customer data ownership policy
+  - Recovery procedures for common scenarios
+  - Disaster recovery SLA (RPO/RTO targets)
+  - Security measures summary
+  - FAQ for non-technical buyers
 
-1. Add `docs/data-backup-recovery.md`:
-   - Supabase automatic daily backups (PITR on Pro plan)
-   - How to export a full database dump on demand
-   - Customer data ownership: customer can request full export at any time
-   - SLA / contact if something goes wrong
-
-2. One-pager "Data Security & Backup" for non-technical buyers (can live in a sales deck, not in codebase)
-
-**Done when:** Can answer "what happens to our data?" in a sales call without hesitation.
+**Done:** Can answer "what happens to our data?" in a sales call without hesitation.
 
 ---
 
 ## Phase 6 — Case Study & Sales Asset 📝
 
-**Why:** This is the highest-ROI work. Live reference customer (own company) is the only sales asset that converts without a long cycle. Everything else in this plan supports the demo — this is the thing that gets the meeting.
+**Why:** This is the highest-ROI work. Live reference customer (own company) is the only sales asset that converts without a long cycle.
 
-**This is not code.** Do in parallel with Phase 1–2.
+**This is not code.** Do in parallel with Phase 1 config.
 
 **Steps:**
 
@@ -176,29 +159,56 @@ These are scope traps. Stop spending time here.
 
 ## Milestone Summary
 
-| Phase | Work type | Blocker for? |
-|---|---|---|
-| 0 — Stop | Scope discipline | Everything else |
-| 1 — Resend email | Config + test | Demo credibility |
-| 2 — Audit trail UI | Frontend feature | Core selling point |
-| 3 — Data export | Frontend feature | Trust / deal unlocker |
-| 4 — CSV import | Frontend feature | Onboarding / setup fee |
-| 5 — Backup story | Documentation | IT sign-off |
-| 6 — Case study | Writing / sales | First paid customer |
-
-Phases 1 and 6 run in parallel. Phases 2, 3, 4 are sequential (2 first, then 3, then 4). Phase 5 can run anytime.
-
-**Total engineering effort estimate:** ~2–3 weeks of focused subtraction + targeted additions. Not new building.
+| Phase | Work type | Status | Blocker for? |
+|---|---|---|---|
+| 0 — Stop | Scope discipline | ✅ Done | Everything else |
+| 1 — Resend email | Config + test | ✅ Code complete (needs secrets) | Demo credibility |
+| 2 — Audit trail UI | Frontend feature | ✅ Done | Core selling point |
+| 3 — Data export | Frontend feature | ✅ Done | Trust / deal unlocker |
+| 4 — CSV import | Frontend feature | ✅ Done | Onboarding / setup fee |
+| 5 — Backup story | Documentation | ✅ Done | IT sign-off |
+| 6 — Case study | Writing / sales | ⏳ Pending | First paid customer |
 
 ---
 
 ## What "Done" Looks Like for MVP
 
 A mid-market HR director can:
-- Log in, see their company's KPI structure with approval history
-- Submit a KPI target and receive an email when it's approved
-- Open Audit Log → see who changed what and when → export to Excel
-- Export competency assessment results for a performance review
-- Ask "where's our data?" and get a clear, confident answer
+- ✅ Log in, see their company's KPI structure with approval history
+- ⏳ Submit a KPI target and receive an email when it's approved _(needs Resend secrets)_
+- ✅ Open Audit Log → see who changed what and when → export to Excel
+- ✅ Export competency assessment results for a performance review
+- ✅ Ask "where's our data?" and get a clear, confident answer
 
 That is the sellable product. Everything else is later.
+
+---
+
+## Product Roadmap
+
+### 🚀 Coming Soon
+
+| Feature | Description |
+|---|---|
+| **Live Attendance** | Picture and GPS-location based attendance capture from mobile. Employees clock in/out with selfie + geolocation proof. |
+
+### 🔨 On Progress (In Development)
+
+| Feature | Description |
+|---|---|
+| **Manpower Planning** | Headcount planning, gap analysis, and approval workflow by department. Hidden via `VITE_ENABLED_MODULES` until complete. |
+| **Recruitment Board** | Candidate pipeline tracking from approved headcount through hiring stages to onboarding. |
+
+### 🎯 Custom Features Upon Request
+
+We build custom modules tailored to your company's specific HR processes. Examples:
+
+- Custom approval workflows (multi-level, cross-department)
+- Industry-specific compliance tracking
+- Integration with existing payroll systems (Talenta, Gadjian, etc.)
+- Custom report templates and dashboards
+- Overtime and shift management
+- Leave management with approval chains
+- Employee self-service portal customization
+
+_Contact us to discuss your requirements and get a scoping estimate._
