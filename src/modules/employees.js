@@ -1955,6 +1955,50 @@ export function exportEmployeeCSV() {
     document.body.removeChild(link);
 }
 
+export async function exportEmployeeExcel() {
+    if (!isAdmin()) { await notify.error('Access Denied'); return; }
+    const { exportToExcel } = await import('../lib/exportUtils.js');
+
+    const rows = Object.values(state.db).map(rec => ({
+        id: rec.id || '-',
+        name: rec.name || '-',
+        position: rec.position || '-',
+        seniority: rec.seniority || '-',
+        department: rec.department || '-',
+        join_date: rec.join_date || '-',
+        manager_id: rec.manager_id || '-',
+        manager_name: state.db[rec.manager_id]?.name || '-',
+        role: rec.role || 'employee',
+        email: rec.auth_email || '-',
+    }));
+
+    if (rows.length === 0) {
+        await notify.warn('No employees to export.');
+        return;
+    }
+
+    try {
+        await exportToExcel(rows, `employee-directory-${new Date().toISOString().slice(0, 10)}`, {
+            sheetName: 'Employees',
+            columns: [
+                { header: 'ID', key: 'id', width: 15 },
+                { header: 'Name', key: 'name', width: 25 },
+                { header: 'Position', key: 'position', width: 22 },
+                { header: 'Seniority', key: 'seniority', width: 14 },
+                { header: 'Department', key: 'department', width: 18 },
+                { header: 'Join Date', key: 'join_date', width: 14 },
+                { header: 'Manager ID', key: 'manager_id', width: 15 },
+                { header: 'Manager Name', key: 'manager_name', width: 20 },
+                { header: 'Role', key: 'role', width: 12 },
+                { header: 'Email', key: 'email', width: 25 },
+            ],
+        });
+        await notify.success('Employee directory exported to Excel.');
+    } catch (err) {
+        await notify.error('Export failed: ' + err.message);
+    }
+}
+
 export async function importEmployeeCSV(input) {
     if (!isAdmin()) { await notify.error('Access Denied'); return; }
     if (!(await requireRecentAuth('importing employee data'))) return;

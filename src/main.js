@@ -150,6 +150,8 @@ const {
 	fillTrainingRec,
 	toggleOngoing,
 	initiateSelfAssessment: recordSelfAssess,
+	exportAssessmentRecordsExcel,
+	exportKpiRecordsExcel,
 } = createFeatureActions("records", [
 	"renderRecordsTable",
 	"openReportByVal",
@@ -167,6 +169,8 @@ const {
 	"fillTrainingRec",
 	"toggleOngoing",
 	"initiateSelfAssessment",
+	"exportAssessmentRecordsExcel",
+	"exportKpiRecordsExcel",
 ]);
 
 const {
@@ -261,6 +265,7 @@ const {
 	deleteEmployeeData,
 	exportEmployeeCSV,
 	importEmployeeCSV,
+	exportEmployeeExcel,
 	clearEmployeeDirectoryFilters,
 } = createFeatureActions("employees", [
 	"switchManpowerTab",
@@ -290,6 +295,7 @@ const {
 	"deleteEmployeeData",
 	"exportEmployeeCSV",
 	"importEmployeeCSV",
+	"exportEmployeeExcel",
 	"clearEmployeeDirectoryFilters",
 ]);
 
@@ -496,6 +502,8 @@ window.__app = {
 	generatePipPlans,
 	updatePipPlanStatus,
 	initiateSelfAssessment: recordSelfAssess,
+	exportAssessmentRecordsExcel,
+	exportKpiRecordsExcel,
 
 	// Admin
 	renderAdminList,
@@ -537,6 +545,7 @@ window.__app = {
 	deleteEmployeeData,
 	exportEmployeeCSV,
 	importEmployeeCSV,
+	exportEmployeeExcel,
 	clearEmployeeDirectoryFilters,
 
 	// Documents

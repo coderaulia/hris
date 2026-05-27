@@ -868,7 +868,9 @@
                                         <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
                                     </button>
                                     <button class="btn btn-success w-100" onclick="window.__app.exportEmployeeCSV()"><i
-                                            class="bi bi-download me-1"></i>Export</button>
+                                            class="bi bi-download me-1"></i>CSV</button>
+                                    <button class="btn btn-warning w-100" onclick="window.__app.exportEmployeeExcel()"><i
+                                            class="bi bi-file-earmark-excel me-1"></i>Excel</button>
                                     <input type="file" id="emp-csv-upload" class="hidden" accept=".csv"
                                         onchange="window.__app.importEmployeeCSV(this)">
                                     <button class="btn btn-outline-primary w-100"
