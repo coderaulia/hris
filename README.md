@@ -1,24 +1,22 @@
 # HR Performance Suite
 
-HR Performance Suite is a Vite single-page app for employee assessment, KPI tracking,
-probation review, manpower planning, HR document generation, and role-based HR operations.
+> Performance & governance layer that sits beside the payroll tool your company already runs.
 
-The app supports two backend modes through `src/lib/backend.js`:
+HR Performance Suite handles KPI governance, competency tracking, probation reviews, and performance improvement plans — with approval trails, snapshot-locked records, and Indonesian HR document generation.
 
-- Supabase mode: the primary deployed model, using Supabase Auth, Postgres, RLS, Storage, and
-  Edge Functions.
-- Laravel mode: an optional API boundary under `backend/`, using Sanctum auth, Postgres, and
-  `EmployeeScopeService` for role-aware scoping.
+Keep your Talenta/Gadjian for payroll. We do the governance they do badly.
 
-## Stack
+---
 
-- Frontend: Vite, vanilla JavaScript modules, Tailwind-enhanced CSS, Bootstrap utilities
-- Backend options: Supabase direct adapter or Laravel API adapter
-- Charts: Chart.js
-- PDF and spreadsheet export: `jspdf`, `jspdf-autotable`, `exceljs`
-- QA: Playwright, schema/migration/RLS hardening scripts, Laravel feature tests
+## What It Does
 
-## Core Modules
+- **KPI Governance** — Define, version, approve, and track KPI targets with full audit history
+- **Competency Assessment** — Structured skill matrices with manager and self-assessment workflows
+- **Probation & PIP** — Monthly scoring, attendance deductions, and performance improvement tracking
+- **HR Documents** — Generate offer letters, contracts, warning letters, payslips, and termination letters from templates
+- **Audit Trail** — Every action logged, filterable, and exportable to Excel
+- **Data Export** — One-click Excel/PDF export across all modules
+- **Role-Based Access** — Superadmin, HR, Director, Manager, and Employee scopes
 
 - Dashboard and department KPI drill-down
 - Employee directory, role-aware access, and training records
@@ -33,106 +31,39 @@ The app supports two backend modes through `src/lib/backend.js`:
   per-type balances and approval chains
 - Settings, branding, organisation config, and admin activity log
 
-## Project Structure
-
-```text
-.
-├── backend/            # Optional Laravel API
-├── complete-setup.sql  # Fresh Supabase baseline schema snapshot
-├── docs/               # Current documentation index and focused references
-├── migrations/         # Active Supabase migration chain and rollback companions
-├── public/
-├── src/                # Vite SPA modules, adapters, UI, data layer
-├── supabase/functions/ # Edge Functions
-└── tests/              # Playwright and support tests
-```
-
-## Local Setup
-
-Install dependencies and start the frontend:
+## Quick Start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Run the usual frontend checks:
+For full setup instructions, database configuration, and deployment guides, see the [documentation](docs/README.md).
 
-```bash
-npm run build
-npm run qa:hardening
-npm run qa:e2e
-```
+---
 
-Use `rtk` when working in the Codex shell, for example `rtk npm run build`.
+## Product Roadmap
 
-## Supabase Setup
+| Status | Feature |
+|--------|---------|
+| ✅ Live | KPI governance, assessment, probation/PIP, HR documents, audit log, data export |
+| 🔨 In Progress | Manpower planning, recruitment pipeline |
+| 🚀 Coming Soon | Live attendance (photo + GPS) |
+| 🎯 Custom | Your specific HR workflows — built on request |
 
-For a fresh Supabase project, follow [docs/fresh-supabase-setup.md](docs/fresh-supabase-setup.md).
-The short version is:
-
-1. Run [complete-setup.sql](complete-setup.sql).
-2. Run the active migrations listed in the fresh setup guide.
-3. Run [supabase/01_dummy_seed.sql](supabase/01_dummy_seed.sql) for demo data.
-4. Copy [.env.example](.env.example) to `.env` and fill in `VITE_SUPABASE_URL`,
-   `VITE_SUPABASE_ANON_KEY`, and `VITE_AUTH_REDIRECT_URL`.
-
-The SQL seed prepares employee rows and `auth_email`, but it does not create Supabase Auth users.
-Create the first login manually in Supabase Authentication using the same email as the employee
-row. Recommended first login: `superadmin@demo.local`.
-
-## Laravel Setup
-
-Laravel mode is optional. Use it when the deployment should route browser writes and reads through a
-PHP API instead of direct Supabase table access.
-
-```bash
-cd backend
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan migrate
-php artisan serve
-```
-
-Then set these frontend variables:
-
-```env
-VITE_BACKEND_TYPE=laravel
-VITE_LARAVEL_API_URL=http://localhost:8000/api/v1
-```
-
-See [backend/README.md](backend/README.md) and
-[docs/laravel-backend-local-runbook.md](docs/laravel-backend-local-runbook.md) for details.
-
-## Deployment
-
-- Hostinger/static deployment: [docs/hostinger-github-autodeploy.md](docs/hostinger-github-autodeploy.md)
-- VPS deployment with Laravel: [docs/cloud-vps-deployment.md](docs/cloud-vps-deployment.md)
-- Supabase Edge Functions: [docs/supabase-functions-deploy.md](docs/supabase-functions-deploy.md)
+---
 
 ## Documentation
 
-Start with [docs/README.md](docs/README.md) for the current documentation map.
+All technical documentation lives in [`docs/`](docs/README.md):
 
-Important current-state references:
+- Setup & deployment guides
+- Database schema & migrations
+- Architecture & API reference
+- Environment configuration
 
-- [Project status](docs/project-status.md)
-- [Missing features](docs/missing-features.md)
-- [Code audit](docs/code-audit.md)
-- [Architecture](docs/architecture.md)
-- [API endpoints](docs/api-endpoints.md)
-- [Database schema](docs/db-schema.md)
-- [Environment guide](docs/env-guide.md)
-
-## Security Notes
-
-- Keep RLS enabled and keep Data API grants aligned with policies.
-- Never expose Supabase service-role keys to frontend hosting.
-- Keep privileged user management, notifications, and server-side exports behind Edge Functions or
-  the Laravel API.
-- Replace seeded/demo passwords before any real rollout.
+---
 
 ## License
 
-This is not an open source project. Any use requires permission from Vanaila Digital.
+Proprietary software by Vanaila Digital. All rights reserved.
