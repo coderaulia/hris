@@ -1394,3 +1394,136 @@ export async function importKpiJSON(input) {
     };
     reader.readAsText(file);
 }
+
+export async function importKpiCSV(input) {
+    if (state.currentUser?.role !== 'superadmin' && state.currentUser?.role !== 'hr') {
+        await notify.error('Access Denied');
+        return;
+    }
+    if (!(await requireRecentAuth('importing KPI definitions from CSV'))) return;
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function (e) {
+        try {
+            const text = String(e.target.result || '');
+            const lines = text.split(/\r\n|\n/);
+            const headerLine = (lines[0] || '').toLowerCase();
+            const startRow = headerLine.includes('kpi_name') || headerLine.includes('name') ? 1 : 0;
+            const errors = [];
+            const normalized = [];
+
+            for (let i = startRow; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const rowNo = i + 1;
+                const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(s => s.replace(/^"|"$/g, '').trim());
+
+                const name = parts[0] || '';
+                if (!name) {
+                    errors.push(`Row ${rowNo}: KPI name is required.`);
+                    continue;
+                }
+
+                const category = parts[1] || 'General';
+                const position = parts[2] || '';
+                const target = Number(parts[3] || 0);
+                if (Number.isNaN(target)) {
+                    errors.push(`Row ${rowNo}: target must be numeric.`);
+                    continue;
+                }
+
+                const unit = parts[4] || '';
+                const period = parts[5] || '';
+                const description = parts[6] || '';
+
+                normalized.push({
+                    name,
+                    category,
+                    position,
+                    target,
+                    unit,
+                    effective_period: period,
+                    description,
+                });
+            }
+
+            if (errors.length > 0) {
+                await notify.error(`CSV validation failed:\n${errors.slice(0, 5).join('\n')}${errors.length > 5 ? `\n...and ${errors.length - 5} more error(s)` : ''}`);
+                input.value = '';
+                return;
+            }
+
+            if (normalized.length === 0) {
+                await notify.warn('No valid KPI rows found in CSV.');
+                input.value = '';
+                return;
+            }
+
+            const previewRows = normalized.slice(0, 10).map(kpi => `
+                <tr>
+                    <td>${escapeHTML(kpi.name)}</td>
+                    <td>${escapeHTML(kpi.category)}</td>
+                    <td>${escapeHTML(kpi.position || '-')}</td>
+                    <td>${formatNumber(kpi.target)}</td>
+                    <td>${escapeHTML(kpi.unit || '-')}</td>
+                    <td>${escapeHTML(kpi.effective_period || '-')}</td>
+                </tr>
+            `).join('');
+
+            const proceed = await notify.confirm('', {
+                title: 'Confirm KPI CSV Import',
+                confirmButtonText: 'Import Now',
+                cancelButtonText: 'Cancel',
+                html: `
+                    <div class="text-start small">
+                        <div class="mb-2"><strong>Total KPI rows:</strong> ${normalized.length}</div>
+                        <div class="table-responsive" style="max-height:220px;">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead><tr><th>Name</th><th>Department</th><th>Position</th><th>Target</th><th>Unit</th><th>Period</th></tr></thead>
+                                <tbody>${previewRows || '<tr><td colspan="6" class="text-center text-muted">No rows</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                        <div class="mt-2 text-muted">CSV format: kpi_name, department, position, target, unit, period, description</div>
+                    </div>
+                `,
+            });
+            if (!proceed) { input.value = ''; return; }
+
+            await notify.withLoading(async () => {
+                for (const kpi of normalized) {
+                    await saveKpiDefinition(kpi);
+                }
+            }, 'Importing KPI Definitions', 'Applying validated CSV rows...');
+
+            await logActivity({
+                action: 'kpi.definition.import.csv',
+                entityType: 'kpi_definition',
+                entityId: 'bulk',
+                details: { total: normalized.length },
+            });
+
+            renderKpiManager();
+            await notify.success(`Imported ${normalized.length} KPI definitions from CSV!`);
+        } catch (err) {
+            await notify.error('CSV import error: ' + err.message);
+            debugError(err);
+        }
+        input.value = '';
+    };
+    reader.readAsText(file);
+}
+
+export function downloadKpiCsvTemplate() {
+    const template = 'kpi_name,department,position,target,unit,period,description\n"Monthly Sales Target","Sales","Sales Executive",100,"%","2026-06","Achieve monthly sales quota"\n"Customer Satisfaction","Support","Support Agent",90,"%","2026-06","Maintain CSAT score"';
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'kpi_definitions_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}

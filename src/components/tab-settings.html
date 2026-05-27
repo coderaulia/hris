@@ -206,6 +206,9 @@
                             <div class="card-header bg-light d-flex justify-content-between align-items-center mb-0 pb-2">
                                 <h6 class="m-0 fw-bold small"><i class="bi bi-bullseye me-1"></i> KPI Definitions</h6>
                                 <div class="d-flex gap-1" style="transform: scale(0.85); transform-origin: right center;">
+                                    <button class="btn btn-outline-info btn-sm" onclick="window.__app.downloadKpiCsvTemplate()" title="Download CSV Template"><i class="bi bi-file-earmark-text"></i></button>
+                                    <button class="btn btn-outline-success btn-sm" onclick="document.getElementById('kpi-csv-import-input').click()" title="Import CSV"><i class="bi bi-filetype-csv"></i></button>
+                                    <input type="file" id="kpi-csv-import-input" class="hidden" accept=".csv" onchange="window.__app.importKpiCSV(this)">
                                     <button class="btn btn-warning btn-sm" onclick="window.__app.exportKpiJSON()"><i class="bi bi-download"></i></button>
                                     <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('kpi-import-input').click()"><i class="bi bi-upload"></i></button>
                                     <input type="file" id="kpi-import-input" class="hidden" accept=".json" onchange="window.__app.importKpiJSON(this)">
