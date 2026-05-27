@@ -10,6 +10,7 @@ use App\Models\ProbationMonthlyScore;
 use App\Models\ProbationReview;
 use App\Services\EmployeeScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProbationController extends Controller
 {
@@ -22,16 +23,16 @@ class ProbationController extends Controller
 
     public function monthlyScores()
     {
-        $reviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->pluck('id');
-        $query = ProbationMonthlyScore::whereIn('probation_review_id', $reviewIds);
+        $scopedReviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->select('id');
+        $query = ProbationMonthlyScore::whereIn('probation_review_id', $scopedReviewIds);
 
         return ProbationMonthlyScoreResource::collection($query->get());
     }
 
     public function attendanceRecords()
     {
-        $reviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->pluck('id');
-        $query = ProbationAttendanceRecord::whereIn('probation_review_id', $reviewIds);
+        $scopedReviewIds = EmployeeScopeService::scopeQuery(ProbationReview::query())->select('id');
+        $query = ProbationAttendanceRecord::whereIn('probation_review_id', $scopedReviewIds);
 
         return ProbationAttendanceRecordResource::collection($query->get());
     }
@@ -74,13 +75,15 @@ class ProbationController extends Controller
             'monthly_total'           => ['nullable', 'numeric'],
         ]);
 
-        $review = ProbationReview::findOrFail($validated['probation_review_id']);
-        $this->abortUnlessCanWriteProbation($request, $review->employee_id);
+        $score = DB::transaction(function () use ($request, $validated) {
+            $review = ProbationReview::lockForUpdate()->findOrFail($validated['probation_review_id']);
+            $this->abortUnlessCanWriteProbation($request, $review->employee_id);
 
-        $score = ProbationMonthlyScore::updateOrCreate(
-            ['probation_review_id' => $validated['probation_review_id'], 'month_no' => $validated['month_no']],
-            $validated
-        );
+            return ProbationMonthlyScore::updateOrCreate(
+                ['probation_review_id' => $validated['probation_review_id'], 'month_no' => $validated['month_no']],
+                $validated
+            );
+        });
         return new ProbationMonthlyScoreResource($score);
     }
 

@@ -209,6 +209,10 @@ export async function renderDeptKpiTable(month, tabBtn) {
         }
 
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        if (deptKpiTrendChart) {
+            deptKpiTrendChart.destroy();
+            deptKpiTrendChart = null;
+        }
         const Chart = await getChartCtor();
         deptKpiTrendChart = new Chart(trendCtx, {
             type: 'bar',

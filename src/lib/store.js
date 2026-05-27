@@ -45,6 +45,11 @@ const listeners = {};
 export function subscribe(event, fn) {
     if (!listeners[event]) listeners[event] = [];
     listeners[event].push(fn);
+    return () => {
+        if (listeners[event]) {
+            listeners[event] = listeners[event].filter(f => f !== fn);
+        }
+    };
 }
 
 export function emit(event, data) {

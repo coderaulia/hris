@@ -12,6 +12,7 @@ use App\Models\HrDocumentTemplate;
 use App\Models\HrPayrollRecord;
 use App\Services\EmployeeScopeService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -61,18 +62,20 @@ class HrDocumentController extends Controller
             'records.*.notes' => ['nullable', 'string'],
         ]);
 
-        $records = collect($validated['records'])
-            ->map(function ($record) {
-                $values = $record;
-                unset($values['id']);
-                return HrPayrollRecord::updateOrCreate(
-                    [
-                        'employee_id' => $record['employee_id'],
-                        'payroll_period' => $record['payroll_period'],
-                    ],
-                    $values
-                );
-            });
+        $records = DB::transaction(function () use ($validated) {
+            return collect($validated['records'])
+                ->map(function ($record) {
+                    $values = $record;
+                    unset($values['id']);
+                    return HrPayrollRecord::updateOrCreate(
+                        [
+                            'employee_id' => $record['employee_id'],
+                            'payroll_period' => $record['payroll_period'],
+                        ],
+                        $values
+                    );
+                });
+        });
 
         return HrPayrollRecordResource::collection($records);
     }
@@ -156,13 +159,14 @@ class HrDocumentController extends Controller
 
         $safeFilename = preg_replace('/[^A-Za-z0-9._-]+/', '_', basename($archive->filename));
         $storagePath = "hr-document-archive/{$archive->id}/{$safeFilename}";
+        $oldPath = $archive->storage_path;
 
-        if ($archive->storage_path) {
-            Storage::disk('local')->delete($archive->storage_path);
-        }
-
-        Storage::disk('local')->put($storagePath, file_get_contents($validated['file']->getRealPath()));
+        $validated['file']->storeAs("hr-document-archive/{$archive->id}", $safeFilename, 'local');
         $archive->update(['storage_path' => $storagePath]);
+
+        if ($oldPath && $oldPath !== $storagePath) {
+            Storage::disk('local')->delete($oldPath);
+        }
 
         return new HrDocumentArchiveResource($archive);
     }

@@ -10,6 +10,8 @@ import { logActivity } from './data/activity.js';
 import * as notify from '../lib/notify.js';
 import { getDirectorOperationalScopeIds } from '../lib/reportFilters.js';
 
+let _submitting = false;
+
 // ---- SELF ASSESSMENT (Employee fast-track) ----
 export function initiateSelfAssessment(clickedId) {
     const targetId = String(clickedId).trim();
@@ -373,6 +375,9 @@ export function reviewAssessment() {
 
 // ---- FINAL SUBMIT ----
 export async function finalSubmit() {
+    if (_submitting) return;
+    _submitting = true;
+    try {
     const { currentSession, currentUser, db } = state;
     if (!currentSession.scores || currentSession.scores.length === 0) {
         await notify.error('Error: No scores found.'); return;
@@ -443,6 +448,9 @@ export async function finalSubmit() {
     document.getElementById('step-review').classList.add('hidden');
     document.getElementById('step-login').classList.remove('hidden');
     renderPendingList();
+    } finally {
+        _submitting = false;
+    }
 }
 
 // ---- BACK ----

@@ -1489,6 +1489,7 @@ function renderTemplateEditor() {
 	const templateSaveBtn = document.getElementById("doc-template-save-btn");
 	if (templateSaveBtn) {
 		templateSaveBtn.addEventListener("click", async () => {
+			if (templateEditorDraft.saveState === "saving") return;
 			const editedRecord = buildEditedTemplateRecord();
 			if (!editedRecord) return;
 
