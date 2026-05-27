@@ -292,6 +292,20 @@ const NAVIGATION_GROUPS = Object.freeze([
 				contentDescription:
 					"Organize departments, positions, and reporting relationships across the company.",
 			},
+			{
+				id: "nav-settings-audit",
+				modules: ["core"],
+				label: "Audit Log",
+				description: "Full activity trail with filters",
+				badge: "Governance",
+				roles: ["superadmin", "hr"],
+				tabId: "tab-settings",
+				navId: "nav-settings",
+				tabOptions: { settingsView: "set-audit" },
+				contentTitle: "Audit Log",
+				contentDescription:
+					"View, filter, and export the complete audit trail of all system actions.",
+			},
 		],
 	},
 ]);

@@ -360,6 +360,10 @@ const {
 	exportOrgConfigJSON,
 	triggerOrgConfigImport,
 	importOrgConfigJSON,
+	renderFullAuditLog,
+	refreshAuditLog,
+	filterAuditLog,
+	exportAuditLogExcel,
 } = createFeatureActions("settings", [
 	"renderSettings",
 	"saveAppSettings",
@@ -377,6 +381,10 @@ const {
 	"exportOrgConfigJSON",
 	"triggerOrgConfigImport",
 	"importOrgConfigJSON",
+	"renderFullAuditLog",
+	"refreshAuditLog",
+	"filterAuditLog",
+	"exportAuditLogExcel",
 ]);
 
 const { renderDocumentsWorkspace, resetDocumentsWorkspace } =
@@ -586,6 +594,10 @@ window.__app = {
 	exportOrgConfigJSON,
 	triggerOrgConfigImport,
 	importOrgConfigJSON,
+	renderFullAuditLog,
+	refreshAuditLog,
+	filterAuditLog,
+	exportAuditLogExcel,
 	toggleSettingsView,
 	toggleRecordsView,
 };
@@ -642,6 +654,7 @@ function getActiveSettingsViewId() {
 		"set-competencies",
 		"set-kpi",
 		"set-org",
+		"set-audit",
 	];
 	const currentView = panels.find((id) => {
 		const el = document.getElementById(id);
@@ -1002,6 +1015,7 @@ async function toggleSettingsView(viewId, btn) {
 		"set-competencies",
 		"set-kpi",
 		"set-org",
+		"set-audit",
 	];
 	const nextViewId = resolveAccessibleView(
 		viewIds,
@@ -1018,6 +1032,7 @@ async function toggleSettingsView(viewId, btn) {
 	// Trigger KPI render when switching to KPI panel
 	if (nextViewId === "set-kpi") await renderKpiManager();
 	if (nextViewId === "set-competencies") await renderAdminList();
+	if (nextViewId === "set-audit") await renderFullAuditLog();
 }
 
 // ---- Sub-View Toggle (Dashboard) ----

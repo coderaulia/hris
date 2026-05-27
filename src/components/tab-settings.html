@@ -47,12 +47,12 @@
                 </div>
                 <div class="border-top p-3">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="m-0 fw-bold small"><i class="bi bi-journal-text me-1"></i>Recent Activity Log</h6>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="window.__app.renderSettings()">
-                            <i class="bi bi-arrow-clockwise"></i>
+                        <h6 class="m-0 fw-bold small"><i class="bi bi-journal-text me-1"></i>Recent Activity (last 10)</h6>
+                        <button class="btn btn-sm btn-outline-primary" onclick="window.__app.toggleSettingsView('set-audit')">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Full Audit Log
                         </button>
                     </div>
-                    <div class="table-responsive" style="max-height: 280px;">
+                    <div class="table-responsive" style="max-height: 200px;">
                         <table class="table table-sm table-striped align-middle mb-0">
                             <thead class="table-light sticky-top">
                                 <tr>
@@ -231,6 +231,74 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="set-audit" class="hidden">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h6 class="m-0 fw-bold"><i class="bi bi-shield-check me-1"></i> Audit Log</h6>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="window.__app.refreshAuditLog()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Refresh
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="window.__app.exportAuditLogExcel()">
+                        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">Module</label>
+                        <select id="audit-filter-module" class="form-select form-select-sm" onchange="window.__app.filterAuditLog()">
+                            <option value="">All Modules</option>
+                            <option value="kpi">KPI</option>
+                            <option value="assessment">Assessment</option>
+                            <option value="probation">Probation</option>
+                            <option value="pip">PIP</option>
+                            <option value="employee">Employee</option>
+                            <option value="document">Documents</option>
+                            <option value="settings">Settings</option>
+                            <option value="organization">Organization</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">User</label>
+                        <select id="audit-filter-user" class="form-select form-select-sm" onchange="window.__app.filterAuditLog()">
+                            <option value="">All Users</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">From</label>
+                        <input type="date" id="audit-filter-from" class="form-control form-control-sm" onchange="window.__app.filterAuditLog()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1">To</label>
+                        <input type="date" id="audit-filter-to" class="form-control form-control-sm" onchange="window.__app.filterAuditLog()">
+                    </div>
+                </div>
+                <div class="table-responsive" style="max-height: 600px;">
+                    <table class="table table-sm table-striped table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width: 160px;">Timestamp</th>
+                                <th style="width: 140px;">User</th>
+                                <th style="width: 180px;">Action</th>
+                                <th style="width: 100px;">Module</th>
+                                <th style="width: 120px;">Record ID</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-log-full-tbody">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-3">Loading audit log...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-2 text-muted small" id="audit-log-count"></div>
             </div>
         </div>
     </div>

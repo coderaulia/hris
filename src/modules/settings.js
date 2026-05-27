@@ -800,7 +800,8 @@ async function renderActivityLog() {
     }
 
     tbody.innerHTML = '';
-    logs.forEach(log => {
+    const recentLogs = logs.slice(0, 10);
+    recentLogs.forEach(log => {
         const actor = state.db[log.actor_employee_id]?.name || log.actor_employee_id || '-';
         const details = log.details && typeof log.details === 'object'
             ? Object.entries(log.details).slice(0, 3).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`).join(' | ')
@@ -813,6 +814,154 @@ async function renderActivityLog() {
         <td class="small text-muted">${escapeHTML(details || '-')}</td>
       </tr>`;
     });
+}
+
+// ---- FULL AUDIT LOG (dedicated tab with filtering) ----
+let _auditLogCache = [];
+
+export async function renderFullAuditLog() {
+    await fetchActivityLogs(500);
+    _auditLogCache = state.activityLogs || [];
+    populateAuditUserFilter();
+    filterAuditLog();
+}
+
+export async function refreshAuditLog() {
+    await renderFullAuditLog();
+}
+
+function populateAuditUserFilter() {
+    const select = document.getElementById('audit-filter-user');
+    if (!select) return;
+    const actors = new Set();
+    _auditLogCache.forEach(log => {
+        if (log.actor_employee_id) actors.add(log.actor_employee_id);
+    });
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">All Users</option>';
+    [...actors].forEach(id => {
+        const name = state.db[id]?.name || id;
+        select.innerHTML += `<option value="${escapeHTML(id)}">${escapeHTML(name)}</option>`;
+    });
+    if (currentVal) select.value = currentVal;
+}
+
+export function filterAuditLog() {
+    const moduleFilter = document.getElementById('audit-filter-module')?.value || '';
+    const userFilter = document.getElementById('audit-filter-user')?.value || '';
+    const fromFilter = document.getElementById('audit-filter-from')?.value || '';
+    const toFilter = document.getElementById('audit-filter-to')?.value || '';
+
+    let filtered = _auditLogCache;
+
+    if (moduleFilter) {
+        filtered = filtered.filter(log => {
+            const action = (log.action || '').toLowerCase();
+            const entityType = (log.entity_type || '').toLowerCase();
+            return action.includes(moduleFilter) || entityType.includes(moduleFilter);
+        });
+    }
+    if (userFilter) {
+        filtered = filtered.filter(log => log.actor_employee_id === userFilter);
+    }
+    if (fromFilter) {
+        const fromDate = new Date(fromFilter);
+        filtered = filtered.filter(log => new Date(log.created_at) >= fromDate);
+    }
+    if (toFilter) {
+        const toDate = new Date(toFilter + 'T23:59:59');
+        filtered = filtered.filter(log => new Date(log.created_at) <= toDate);
+    }
+
+    renderAuditLogTable(filtered);
+}
+
+function renderAuditLogTable(logs) {
+    const tbody = document.getElementById('audit-log-full-tbody');
+    const countEl = document.getElementById('audit-log-count');
+    if (!tbody) return;
+
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No matching audit entries.</td></tr>';
+        if (countEl) countEl.textContent = '0 entries';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    logs.forEach(log => {
+        const actor = state.db[log.actor_employee_id]?.name || log.actor_employee_id || '-';
+        const module = (log.entity_type || log.action?.split('.')[0] || '-');
+        const recordId = log.entity_id || '-';
+        const details = log.details && typeof log.details === 'object'
+            ? Object.entries(log.details).slice(0, 4).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`).join(' | ')
+            : '-';
+        tbody.innerHTML += `
+      <tr>
+        <td class="small">${escapeHTML(formatDateTime(log.created_at))}</td>
+        <td class="small fw-bold">${escapeHTML(actor)}</td>
+        <td class="small"><span class="badge bg-light text-dark border">${escapeHTML(log.action || '-')}</span></td>
+        <td class="small text-capitalize">${escapeHTML(module)}</td>
+        <td class="small font-monospace">${escapeHTML(recordId)}</td>
+        <td class="small text-muted text-truncate" style="max-width: 300px;" title="${escapeHTML(details)}">${escapeHTML(details)}</td>
+      </tr>`;
+    });
+
+    if (countEl) countEl.textContent = `${logs.length} entries shown`;
+}
+
+export async function exportAuditLogExcel() {
+    if (!isAdmin()) return;
+    const { exportToExcel } = await import('../lib/exportUtils.js');
+
+    const moduleFilter = document.getElementById('audit-filter-module')?.value || '';
+    const userFilter = document.getElementById('audit-filter-user')?.value || '';
+    const fromFilter = document.getElementById('audit-filter-from')?.value || '';
+    const toFilter = document.getElementById('audit-filter-to')?.value || '';
+
+    let filtered = _auditLogCache;
+    if (moduleFilter) {
+        filtered = filtered.filter(log => {
+            const action = (log.action || '').toLowerCase();
+            const entityType = (log.entity_type || '').toLowerCase();
+            return action.includes(moduleFilter) || entityType.includes(moduleFilter);
+        });
+    }
+    if (userFilter) filtered = filtered.filter(log => log.actor_employee_id === userFilter);
+    if (fromFilter) filtered = filtered.filter(log => new Date(log.created_at) >= new Date(fromFilter));
+    if (toFilter) filtered = filtered.filter(log => new Date(log.created_at) <= new Date(toFilter + 'T23:59:59'));
+
+    if (filtered.length === 0) {
+        await notify.warn('No audit entries to export.');
+        return;
+    }
+
+    const rows = filtered.map(log => ({
+        timestamp: formatDateTime(log.created_at),
+        user: state.db[log.actor_employee_id]?.name || log.actor_employee_id || '-',
+        role: log.actor_role || '-',
+        action: log.action || '-',
+        module: log.entity_type || '-',
+        record_id: log.entity_id || '-',
+        details: log.details ? JSON.stringify(log.details) : '-',
+    }));
+
+    try {
+        await exportToExcel(rows, `audit-log-${new Date().toISOString().slice(0, 10)}`, {
+            sheetName: 'Audit Log',
+            columns: [
+                { header: 'Timestamp', key: 'timestamp', width: 22 },
+                { header: 'User', key: 'user', width: 20 },
+                { header: 'Role', key: 'role', width: 12 },
+                { header: 'Action', key: 'action', width: 28 },
+                { header: 'Module', key: 'module', width: 15 },
+                { header: 'Record ID', key: 'record_id', width: 18 },
+                { header: 'Details', key: 'details', width: 50 },
+            ],
+        });
+        await notify.success('Audit log exported.');
+    } catch (err) {
+        await notify.error('Export failed: ' + err.message);
+    }
 }
 
 
