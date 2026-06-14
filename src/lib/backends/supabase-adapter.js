@@ -354,5 +354,77 @@ export const supabaseAdapter = {
                 .from('document-signatures')
                 .createSignedUrl(storagePath, 3600);
         },
-    }
+    },
+    attendance: {
+        listWorkSites: async () => {
+            return await supabase
+                .from('attendance_work_sites')
+                .select('*')
+                .order('name', { ascending: true });
+        },
+        upsertWorkSite: async (payload) => {
+            return await supabase
+                .from('attendance_work_sites')
+                .upsert(payload)
+                .select()
+                .single();
+        },
+        deleteWorkSite: async (id) => {
+            return await supabase.from('attendance_work_sites').delete().eq('id', id);
+        },
+        listMyAttendance: async (employeeId, { from, to } = {}) => {
+            let query = supabase
+                .from('attendance_records')
+                .select('*')
+                .eq('employee_id', employeeId)
+                .order('event_time', { ascending: false });
+            if (from) query = query.gte('event_time', from);
+            if (to) query = query.lte('event_time', to);
+            return await query;
+        },
+        listAttendance: async ({ from, to, employeeId } = {}) => {
+            let query = supabase
+                .from('attendance_records')
+                .select('*')
+                .order('event_time', { ascending: false });
+            if (employeeId) query = query.eq('employee_id', employeeId);
+            if (from) query = query.gte('event_time', from);
+            if (to) query = query.lte('event_time', to);
+            return await query;
+        },
+        recordEvent: async (row, photoBlob, storagePath) => {
+            const payload = { ...row };
+            if (photoBlob && storagePath) {
+                const { error: uploadError } = await supabase.storage
+                    .from('attendance-photos')
+                    .upload(storagePath, photoBlob, { contentType: 'image/jpeg', upsert: false });
+                if (uploadError) throw uploadError;
+                payload.photo_storage_path = storagePath;
+            }
+            return await supabase
+                .from('attendance_records')
+                .insert(payload)
+                .select()
+                .single();
+        },
+        updateRecord: async (id, patch) => {
+            return await supabase
+                .from('attendance_records')
+                .update(patch)
+                .eq('id', id)
+                .select()
+                .single();
+        },
+        deleteRecord: async (id, storagePath) => {
+            if (storagePath) {
+                await supabase.storage.from('attendance-photos').remove([storagePath]);
+            }
+            return await supabase.from('attendance_records').delete().eq('id', id);
+        },
+        getPhotoUrl: async (storagePath) => {
+            return await supabase.storage
+                .from('attendance-photos')
+                .createSignedUrl(storagePath, 3600);
+        },
+    },
 };
