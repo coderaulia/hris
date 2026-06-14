@@ -19,6 +19,11 @@ Use `.env.example` as the source template. Never commit real `.env` secrets.
 | `VITE_BACKEND_MODE` | Optional | Backward-compatible backend mode alias |
 | `VITE_LARAVEL_API_URL` | Laravel mode | Laravel API base URL, for example `http://localhost:8000/api/v1` |
 
+`VITE_ENABLED_MODULES` is a comma-separated list. Known optional modules: `assessment`, `tna`,
+`manpower`, `recruitment`, `probation`, `pip`, `attendance`. `core`, `dashboard`, `employees`, and
+`kpi` are always on. Enable Live Attendance with `attendance` (it also needs the `attendance-photos`
+storage bucket created by `migrations/20260615_live_attendance.sql`).
+
 ## Supabase Edge Function Secrets
 
 Set these as Supabase function secrets, not frontend hosting variables:

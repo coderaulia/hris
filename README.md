@@ -28,6 +28,9 @@ The app supports two backend modes through `src/lib/backend.js`:
 - Probation and PIP workflows
 - HR Documents for offer letters, contracts, payslips, warnings, terminations, templates, payroll
   import, and generated-document archive
+- Live Attendance (in development): mobile-web clock in/out with GPS geolocation and selfie capture
+- Leave Management (in development): annual, special, permission, and sick leave requests with
+  per-type balances and approval chains
 - Settings, branding, organisation config, and admin activity log
 
 ## Project Structure

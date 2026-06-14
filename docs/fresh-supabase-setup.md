@@ -30,7 +30,8 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 12. [20260429_hr_payroll_records.sql](../migrations/20260429_hr_payroll_records.sql)
 13. [20260507_hr_document_archive.sql](../migrations/20260507_hr_document_archive.sql)
 14. [20260614_document_signatures.sql](../migrations/20260614_document_signatures.sql)
-15. [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
+15. [20260615_live_attendance.sql](../migrations/20260615_live_attendance.sql)
+16. [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
 
 ## Migration Notes
 
@@ -40,6 +41,7 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 - `20260429_hr_payroll_records.sql` adds reusable employee/month payroll rows for HR Documents payslip CSV import.
 - `20260507_hr_document_archive.sql` adds generated-document archive metadata plus the private Supabase Storage bucket and policies.
 - `20260614_document_signatures.sql` adds the e-signature `document_signature_requests` table with RLS, the private `document-signatures` storage bucket, and a signer-scoped read policy for assigned archive PDFs.
+- `20260615_live_attendance.sql` adds the `attendance_work_sites` and `attendance_records` tables, the `attendance_daily` summary view, and the private `attendance-photos` storage bucket, all RLS-scoped (employee self, manager team, HR/superadmin all).
 - Local bootstrap and QA audit scripts now use this same canonical chain directly, so the documented order and automation are locked together.
 
 ## What The Seed Includes
