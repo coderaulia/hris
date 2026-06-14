@@ -87,6 +87,45 @@ test.describe('Signature request adapter routing', () => {
         expect(result.data.status).toBe('declined');
     });
 
+    test('Supabase: deleteSignatureRequest deletes by id', async ({ page }) => {
+        let method = '';
+        let requestedUrl = '';
+        await page.route('**/rest/v1/document_signature_requests?*', async route => {
+            const req = route.request();
+            method = req.method();
+            requestedUrl = req.url();
+            await route.fulfill({ status: 204, contentType: 'application/json', body: '[]' });
+        });
+
+        await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            return await backend.documents.deleteSignatureRequest('SIG-1');
+        });
+
+        expect(method).toBe('DELETE');
+        expect(requestedUrl).toContain('id=eq.SIG-1');
+    });
+
+    test('Supabase: getSignatureSignedUrl signs a storage object', async ({ page }) => {
+        let signedPath = '';
+        await page.route('**/storage/v1/object/sign/document-signatures/**', async route => {
+            signedPath = route.request().url();
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({ signedURL: '/storage/v1/object/sign/document-signatures/EMP-1/SIG-1.png?token=abc' }),
+            });
+        });
+
+        const result = await page.evaluate(async () => {
+            const { backend } = await import('./src/lib/backend.js');
+            return await backend.documents.getSignatureSignedUrl('EMP-1/SIG-1.png');
+        });
+
+        expect(signedPath).toContain('document-signatures');
+        expect(result.data.signedUrl).toContain('token=abc');
+    });
+
     test('Laravel: signature methods degrade gracefully', async ({ page }) => {
         await page.addInitScript(() => {
             window._VITE_BACKEND_TYPE = 'laravel';

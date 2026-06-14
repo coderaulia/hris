@@ -120,6 +120,24 @@ The optional Laravel API is mounted under `/api/v1`. Frontend calls should go th
 | `POST` | `/hr-document-archives/{id}/file` | Alias for archive PDF upload |
 | `GET` | `/hr-document-archives/{id}/file` | Alias for archive PDF download |
 
+## Document Signatures (Supabase only)
+
+The e-signature workflow runs through the Supabase adapter, not the Laravel API. The
+`backend.documents` surface exposes: `listSignatureRequests(archiveId)`,
+`listMySignatureRequests(signerEmployeeId)`, `createSignatureRequests(rows)`,
+`updateSignatureRequest(id, patch, blob?, path?)`, `deleteSignatureRequest(id, path?)`, and
+`getSignatureSignedUrl(path)`. These map to the `document_signature_requests` table and the private
+`document-signatures` storage bucket. Signer dispatch uses the `approval-notifications` Edge Function
+with `action: "document_signature_requests"` and `signature_request_id`.
+
+Laravel parity (controller routes such as `/document-signature-requests`) is **not implemented**; the
+Laravel adapter returns graceful stubs until that work lands.
+
+## Notification Edge Actions
+
+`approval-notifications` accepts `action` values: `employee_kpi_target_versions`,
+`kpi_definition_versions`, `probation_reviews`, `pip_plans`, and `document_signature_requests`.
+
 ## Response Shape Rule
 
 New Laravel endpoints should return JSON shaped as:
