@@ -230,6 +230,18 @@ const NAVIGATION_GROUPS = Object.freeze([
 				contentDescription:
 					"Manage probation reviews, attendance entries, and performance improvement plans.",
 			},
+			{
+				id: "nav-records-signatures",
+				modules: ["core"],
+				label: "My Signatures",
+				description: "Documents awaiting your signature",
+				tabId: "tab-records",
+				navId: "nav-records",
+				tabOptions: { recordsView: "records-signatures" },
+				contentTitle: "My Signatures",
+				contentDescription:
+					"Review and sign HR documents assigned to you, or decline with a reason.",
+			},
 		],
 	},
 	{

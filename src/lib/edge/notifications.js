@@ -44,3 +44,14 @@ export async function requestPipNotification(pipPlanId, options = {}) {
     });
 }
 
+export async function requestSignatureNotification(requestId, options = {}) {
+    const id = String(requestId || '').trim();
+    if (!id) return null;
+
+    return invokeEdgeFunction('approval-notifications', {
+        action: 'document_signature_requests',
+        signature_request_id: id,
+        dry_run: Boolean(options.dryRun),
+    });
+}
+

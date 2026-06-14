@@ -21,6 +21,12 @@
                         <i class="bi bi-shield-check me-1"></i>Probation & PIP
                     </button>
                 </li>
+                <li class="nav-item">
+                    <button class="nav-link" data-target="records-signatures"
+                        onclick="window.__app.toggleRecordsView('records-signatures', this)">
+                        <i class="bi bi-pen me-1"></i>My Signatures
+                    </button>
+                </li>
             </ul>
 
             <!-- ASSESSMENT RECORDS VIEW -->
@@ -192,4 +198,7 @@
                     </div>
                 </div>
             </div>
+
+            <!-- MY SIGNATURES VIEW -->
+            <div id="records-signatures" class="hidden"></div>
         </div>

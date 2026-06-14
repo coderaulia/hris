@@ -763,5 +763,25 @@ export const laravelAdapter = {
                 return { data: null, error };
             }
         },
+        // E-signature workflow is Supabase-only for now. Laravel parity is a
+        // deferred follow-up; these stubs degrade gracefully in Laravel mode.
+        listSignatureRequests: async () => {
+            return { data: [], error: null };
+        },
+        listMySignatureRequests: async () => {
+            return { data: [], error: null };
+        },
+        createSignatureRequests: async () => {
+            return { data: null, error: new Error('Signature requests are not available in Laravel mode yet') };
+        },
+        updateSignatureRequest: async () => {
+            return { data: null, error: new Error('Signature requests are not available in Laravel mode yet') };
+        },
+        deleteSignatureRequest: async () => {
+            return { error: new Error('Signature requests are not available in Laravel mode yet') };
+        },
+        getSignatureSignedUrl: async () => {
+            return { data: null, error: new Error('Signature requests are not available in Laravel mode yet') };
+        },
     }
 };

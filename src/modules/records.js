@@ -6,3 +6,4 @@ export * from './records/probationActions.js';
 export * from './records/probationExport.js';
 export * from './records/pipActions.js';
 export * from './records/recordsExport.js';
+export * from './records/signaturesInbox.js';

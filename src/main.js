@@ -152,6 +152,7 @@ const {
 	initiateSelfAssessment: recordSelfAssess,
 	exportAssessmentRecordsExcel,
 	exportKpiRecordsExcel,
+	renderSignatureInbox,
 } = createFeatureActions("records", [
 	"renderRecordsTable",
 	"openReportByVal",
@@ -171,6 +172,7 @@ const {
 	"initiateSelfAssessment",
 	"exportAssessmentRecordsExcel",
 	"exportKpiRecordsExcel",
+	"renderSignatureInbox",
 ]);
 
 const {
@@ -497,6 +499,7 @@ window.__app = {
 	resetTrainingForm,
 	fillTrainingRec,
 	toggleOngoing,
+	renderSignatureInbox,
 	renderProbationPipView,
 	generateProbationDrafts,
 	reviewProbation,
@@ -632,7 +635,7 @@ function getActiveDashboardViewId() {
 }
 
 function getActiveRecordsViewId() {
-	const viewIds = ["records-assessment", "records-kpi", "records-probation"];
+	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures"];
 	const currentView = viewIds.find((id) => {
 		const el = document.getElementById(id);
 		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
@@ -891,12 +894,15 @@ async function refreshActiveReports() {
 		const assessmentView = document.getElementById("records-assessment");
 		const kpiView = document.getElementById("records-kpi");
 		const probationView = document.getElementById("records-probation");
+		const signaturesView = document.getElementById("records-signatures");
 
 		const isAssessmentVisible =
 			assessmentView && !assessmentView.classList.contains("hidden");
 		const isKpiVisible = kpiView && !kpiView.classList.contains("hidden");
 		const isProbationVisible =
 			probationView && !probationView.classList.contains("hidden");
+		const isSignaturesVisible =
+			signaturesView && !signaturesView.classList.contains("hidden");
 
 		if (isAssessmentVisible) {
 			await renderRecordsTable();
@@ -908,6 +914,10 @@ async function refreshActiveReports() {
 		}
 		if (isProbationVisible) {
 			await renderProbationPipView();
+			return;
+		}
+		if (isSignaturesVisible) {
+			await renderSignatureInbox();
 			return;
 		}
 
@@ -1090,7 +1100,7 @@ function toggleEmployeesView(viewId) {
 
 // ---- Sub-View Toggle (Records) ----
 async function toggleRecordsView(viewId, btn) {
-	const viewIds = ["records-assessment", "records-kpi", "records-probation"];
+	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures"];
 	const nextViewId = resolveAccessibleView(
 		viewIds,
 		viewId,
@@ -1109,6 +1119,7 @@ async function toggleRecordsView(viewId, btn) {
 	if (nextViewId === "records-assessment") await renderRecordsTable();
 	if (nextViewId === "records-kpi") await renderKpiHistory();
 	if (nextViewId === "records-probation") await renderProbationPipView();
+	if (nextViewId === "records-signatures") await renderSignatureInbox();
 }
 
 // ---- Theme Toggle ----
