@@ -11,3 +11,4 @@ export * from './dashboard.js';
 export * from './sync.js';
 export * from './hr-documents.js';
 export * from './signatures.js';
+export * from './attendance.js';
