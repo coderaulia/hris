@@ -97,7 +97,9 @@ Most recent recorded checks:
 - Playwright workflow coverage is still missing for employee CRUD, training records, manpower
   approvals/pipeline management, payroll import, real archive workspace download, and role
   guardrails.
-- E-signature is not implemented beyond signer placeholders and archived generated PDFs.
+- E-signature request-to-sign is implemented in Supabase mode (request, signer inbox, upload-only
+  capture, status, signer dispatch). Laravel parity, optional drawn/typed capture, and full UI E2E
+  coverage remain.
 - Production notification provider secrets and live outbound notification QA are still pending.
 - Payroll import needs production-like QA with real employee IDs, payslip PDF verification, and
   Supabase/Laravel idempotency checks.
@@ -116,3 +118,8 @@ Most recent recorded checks:
   docs so rollback coverage is no longer the next open item.
 - 2026-05-21: Refreshed the documentation surface to current state, added a docs index, removed
   stale historical/refactor docs, and fixed outdated absolute links.
+- 2026-06-14: Implemented the Supabase e-signature workflow — `document_signature_requests` table
+  with RLS and rollback, signature methods on the Supabase adapter (Laravel stubs), a signatures
+  data module, HR request/manage UI in the documents archive, a Records → My Signatures signer inbox
+  (upload-only capture), signer notification dispatch, and adapter-routing tests. `npm run build`,
+  `npm run qa:hardening`, `tests/signature.spec.js`, and `tests/backend-adapter.spec.js` pass.

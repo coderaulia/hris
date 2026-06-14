@@ -15,6 +15,14 @@ import {
 	deleteHrDocumentArchive,
 	getHrDocumentArchiveUrl,
 } from "./data/hr-documents.js";
+import {
+	fetchSignatureRequests,
+	createSignatureRequests,
+	deleteSignatureRequest,
+	getSignatureImageUrl,
+} from "./data/signatures.js";
+import { requestSignatureNotification } from "../lib/edge/notifications.js";
+import { getSwal } from "../lib/swal.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const CURRENT_PERIOD = TODAY_ISO.slice(0, 7);
@@ -2930,6 +2938,15 @@ function makeArchiveRow(record) {
 		btnGroup.appendChild(dlBtn);
 	}
 
+	const signBtn = document.createElement("button");
+	signBtn.className = "btn btn-outline-secondary doc-archive-sign-btn";
+	signBtn.dataset.id = record.id;
+	signBtn.title = "Manage signatures";
+	const signIcon = document.createElement("i");
+	signIcon.className = "bi bi-pen";
+	signBtn.appendChild(signIcon);
+	btnGroup.appendChild(signBtn);
+
 	const delBtn = document.createElement("button");
 	delBtn.className = "btn btn-outline-danger doc-archive-delete-btn";
 	delBtn.dataset.id = record.id;
@@ -2997,6 +3014,17 @@ function bindArchiveHandlers() {
 				return;
 			}
 
+			const signManageBtn = event.target.closest(".doc-archive-sign-btn");
+			if (signManageBtn) {
+				const id = signManageBtn.dataset.id;
+				const record = (Array.isArray(state.hrDocumentArchive)
+					? state.hrDocumentArchive
+					: []
+				).find((r) => String(r.id) === String(id));
+				if (record) await openSignatureManager(record);
+				return;
+			}
+
 			const deleteBtn = event.target.closest(".doc-archive-delete-btn");
 			if (deleteBtn) {
 				const id = deleteBtn.dataset.id;
@@ -3012,6 +3040,180 @@ function bindArchiveHandlers() {
 			}
 		});
 	}
+}
+
+function mapSignerRole(role) {
+	const value = String(role || "").toLowerCase();
+	if (value === "manager") return "manager";
+	if (value === "hr" || value === "director" || value === "superadmin") return "hr";
+	return "employee";
+}
+
+function signatureStatusBadge(status) {
+	const value = String(status || "pending").toLowerCase();
+	if (value === "signed") return '<span class="badge bg-success-subtle text-success border">Signed</span>';
+	if (value === "declined") return '<span class="badge bg-danger-subtle text-danger border">Declined</span>';
+	return '<span class="badge bg-warning-subtle text-warning-emphasis border">Pending</span>';
+}
+
+function renderSignatureRequestRows(requests) {
+	const list = Array.isArray(requests) ? requests : [];
+	if (list.length === 0) {
+		return '<div class="small text-muted">No signature requests yet.</div>';
+	}
+	return list
+		.map((req) => {
+			const signer = state.db?.[req.signer_employee_id];
+			const name = signer?.name || req.signer_employee_id || "-";
+			const meta = `${escapeHTML(String(name))} <span class="text-muted">(${escapeHTML(String(req.signer_role || "-"))})</span>`;
+			const viewBtn = req.signature_storage_path
+				? `<button type="button" class="btn btn-sm btn-link p-0 sig-view-btn" data-id="${escapeHTML(String(req.id))}">View</button>`
+				: "";
+			const decline = req.decline_reason
+				? `<div class="small text-danger">Reason: ${escapeHTML(String(req.decline_reason))}</div>`
+				: "";
+			return `
+			<div class="d-flex justify-content-between align-items-start gap-2 border-bottom py-2">
+				<div class="small">
+					<div class="fw-semibold">${meta}</div>
+					${decline}
+				</div>
+				<div class="text-end small">
+					${signatureStatusBadge(req.status)}
+					<div class="mt-1 d-flex gap-2 justify-content-end">
+						${viewBtn}
+						<button type="button" class="btn btn-sm btn-link text-danger p-0 sig-del-btn" data-id="${escapeHTML(String(req.id))}">Remove</button>
+					</div>
+				</div>
+			</div>`;
+		})
+		.join("");
+}
+
+function buildSignerOptions(existingSignerIds = new Set()) {
+	const db = state.db || {};
+	return Object.keys(db)
+		.map((id) => db[id])
+		.filter((rec) => rec && rec.id && !existingSignerIds.has(String(rec.id)))
+		.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+		.map(
+			(rec) =>
+				`<option value="${escapeHTML(String(rec.id))}">${escapeHTML(String(rec.name || rec.id))} — ${escapeHTML(String(rec.position || rec.role || ""))}</option>`,
+		)
+		.join("");
+}
+
+async function openSignatureManager(record) {
+	const Swal = await getSwal();
+	let requests = await fetchSignatureRequests(record.id);
+
+	const renderBody = () => {
+		const existing = new Set(requests.map((r) => String(r.signer_employee_id)));
+		return `
+			<div class="text-start">
+				<div class="small text-muted mb-2">${escapeHTML(String(record.filename || ""))}</div>
+				<div id="sig-request-list" class="mb-3">${renderSignatureRequestRows(requests)}</div>
+				<div class="border-top pt-2">
+					<label class="form-label small fw-bold text-muted">Add signer</label>
+					<div class="d-flex gap-2">
+						<select id="sig-signer-select" class="form-select form-select-sm">
+							<option value="">-- Select employee --</option>
+							${buildSignerOptions(existing)}
+						</select>
+						<button type="button" id="sig-add-btn" class="btn btn-sm btn-primary text-nowrap">Send request</button>
+					</div>
+				</div>
+			</div>`;
+	};
+
+	const refreshList = (container) => {
+		const listEl = container.querySelector("#sig-request-list");
+		if (listEl) listEl.innerHTML = renderSignatureRequestRows(requests);
+		const select = container.querySelector("#sig-signer-select");
+		if (select) {
+			const existing = new Set(requests.map((r) => String(r.signer_employee_id)));
+			select.innerHTML = `<option value="">-- Select employee --</option>${buildSignerOptions(existing)}`;
+		}
+	};
+
+	await Swal.fire({
+		title: "Document Signatures",
+		html: renderBody(),
+		width: 620,
+		showConfirmButton: true,
+		confirmButtonText: "Done",
+		heightAuto: false,
+		didOpen: () => {
+			const container = Swal.getHtmlContainer();
+			if (!container) return;
+
+			container.addEventListener("click", async (event) => {
+				const addBtn = event.target.closest("#sig-add-btn");
+				if (addBtn) {
+					const select = container.querySelector("#sig-signer-select");
+					const signerId = select?.value || "";
+					if (!signerId) return;
+					const signer = state.db?.[signerId];
+					addBtn.disabled = true;
+					try {
+						const created = await createSignatureRequests(record, [
+							{
+								signer_employee_id: signerId,
+								signer_role: mapSignerRole(signer?.role),
+							},
+						]);
+						const newRow = Array.isArray(created) ? created[0] : null;
+						if (newRow) {
+							requests = [...requests, newRow];
+							refreshList(container);
+							try {
+								await requestSignatureNotification(newRow.id);
+							} catch (notifyErr) {
+								// Notification is best-effort; signing still works without it.
+								console.warn("Signature notification failed:", notifyErr);
+							}
+						}
+					} catch (err) {
+						await notify.error(`Could not create request: ${err?.message || String(err)}`);
+					} finally {
+						addBtn.disabled = false;
+					}
+					return;
+				}
+
+				const delBtn = event.target.closest(".sig-del-btn");
+				if (delBtn) {
+					const id = delBtn.dataset.id;
+					const req = requests.find((r) => String(r.id) === String(id));
+					if (!req) return;
+					try {
+						await deleteSignatureRequest(req);
+						requests = requests.filter((r) => String(r.id) !== String(id));
+						refreshList(container);
+					} catch (err) {
+						await notify.error(`Could not remove request: ${err?.message || String(err)}`);
+					}
+					return;
+				}
+
+				const viewBtn = event.target.closest(".sig-view-btn");
+				if (viewBtn) {
+					const id = viewBtn.dataset.id;
+					const req = requests.find((r) => String(r.id) === String(id));
+					if (!req) return;
+					try {
+						const url = await getSignatureImageUrl(req);
+						if (url) window.open(url, "_blank");
+					} catch (err) {
+						await notify.error(`Could not open signature: ${err?.message || String(err)}`);
+					}
+				}
+			});
+		},
+	});
+
+	await fetchHrDocumentArchive();
+	renderDocumentArchive(state.hrDocumentArchive);
 }
 
 export function resetDocumentsWorkspace() {

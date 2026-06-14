@@ -71,10 +71,13 @@ Current optional aggregate views not yet created: `manpower_funnel_summary`, `ma
 | `hr_document_reference_options` | Contract, SP, payroll, and legal reference options |
 | `hr_payroll_records` | Reusable employee/month payroll rows for payslip import |
 | `hr_document_archive` | Generated-document archive metadata and storage path |
+| `document_signature_requests` | E-signature request-to-sign rows linking an archived document to signers |
 
 `hr_payroll_records` is created by `migrations/20260429_hr_payroll_records.sql` and is unique by `(employee_id, payroll_period)`.
 
 `hr_document_archive` is created by `migrations/20260507_hr_document_archive.sql`. Key columns: `id`, `employee_id`, `document_type`, `filename`, `storage_path`, `generated_by`, `generated_at`, `metadata` (JSONB), and `created_at`. PDFs are stored in the private `hr-document-archive` Supabase Storage bucket in Supabase mode and the Laravel private local disk under `hr-document-archive/{archive_id}/...` in Laravel mode.
+
+`document_signature_requests` is created by `migrations/20260614_document_signatures.sql` (Supabase only; Laravel adapter returns graceful stubs). Key columns: `id`, `archive_id` (FK → `hr_document_archive`, `ON DELETE CASCADE`), `signer_employee_id`, `signer_role` (`employee|manager|hr`), `status` (`pending|signed|declined`), `signature_type` (`uploaded`), `signature_storage_path`, denormalized `document_filename`/`document_type`/`employee_name`/`archive_storage_path` (so signers see context without HR-only archive access), `signed_at`, `decline_reason`, `created_by`, timestamps. RLS: HR/superadmin manage all; a signer may read and act on their own row only while `pending`. Uploaded signature images live in the private `document-signatures` bucket under `{signer_employee_id}/{request_id}.png`. The `can_read_signature_archive_object(name)` SECURITY DEFINER helper plus a storage policy let a signer read only the specific archived PDF they were asked to sign.
 
 ## Schema Safety Rules
 

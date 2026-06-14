@@ -8,6 +8,7 @@ type Payload = {
   version_id?: string;
   review_id?: string;
   pip_plan_id?: string;
+  signature_request_id?: string;
   dry_run?: boolean;
 };
 
@@ -393,6 +394,49 @@ async function buildPipNotification(admin: ReturnType<typeof createServiceClient
   };
 }
 
+async function buildSignatureNotification(admin: ReturnType<typeof createServiceClient>, requestId: string) {
+  const { data: request, error } = await admin
+    .from("document_signature_requests")
+    .select("id, archive_id, signer_employee_id, signer_role, status, document_filename, document_type, employee_name")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (error || !request) {
+    throw new Error(error?.message || "Signature request not found.");
+  }
+
+  const signer = await resolveEmployee(admin, request.signer_employee_id);
+
+  const recipients = uniqueRecipients([
+    signer?.auth_email
+      ? { employee_id: signer.employee_id, email: signer.auth_email, name: signer.name || signer.employee_id }
+      : null,
+  ].filter(Boolean) as Recipient[]);
+
+  const subject = `[HRIS] Signature requested: ${request.document_filename || request.document_type || "HR document"}`;
+  const text = [
+    `You have been asked to sign an HR document.`,
+    `Document: ${request.document_filename || request.document_type || "-"}`,
+    request.employee_name ? `Subject: ${request.employee_name}` : "",
+    `Your role: ${request.signer_role || "signer"}`,
+    `Open the HR app and go to Records → My Signatures to review and sign.`,
+  ].filter(Boolean).join("\n");
+
+  return {
+    entity_id: request.id,
+    notification_type: "document_signature_requests",
+    recipients,
+    subject,
+    text,
+    html: `<pre>${text}</pre>`,
+    meta: {
+      archive_id: request.archive_id,
+      signer_employee_id: request.signer_employee_id,
+      status: String(request.status || "").toLowerCase(),
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -439,6 +483,9 @@ serve(async (req) => {
         break;
       case "pip_plans":
         notification = await buildPipNotification(dataClient, String(payload.pip_plan_id || "").trim());
+        break;
+      case "document_signature_requests":
+        notification = await buildSignatureNotification(dataClient, String(payload.signature_request_id || "").trim());
         break;
       default:
         return jsonResponse(400, {

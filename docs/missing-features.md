@@ -4,24 +4,29 @@ Known product gaps confirmed by current docs and code shape.
 
 ## E-Signature Workflow
 
-**Current state:** HR Documents can render signer placeholders, export generated PDFs, and archive
-files in both Supabase and Laravel modes. There is no request-to-sign workflow, signer inbox,
-signature capture, or signed/declined state. The archive table currently stores metadata and
-`storage_path`; it does not include signature status columns.
+**Current state (Supabase mode: implemented):** A request-to-sign workflow exists end to end in
+Supabase mode. `document_signature_requests` (migration `20260614_document_signatures.sql`) links an
+archived document to signers with status `pending | signed | declined`. HR/superadmin request and
+manage signers from the HR Documents archive (the `bi-pen` action on each archive row). Signers reach
+their queue at **Records → My Signatures**, preview the source PDF, upload a signature image (PNG/JPEG
+to the private `document-signatures` bucket), and sign or decline with a reason. Signer dispatch is
+wired through the `document_signature_requests` action in `approval-notifications`. Capture is
+upload-only for now (no drawn/typed signature).
 
-**Needed:**
-- Signature request model linking an archived document to signers (employee, manager, HR) with
-  status `pending | signed | declined`.
-- Signer UX: notification -> review -> sign (drawn/typed/uploaded, stored securely) -> attach to
-  archive row or companion signature row.
-- Status tracking visible in the HR Documents archive workspace.
-- Backend parity for Supabase and Laravel before wiring the frontend actions.
+**Remaining:**
+- Laravel parity: the Laravel adapter currently returns graceful stubs; signature tables, controller
+  routes, and `EmployeeScopeService` wiring are still needed for Laravel mode.
+- Optional drawn/typed signature capture in addition to image upload.
+- Full UI E2E coverage of the sign/decline flow (adapter-routing coverage exists in
+  `tests/signature.spec.js`).
+- Production notification QA for signer dispatch once provider secrets are live.
 
-**Depends on:** HR Document Archive metadata and file storage.
-
-**Touch:** new signature table/migration, rollback script, `src/modules/documents.js`,
-`src/modules/data/hr-documents.js`, both backend adapters, `HrDocumentController`, and
-`supabase/functions/approval-notifications/` for signer dispatch.
+**Touch (done in Supabase pass):** `migrations/20260614_document_signatures.sql` (+ rollback),
+`scripts/support/canonical-migration-chain.mjs`, `src/lib/backends/supabase-adapter.js`,
+`src/lib/backends/laravel-adapter.js` (stubs), `src/modules/data/signatures.js`,
+`src/modules/documents.js`, `src/modules/records/signaturesInbox.js`, records tab wiring in
+`src/main.js`, `src/config/module-navigation.js`, `src/components/tab-records.html`,
+`src/lib/edge/notifications.js`, and `supabase/functions/approval-notifications/index.ts`.
 
 ## Production Notification Provider
 
