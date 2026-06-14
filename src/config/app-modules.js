@@ -66,6 +66,12 @@ const MODULE_REGISTRY = Object.freeze({
         dependencies: ['core', 'employees', 'kpi', 'probation'],
         description: 'Performance improvement plans and action tracking.',
     },
+    attendance: {
+        id: 'attendance',
+        label: 'Attendance',
+        dependencies: ['core', 'employees'],
+        description: 'Live mobile-web clock in/out with GPS geolocation and selfie capture.',
+    },
 });
 
 function normalizeModuleId(value) {
