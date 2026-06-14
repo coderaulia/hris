@@ -18,18 +18,24 @@ use Illuminate\Support\Str;
 
 class HrDocumentController extends Controller
 {
-    public function templates()
+    public function templates(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         return HrDocumentTemplateResource::collection(HrDocumentTemplate::all());
     }
 
-    public function options()
+    public function options(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         return HrDocumentReferenceOptionResource::collection(HrDocumentReferenceOption::all());
     }
 
-    public function payrollRecords()
+    public function payrollRecords(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         return HrPayrollRecordResource::collection(
             HrPayrollRecord::orderByDesc('payroll_period')->orderBy('employee_id')->get()
         );
@@ -37,6 +43,8 @@ class HrDocumentController extends Controller
 
     public function importPayrollRecords(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         $validated = $request->validate([
             'records' => ['required', 'array', 'min:1'],
             'records.*.employee_id' => ['required', 'string', 'max:64'],
@@ -82,6 +90,8 @@ class HrDocumentController extends Controller
 
     public function storeTemplate(Request $request)
     {
+        $this->abortUnlessHrOperator($request);
+
         $validated = $request->validate([
             'id'                   => ['nullable', 'uuid'],
             'document_type'        => ['required', 'string', 'max:128'],
@@ -102,8 +112,10 @@ class HrDocumentController extends Controller
         return new HrDocumentTemplateResource($template);
     }
 
-    public function deleteTemplate($id)
+    public function deleteTemplate(Request $request, $id)
     {
+        $this->abortUnlessHrOperator($request);
+
         HrDocumentTemplate::destroy($id);
         return response()->noContent();
     }

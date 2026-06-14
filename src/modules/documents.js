@@ -1,5 +1,5 @@
 import { state } from "../lib/store.js";
-import { escapeHTML } from "../lib/utils.js";
+import { escapeHTML, debugError } from "../lib/utils.js";
 import * as notify from "../lib/notify.js";
 import { logActivity } from "./data/activity.js";
 import { saveEmployee } from "./data/employees.js";
@@ -2781,7 +2781,7 @@ function bindSetupHandlers() {
 					);
 					renderDocumentArchive(state.hrDocumentArchive);
 				} catch (archiveError) {
-					console.warn("Archive save failed:", archiveError);
+					debugError("Archive save failed:", archiveError);
 				}
 
 				if (documentsDraft.documentType === "warning_letter" && state.db?.[context.subject.id]) {
