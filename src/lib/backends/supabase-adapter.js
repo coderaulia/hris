@@ -266,7 +266,11 @@ export const supabaseAdapter = {
             }).select('*');
         },
         saveTemplate: async (payload) => {
-            return await supabase.from('hr_document_templates').upsert(payload);
+            return await supabase
+                .from('hr_document_templates')
+                .upsert(payload)
+                .select()
+                .single();
         },
         deleteTemplate: async (id) => {
             return await supabase.from('hr_document_templates').delete().eq('id', id);
@@ -298,6 +302,56 @@ export const supabaseAdapter = {
         getSignedUrl: async (storagePath) => {
             return await supabase.storage
                 .from('hr-document-archive')
+                .createSignedUrl(storagePath, 3600);
+        },
+        listSignatureRequests: async (archiveId) => {
+            return await supabase
+                .from('document_signature_requests')
+                .select('*')
+                .eq('archive_id', archiveId)
+                .order('created_at', { ascending: true });
+        },
+        listMySignatureRequests: async (signerEmployeeId) => {
+            return await supabase
+                .from('document_signature_requests')
+                .select('*')
+                .eq('signer_employee_id', signerEmployeeId)
+                .order('created_at', { ascending: false });
+        },
+        createSignatureRequests: async (rows) => {
+            return await supabase
+                .from('document_signature_requests')
+                .insert(rows)
+                .select('*');
+        },
+        updateSignatureRequest: async (id, patch, signatureBlob, storagePath) => {
+            const nextPatch = { ...patch, updated_at: new Date().toISOString() };
+            if (signatureBlob && storagePath) {
+                const { error: uploadError } = await supabase.storage
+                    .from('document-signatures')
+                    .upload(storagePath, signatureBlob, { upsert: true });
+                if (uploadError) throw uploadError;
+                nextPatch.signature_storage_path = storagePath;
+            }
+            return await supabase
+                .from('document_signature_requests')
+                .update(nextPatch)
+                .eq('id', id)
+                .select()
+                .single();
+        },
+        deleteSignatureRequest: async (id, storagePath) => {
+            if (storagePath) {
+                await supabase.storage.from('document-signatures').remove([storagePath]);
+            }
+            return await supabase
+                .from('document_signature_requests')
+                .delete()
+                .eq('id', id);
+        },
+        getSignatureSignedUrl: async (storagePath) => {
+            return await supabase.storage
+                .from('document-signatures')
                 .createSignedUrl(storagePath, 3600);
         },
     }
