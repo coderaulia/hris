@@ -255,6 +255,18 @@ const NAVIGATION_GROUPS = Object.freeze([
 				contentDescription:
 					"Clock in and out from your phone with a selfie and GPS location. HR can review the full attendance log.",
 			},
+			{
+				id: "nav-records-leave",
+				modules: ["leave"],
+				label: "Leave Management",
+				description: "Submit and manage cuti & izin requests",
+				tabId: "tab-records",
+				navId: "nav-records",
+				tabOptions: { recordsView: "records-leave" },
+				contentTitle: "Leave Management",
+				contentDescription:
+					"Submit leave requests, track your remaining balance, and approve or reject your team's requests.",
+			},
 		],
 	},
 	{
