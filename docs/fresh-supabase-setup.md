@@ -32,7 +32,8 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 14. [20260614_document_signatures.sql](../migrations/20260614_document_signatures.sql)
 15. [20260615_live_attendance.sql](../migrations/20260615_live_attendance.sql)
 16. [20260615_attendance_geofence_trigger.sql](../migrations/20260615_attendance_geofence_trigger.sql)
-17. [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
+17. [20260615_leave_management.sql](../migrations/20260615_leave_management.sql)
+18. [01_dummy_seed.sql](../supabase/01_dummy_seed.sql)
 
 ## Migration Notes
 
@@ -44,6 +45,7 @@ Run these SQL files in Supabase SQL Editor in this exact order:
 - `20260614_document_signatures.sql` adds the e-signature `document_signature_requests` table with RLS, the private `document-signatures` storage bucket, and a signer-scoped read policy for assigned archive PDFs.
 - `20260615_live_attendance.sql` adds the `attendance_work_sites` and `attendance_records` tables, the `attendance_daily` summary view, and the private `attendance-photos` storage bucket, all RLS-scoped (employee self, manager team, HR/superadmin all).
 - `20260615_attendance_geofence_trigger.sql` adds a `BEFORE INSERT` trigger on `attendance_records` that recomputes `within_geofence` and `work_site_id` server-side using Haversine distance in PL/pgSQL, preventing clients from spoofing geofence status.
+- `20260615_leave_management.sql` adds `leave_types` (seeded with 4 Indonesian leave types), `leave_balances`, `leave_requests` tables, `leave_balance_overview` view, `apply_leave_balance_delta` RPC, and the private `leave-attachments` storage bucket with full RLS.
 - Local bootstrap and QA audit scripts now use this same canonical chain directly, so the documented order and automation are locked together.
 
 ## What The Seed Includes
