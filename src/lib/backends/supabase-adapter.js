@@ -427,4 +427,113 @@ export const supabaseAdapter = {
                 .createSignedUrl(storagePath, 3600);
         },
     },
+    leave: {
+        listLeaveTypes: async () => {
+            return await supabase
+                .from('leave_types')
+                .select('*')
+                .eq('active', true)
+                .order('name_id', { ascending: true });
+        },
+        upsertLeaveType: async (payload) => {
+            return await supabase
+                .from('leave_types')
+                .upsert(payload)
+                .select()
+                .single();
+        },
+        listMyLeave: async (employeeId, filters = {}) => {
+            let query = supabase
+                .from('leave_requests')
+                .select('*, leave_types(code, name_id, name_en, is_paid)')
+                .eq('employee_id', employeeId)
+                .order('created_at', { ascending: false });
+            if (filters.status) query = query.eq('status', filters.status);
+            if (filters.year) {
+                query = query
+                    .gte('start_date', `${filters.year}-01-01`)
+                    .lte('end_date', `${filters.year}-12-31`);
+            }
+            return await query;
+        },
+        listLeaveRequests: async (filters = {}) => {
+            let query = supabase
+                .from('leave_requests')
+                .select('*, leave_types(code, name_id, name_en, is_paid)')
+                .order('created_at', { ascending: false });
+            if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
+            if (filters.status) query = query.eq('status', filters.status);
+            if (filters.leaveTypeId) query = query.eq('leave_type_id', filters.leaveTypeId);
+            if (filters.from) query = query.gte('start_date', filters.from);
+            if (filters.to) query = query.lte('end_date', filters.to);
+            return await query;
+        },
+        createLeaveRequest: async (row, attachmentBlob, storagePath) => {
+            const payload = { ...row };
+            if (attachmentBlob && storagePath) {
+                const { error: uploadError } = await supabase.storage
+                    .from('leave-attachments')
+                    .upload(storagePath, attachmentBlob, { upsert: false });
+                if (uploadError) throw uploadError;
+                payload.attachment_storage_path = storagePath;
+            }
+            return await supabase
+                .from('leave_requests')
+                .insert(payload)
+                .select('*, leave_types(code, name_id, name_en, is_paid)')
+                .single();
+        },
+        decideLeaveRequest: async (id, patch) => {
+            return await supabase
+                .from('leave_requests')
+                .update({ ...patch, updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select('*, leave_types(code, name_id, name_en, is_paid)')
+                .single();
+        },
+        cancelLeaveRequest: async (id) => {
+            return await supabase
+                .from('leave_requests')
+                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .eq('id', id)
+                .select()
+                .single();
+        },
+        listMyBalances: async (employeeId, year) => {
+            let query = supabase
+                .from('leave_balance_overview')
+                .select('*')
+                .eq('employee_id', employeeId);
+            if (year) query = query.eq('year', year);
+            return await query;
+        },
+        listBalances: async (filters = {}) => {
+            let query = supabase
+                .from('leave_balance_overview')
+                .select('*');
+            if (filters.employeeId) query = query.eq('employee_id', filters.employeeId);
+            if (filters.year) query = query.eq('year', filters.year);
+            return await query;
+        },
+        upsertBalance: async (payload) => {
+            return await supabase
+                .from('leave_balances')
+                .upsert(payload)
+                .select()
+                .single();
+        },
+        applyBalanceDelta: async (employeeId, leaveTypeId, year, delta) => {
+            return await supabase.rpc('apply_leave_balance_delta', {
+                p_employee_id:   employeeId,
+                p_leave_type_id: leaveTypeId,
+                p_year:          year,
+                p_delta:         delta,
+            });
+        },
+        getLeaveAttachmentUrl: async (storagePath) => {
+            return await supabase.storage
+                .from('leave-attachments')
+                .createSignedUrl(storagePath, 3600);
+        },
+    },
 };
