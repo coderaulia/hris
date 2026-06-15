@@ -1,6 +1,20 @@
 const MONITOR_WEBHOOK_URL = import.meta.env.VITE_MONITOR_WEBHOOK_URL || '';
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN || '';
 let _initialized = false;
+let _sentryLoaded = false;
+
+async function loadSentry() {
+    if (_sentryLoaded || !SENTRY_DSN) return;
+    _sentryLoaded = true;
+    await new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = 'https://browser.sentry-cdn.com/8.42.0/bundle.tracing.min.js';
+        s.crossOrigin = 'anonymous';
+        s.onload = resolve;
+        s.onerror = resolve;
+        document.head.appendChild(s);
+    });
+}
 
 function safeStringify(value) {
     try {
@@ -73,7 +87,7 @@ export async function captureMessage(message, context = {}) {
     });
 }
 
-export function initMonitoring() {
+export async function initMonitoring() {
     if (_initialized) return;
     _initialized = true;
 
@@ -92,11 +106,14 @@ export function initMonitoring() {
         captureError(reason, { kind: 'unhandledrejection' });
     });
 
-    if (SENTRY_DSN && typeof window !== 'undefined' && window.Sentry && typeof window.Sentry.init === 'function') {
-        try {
-            window.Sentry.init({ dsn: SENTRY_DSN });
-        } catch {
-            // non-fatal
+    if (SENTRY_DSN) {
+        await loadSentry();
+        if (typeof window !== 'undefined' && window.Sentry && typeof window.Sentry.init === 'function') {
+            try {
+                window.Sentry.init({ dsn: SENTRY_DSN });
+            } catch {
+                // non-fatal
+            }
         }
     }
 }

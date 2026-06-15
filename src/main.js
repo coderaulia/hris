@@ -3,6 +3,8 @@
 // ==================================================
 
 import "./styles/main.css";
+import * as bootstrap from 'bootstrap';
+window.bootstrap = bootstrap;
 
 // ---- Component HTML Imports (inlined at build time via Vite ?raw) ----
 import loginHTML from "./components/login.html?raw";
