@@ -9,6 +9,7 @@ type Payload = {
   review_id?: string;
   pip_plan_id?: string;
   signature_request_id?: string;
+  leave_request_id?: string;
   dry_run?: boolean;
 };
 
@@ -394,6 +395,72 @@ async function buildPipNotification(admin: ReturnType<typeof createServiceClient
   };
 }
 
+async function buildLeaveNotification(admin: ReturnType<typeof createServiceClient>, requestId: string) {
+  const { data: request, error } = await admin
+    .from("leave_requests")
+    .select("id, employee_id, leave_type_id, start_date, end_date, days_count, status, reason, decision_note, leave_types(name_id, name_en)")
+    .eq("id", requestId)
+    .maybeSingle();
+
+  if (error || !request) {
+    throw new Error(error?.message || "Leave request not found.");
+  }
+
+  const employee = await resolveEmployee(admin, request.employee_id);
+  const manager  = await resolveEmployee(admin, employee?.manager_id || null);
+  const { data: hrRows } = await admin
+    .from("employees")
+    .select("employee_id, name, auth_email, role")
+    .eq("role", "hr");
+
+  const status = String(request.status || "").toLowerCase();
+  const typeName = (request as Record<string, unknown>).leave_types
+    ? ((request as Record<string, unknown>).leave_types as Record<string, unknown>).name_id || "Leave"
+    : "Leave";
+
+  let recipients: Recipient[];
+  if (status === "pending") {
+    // Notify manager + HR that an employee submitted
+    recipients = uniqueRecipients([
+      manager?.auth_email ? { employee_id: manager.employee_id, email: manager.auth_email, name: manager.name || manager.employee_id } : null,
+      ...(hrRows || []).filter((row) => row.auth_email).map((row) => ({
+        employee_id: row.employee_id,
+        email: row.auth_email,
+        name: row.name || row.employee_id,
+      })),
+    ].filter(Boolean) as Recipient[]);
+  } else {
+    // Notify employee of the decision
+    recipients = uniqueRecipients([
+      employee?.auth_email ? { employee_id: employee.employee_id, email: employee.auth_email, name: employee.name || employee.employee_id } : null,
+    ].filter(Boolean) as Recipient[]);
+  }
+
+  const subject = `[HRIS] Leave request ${status}: ${typeName} for ${employee?.name || request.employee_id}`;
+  const text = [
+    `Employee: ${employee?.name || request.employee_id}`,
+    `Type: ${typeName}`,
+    `Dates: ${request.start_date} to ${request.end_date} (${request.days_count} day(s))`,
+    `Status: ${status}`,
+    request.reason ? `Reason: ${request.reason}` : "",
+    request.decision_note ? `Decision Note: ${request.decision_note}` : "",
+  ].filter(Boolean).join("\n");
+
+  return {
+    entity_id: request.id,
+    notification_type: "leave_requests",
+    recipients,
+    subject,
+    text,
+    html: `<pre>${text}</pre>`,
+    meta: {
+      employee_id: request.employee_id,
+      leave_type_id: request.leave_type_id,
+      status,
+    },
+  };
+}
+
 async function buildSignatureNotification(admin: ReturnType<typeof createServiceClient>, requestId: string) {
   const { data: request, error } = await admin
     .from("document_signature_requests")
@@ -486,6 +553,9 @@ serve(async (req) => {
         break;
       case "document_signature_requests":
         notification = await buildSignatureNotification(dataClient, String(payload.signature_request_id || "").trim());
+        break;
+      case "leave_requests":
+        notification = await buildLeaveNotification(dataClient, String(payload.leave_request_id || "").trim());
         break;
       default:
         return jsonResponse(400, {
