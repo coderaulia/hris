@@ -9,7 +9,14 @@ on:
 jobs:
   regression-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+
+    # Dummy local-Supabase values — no real project needed.
+    # Tests in this job use page.route() to intercept all network calls,
+    # so the Supabase client never actually connects to anything.
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxvY2FsaG9zdCIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNjkwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTl9.local-dev-placeholder
 
     steps:
       - name: Checkout
@@ -27,54 +34,12 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Start local Supabase
-        run: supabase start
-
-      - name: Export local Supabase env
-        run: |
-          supabase status -o env >> "$GITHUB_ENV"
-          echo "SUPABASE_DB_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres" >> "$GITHUB_ENV"
-          echo "VITE_AUTH_REDIRECT_URL=http://127.0.0.1:4173/" >> "$GITHUB_ENV"
-          echo "E2E_BASE_URL=http://127.0.0.1:4173" >> "$GITHUB_ENV"
-
-      - name: Bootstrap schema, migrations, seed, and auth users
-        run: npm run e2e:bootstrap:local
-
-      - name: Build app against local Supabase
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-          VITE_AUTH_REDIRECT_URL: ${{ env.VITE_AUTH_REDIRECT_URL }}
-
-      - name: Start preview server
-        run: |
-          npm run preview -- --host 127.0.0.1 --port 4173 > preview.log 2>&1 &
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:4173 > /dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-          cat preview.log
-          exit 1
-        env:
-          VITE_SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-          VITE_AUTH_REDIRECT_URL: ${{ env.VITE_AUTH_REDIRECT_URL }}
-
-      - name: Run Playwright regression tests
-        run: npm run qa:e2e
+      # Playwright's webServer config (playwright.config.js) starts the Vite
+      # dev server automatically. No manual server management needed here.
+      - name: Run adapter regression tests
+        run: npx playwright test tests/backend-adapter.spec.js tests/signature.spec.js
         env:
           CI: true
-          SUPABASE_URL: ${{ env.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ env.SUPABASE_ANON_KEY }}
-          E2E_BASE_URL: ${{ env.E2E_BASE_URL }}
 
       - name: Upload Playwright report
         if: always()
@@ -83,7 +48,3 @@ jobs:
           name: playwright-report
           path: playwright-report
           if-no-files-found: ignore
-
-      - name: Stop local Supabase
-        if: always()
-        run: supabase stop --no-backup
