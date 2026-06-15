@@ -81,6 +81,8 @@ const FEATURE_LOADERS = {
 	kpi: () => import("./modules/kpi.js"),
 	documents: () => import("./modules/documents.js"),
 	settings: () => import("./modules/settings.js"),
+	attendance: () => import("./modules/attendance.js"),
+	leave: () => import("./modules/leave.js"),
 };
 
 const _featureModuleCache = {};
@@ -404,6 +406,14 @@ const { renderDocumentsWorkspace, resetDocumentsWorkspace } =
 		"renderDocumentsWorkspace",
 		"resetDocumentsWorkspace",
 	]);
+
+const { renderAttendanceView } = createFeatureActions("attendance", [
+	"renderAttendanceView",
+]);
+
+const { renderLeaveView } = createFeatureActions("leave", [
+	"renderLeaveView",
+]);
 function parseModuleListAttr(value = "") {
 	return String(value || "")
 		.split(",")
@@ -500,6 +510,8 @@ window.__app = {
 	fillTrainingRec,
 	toggleOngoing,
 	renderSignatureInbox,
+	renderAttendanceView,
+	renderLeaveView,
 	renderProbationPipView,
 	generateProbationDrafts,
 	reviewProbation,
@@ -635,7 +647,7 @@ function getActiveDashboardViewId() {
 }
 
 function getActiveRecordsViewId() {
-	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures"];
+	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures", "records-attendance", "records-leave"];
 	const currentView = viewIds.find((id) => {
 		const el = document.getElementById(id);
 		return el && !el.classList.contains("hidden") && !el.classList.contains("d-none");
@@ -895,6 +907,8 @@ async function refreshActiveReports() {
 		const kpiView = document.getElementById("records-kpi");
 		const probationView = document.getElementById("records-probation");
 		const signaturesView = document.getElementById("records-signatures");
+		const attendanceView = document.getElementById("records-attendance");
+		const leaveView      = document.getElementById("records-leave");
 
 		const isAssessmentVisible =
 			assessmentView && !assessmentView.classList.contains("hidden");
@@ -903,6 +917,8 @@ async function refreshActiveReports() {
 			probationView && !probationView.classList.contains("hidden");
 		const isSignaturesVisible =
 			signaturesView && !signaturesView.classList.contains("hidden");
+		const isAttendanceVisible =
+			attendanceView && !attendanceView.classList.contains("hidden");
 
 		if (isAssessmentVisible) {
 			await renderRecordsTable();
@@ -918,6 +934,15 @@ async function refreshActiveReports() {
 		}
 		if (isSignaturesVisible) {
 			await renderSignatureInbox();
+			return;
+		}
+		if (isAttendanceVisible) {
+			await renderAttendanceView();
+			return;
+		}
+		const isLeaveVisible = leaveView && !leaveView.classList.contains("hidden");
+		if (isLeaveVisible) {
+			await renderLeaveView();
 			return;
 		}
 
@@ -1100,7 +1125,7 @@ function toggleEmployeesView(viewId) {
 
 // ---- Sub-View Toggle (Records) ----
 async function toggleRecordsView(viewId, btn) {
-	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures"];
+	const viewIds = ["records-assessment", "records-kpi", "records-probation", "records-signatures", "records-attendance", "records-leave"];
 	const nextViewId = resolveAccessibleView(
 		viewIds,
 		viewId,
@@ -1120,6 +1145,8 @@ async function toggleRecordsView(viewId, btn) {
 	if (nextViewId === "records-kpi") await renderKpiHistory();
 	if (nextViewId === "records-probation") await renderProbationPipView();
 	if (nextViewId === "records-signatures") await renderSignatureInbox();
+	if (nextViewId === "records-attendance") await renderAttendanceView();
+	if (nextViewId === "records-leave") await renderLeaveView();
 }
 
 // ---- Theme Toggle ----

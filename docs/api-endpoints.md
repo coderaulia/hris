@@ -133,6 +133,19 @@ with `action: "document_signature_requests"` and `signature_request_id`.
 Laravel parity (controller routes such as `/document-signature-requests`) is **not implemented**; the
 Laravel adapter returns graceful stubs until that work lands.
 
+## Live Attendance (Supabase only)
+
+Live Attendance runs through the Supabase adapter, not the Laravel API. The `backend.attendance`
+surface exposes: `listWorkSites()`, `upsertWorkSite(payload)`, `deleteWorkSite(id)`,
+`listMyAttendance(employeeId, { from, to })`, `listAttendance({ from, to, employeeId })`,
+`recordEvent(row, photoBlob?, storagePath?)`, `updateRecord(id, patch)`,
+`deleteRecord(id, storagePath?)`, and `getPhotoUrl(storagePath)`. These map to the
+`attendance_work_sites` / `attendance_records` tables and the private `attendance-photos` storage
+bucket.
+
+Laravel parity (controller routes) is **not implemented**; the Laravel adapter returns graceful
+stubs until that work lands.
+
 ## Notification Edge Actions
 
 `approval-notifications` accepts `action` values: `employee_kpi_target_versions`,

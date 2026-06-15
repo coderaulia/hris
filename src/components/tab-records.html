@@ -27,6 +27,18 @@
                         <i class="bi bi-pen me-1"></i>My Signatures
                     </button>
                 </li>
+                <li class="nav-item" data-module-all="attendance">
+                    <button class="nav-link" data-target="records-attendance"
+                        onclick="window.__app.toggleRecordsView('records-attendance', this)">
+                        <i class="bi bi-camera me-1"></i>Live Attendance
+                    </button>
+                </li>
+                <li class="nav-item" data-module-all="leave">
+                    <button class="nav-link" data-target="records-leave"
+                        onclick="window.__app.toggleRecordsView('records-leave', this)">
+                        <i class="bi bi-calendar-check me-1"></i>Leave
+                    </button>
+                </li>
             </ul>
 
             <!-- ASSESSMENT RECORDS VIEW -->
@@ -201,4 +213,10 @@
 
             <!-- MY SIGNATURES VIEW -->
             <div id="records-signatures" class="hidden"></div>
+
+            <!-- LIVE ATTENDANCE VIEW -->
+            <div id="records-attendance" class="hidden" data-module-all="attendance"></div>
+
+            <!-- LEAVE MANAGEMENT VIEW -->
+            <div id="records-leave" class="hidden" data-module-all="leave"></div>
         </div>

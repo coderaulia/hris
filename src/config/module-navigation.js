@@ -242,6 +242,31 @@ const NAVIGATION_GROUPS = Object.freeze([
 				contentDescription:
 					"Review and sign HR documents assigned to you, or decline with a reason.",
 			},
+			{
+				id: "nav-records-attendance",
+				modules: ["attendance"],
+				label: "Live Attendance",
+				description: "Clock in/out with selfie and location",
+				badge: "Mobile",
+				tabId: "tab-records",
+				navId: "nav-records",
+				tabOptions: { recordsView: "records-attendance" },
+				contentTitle: "Live Attendance",
+				contentDescription:
+					"Clock in and out from your phone with a selfie and GPS location. HR can review the full attendance log.",
+			},
+			{
+				id: "nav-records-leave",
+				modules: ["leave"],
+				label: "Leave Management",
+				description: "Submit and manage cuti & izin requests",
+				tabId: "tab-records",
+				navId: "nav-records",
+				tabOptions: { recordsView: "records-leave" },
+				contentTitle: "Leave Management",
+				contentDescription:
+					"Submit leave requests, track your remaining balance, and approve or reject your team's requests.",
+			},
 		],
 	},
 	{

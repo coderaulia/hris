@@ -55,3 +55,14 @@ export async function requestSignatureNotification(requestId, options = {}) {
     });
 }
 
+export async function requestLeaveNotification(requestId, options = {}) {
+    const id = String(requestId || '').trim();
+    if (!id) return null;
+
+    return invokeEdgeFunction('approval-notifications', {
+        action: 'leave_requests',
+        leave_request_id: id,
+        dry_run: Boolean(options.dryRun),
+    });
+}
+

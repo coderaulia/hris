@@ -783,5 +783,76 @@ export const laravelAdapter = {
         getSignatureSignedUrl: async () => {
             return { data: null, error: new Error('Signature requests are not available in Laravel mode yet') };
         },
-    }
+    },
+    // Live Attendance is Supabase-only for now. Laravel parity is a deferred
+    // follow-up; these stubs degrade gracefully in Laravel mode.
+    attendance: {
+        listWorkSites: async () => {
+            return { data: [], error: null };
+        },
+        upsertWorkSite: async () => {
+            return { data: null, error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+        deleteWorkSite: async () => {
+            return { error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+        listMyAttendance: async () => {
+            return { data: [], error: null };
+        },
+        listAttendance: async () => {
+            return { data: [], error: null };
+        },
+        recordEvent: async () => {
+            return { data: null, error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+        updateRecord: async () => {
+            return { data: null, error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+        deleteRecord: async () => {
+            return { error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+        getPhotoUrl: async () => {
+            return { data: null, error: new Error('Live Attendance is not available in Laravel mode yet') };
+        },
+    },
+    // Leave Management is Supabase-only for now. Laravel parity is a deferred
+    // follow-up; these stubs degrade gracefully in Laravel mode.
+    leave: {
+        listLeaveTypes: async () => {
+            return { data: [], error: null };
+        },
+        upsertLeaveType: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        listMyLeave: async () => {
+            return { data: [], error: null };
+        },
+        listLeaveRequests: async () => {
+            return { data: [], error: null };
+        },
+        createLeaveRequest: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        decideLeaveRequest: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        cancelLeaveRequest: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        listMyBalances: async () => {
+            return { data: [], error: null };
+        },
+        listBalances: async () => {
+            return { data: [], error: null };
+        },
+        upsertBalance: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        applyBalanceDelta: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+        getLeaveAttachmentUrl: async () => {
+            return { data: null, error: new Error('Leave Management is not available in Laravel mode yet') };
+        },
+    },
 };

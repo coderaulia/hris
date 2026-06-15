@@ -79,6 +79,18 @@ Current optional aggregate views not yet created: `manpower_funnel_summary`, `ma
 
 `document_signature_requests` is created by `migrations/20260614_document_signatures.sql` (Supabase only; Laravel adapter returns graceful stubs). Key columns: `id`, `archive_id` (FK → `hr_document_archive`, `ON DELETE CASCADE`), `signer_employee_id`, `signer_role` (`employee|manager|hr`), `status` (`pending|signed|declined`), `signature_type` (`uploaded`), `signature_storage_path`, denormalized `document_filename`/`document_type`/`employee_name`/`archive_storage_path` (so signers see context without HR-only archive access), `signed_at`, `decline_reason`, `created_by`, timestamps. RLS: HR/superadmin manage all; a signer may read and act on their own row only while `pending`. Uploaded signature images live in the private `document-signatures` bucket under `{signer_employee_id}/{request_id}.png`. The `can_read_signature_archive_object(name)` SECURITY DEFINER helper plus a storage policy let a signer read only the specific archived PDF they were asked to sign.
 
+## Live Attendance Tables
+
+| Relation | Purpose |
+|---|---|
+| `attendance_work_sites` | Optional geofence anchors (`latitude`, `longitude`, `radius_m`, `active`) |
+| `attendance_records` | One immutable row per clock event |
+| `attendance_daily` | Per employee per day view: `first_clock_in`, `last_clock_out`, `punch_count`, `worked_minutes` |
+
+Created by `migrations/20260615_live_attendance.sql`. `attendance_records` key columns: `id`, `employee_id` (TEXT), `event_type` (`clock_in|clock_out`), `event_time`, `latitude`, `longitude`, `accuracy_m`, `address`, `photo_storage_path`, `work_site_id` (FK → `attendance_work_sites`, `ON DELETE SET NULL`), `within_geofence`, `device_info` (JSONB), `note`, `corrected_by`, `created_at`.
+
+RLS: employee inserts/reads own; manager reads team (via `employees` join on `manager_id`/department, mirroring `kpi_records`); HR/superadmin read all, update (corrections), and delete. Employee punches are immutable — no employee `UPDATE`/`DELETE`. Selfies live in the private `attendance-photos` bucket under `{employee_id}/{YYYY-MM-DD}/{record_id}.jpg` (employee reads own folder; HR/superadmin read all). `attendance_daily` is a security-invoker view computing the work date in `Asia/Jakarta`. Supabase only; the Laravel adapter returns graceful stubs.
+
 ## Schema Safety Rules
 
 - Verify table and column names in SQL/migrations before writing queries.

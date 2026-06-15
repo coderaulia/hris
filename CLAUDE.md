@@ -90,6 +90,17 @@ At the end of the session, or when the user asks:
 - [ ] No errors in logs
 - [ ] Docs updated
 
+---
+
+## Active Feature Builds
+
+Plan: `docs/mvp-implementation-plan.md` (Phases 7–8).
+
+- **Live Attendance** (`attendance` module) — mobile-web clock in/out with geolocation + selfie photo. Tables `attendance_records`, `attendance_work_sites`; private `attendance-photos` bucket.
+- **Leave Management** (`leave` module) — cuti tahunan, cuti spesial, izin, sakit with balances + approval chain. Tables `leave_types`, `leave_balances`, `leave_requests`; private `leave-attachments` bucket; `leave_requests` notification action.
+
+Both gated via `VITE_ENABLED_MODULES`. Follow the existing pattern: register in `src/config/app-modules.js`, data module under `src/modules/data/`, feature module under `src/modules/`, adapter methods on `backend.*`, additive migration + rollback pair, RLS mirroring the signatures pattern (Supabase-first; Laravel adapter returns stubs until parity lands).
+
 <!-- rtk-instructions v2 -->
 
 # RTK (Rust Token Killer) - Token-Optimized Commands
