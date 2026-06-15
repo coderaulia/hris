@@ -16,6 +16,7 @@ export const CANONICAL_MIGRATION_CHAIN = Object.freeze([
     'migrations/20260507_hr_document_archive.sql',
     'migrations/20260614_document_signatures.sql',
     'migrations/20260615_live_attendance.sql',
+    'migrations/20260615_attendance_geofence_trigger.sql',
 ]);
 
 function assertFilesExist(repoRoot, relativePaths) {
