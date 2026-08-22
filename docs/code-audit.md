@@ -1,6 +1,6 @@
 # Code Audit
 
-Updated: 2026-05-21
+Updated: 2026-08-22
 
 This document captures current code flaws and missing features found during the local audit. Keep
 this page focused on actionable implementation gaps; keep broad delivery status in
@@ -8,8 +8,12 @@ this page focused on actionable implementation gaps; keep broad delivery status 
 
 ## Verification Snapshot
 
-- `npm run build`: passed on 2026-05-08. Latest bundle split reduced `pdf-vendor` from 619.14 KB
-  to 370.54 KB and split PDF-adjacent optional packages into named chunks.
+- `npm run build`: passed on 2026-08-22. New finding: the lazy-loaded `excel-vendor` chunk has
+  grown to 936.78 KB (270.62 KB gzip) and now exceeds the 500 KB Vite warning threshold.
+  `pdf-vendor` remains below it at 370.72 KB. Candidate fix: split exceljs into
+  worksheet/style sub-chunks or move export generation behind a worker.
+- `npm run qa:hardening`: passed on 2026-08-22 (12 forward + 12 rollback migrations, 74 RLS
+  policies across 28 tables, grants aligned for 31 frontend tables).
 - `npm run qa:hardening`: passed on 2026-05-08 and again on 2026-05-09 after adding rollback
   companions for every active Supabase migration. It also passed after the Laravel workflow parity
   migration and feature-test expansion on 2026-05-09, and again after the Laravel training adapter
@@ -214,8 +218,10 @@ PDF verification, and idempotency checks across both backend modes are still pen
 ## Suggested Next Fix Order
 
 1. Run the expanded Laravel feature suite in an environment with PHP/Composer and address any
-   failures.
-2. Add full UI Playwright specs for training records, manpower, payroll import, real archive
+   failures. Cheapest path: a CI job (setup-php + `composer install` + `php artisan test`) since
+   local shells still lack PHP.
+2. Split or lazy-load the `excel-vendor` chunk back below the 500 KB build warning threshold.
+3. Add full UI Playwright specs for training records, manpower, payroll import, real archive
    workspace download, and broader role guardrails. Employee CRUD UI coverage and adapter-level
    route coverage for several of these areas are now in place.
 3. Deepen backend edge coverage for orphan/delete cases and KPI re-submit/stale approval paths.

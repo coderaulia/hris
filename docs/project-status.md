@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-05-21
+Last updated: 2026-08-22
 
 This is the current project recap for handoff and planning. Use `docs/README.md` as the docs map,
 `docs/missing-features.md` for confirmed gaps, and `docs/code-audit.md` for audit fix order.
@@ -79,9 +79,10 @@ Production notification delivery still depends on real provider secrets and live
 
 Most recent recorded checks:
 
-- `npm run build`: passed on 2026-05-08.
-- `npm run qa:hardening`: passed on 2026-05-09 with 12 forward migrations and 12 rollback
-  migrations scanned.
+- `npm run build`: passed on 2026-08-22. Note: `excel-vendor` is now 936.78 KB and exceeds the
+  500 KB Vite warning threshold; `pdf-vendor` remains below it at 370.72 KB.
+- `npm run qa:hardening`: passed on 2026-08-22 with 12 forward migrations and 12 rollback
+  migrations scanned (74 RLS policies across 28 tables; 31 frontend tables grant-checked).
 - `npx playwright test tests/backend-adapter.spec.js`: passed on 2026-05-08, including Laravel HR
   document archive upload/download adapter coverage.
 - Laravel PHP feature tests were added but have not been run locally because `php` and `composer`
