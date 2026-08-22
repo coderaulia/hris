@@ -31,6 +31,10 @@ this page focused on actionable implementation gaps; keep broad delivery status 
   available on PATH in that local shell, so they were not run in that pass.
 - `rtk` is available in the current shell and should prefix verification commands per repo
   instructions.
+- 2026-08-22: added `.github/workflows/verify.yml` with two jobs: a frontend build +
+  `qa:hardening` job, and a Laravel job running `composer ci` on PHP 8.3 with SQLite. This gives
+  the expanded feature suite its first real execution environment; results land on the first
+  pushed CI run.
 - 2026-05-21 docs reconciliation removed redundant historical docs, added `docs/README.md`, and
   refreshed stale absolute links. No application behavior changed.
 
